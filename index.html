@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hockey Positioning MVP</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    button, select { font-size: 16px; padding: 10px 12px; }
+    #wrap { max-width: 720px; }
+    #status { margin-top: 10px; font-size: 16px; }
+    canvas { width: 100%; height: auto; border: 2px solid #222; border-radius: 12px; touch-action: none; }
+    .pill { display: inline-block; padding: 4px 10px; border: 1px solid #aaa; border-radius: 999px; margin-right: 6px; }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <h2>Hockey Positioning MVP</h2>
+
+  <div class="row">
+    <label>
+      Position:
+      <select id="role">
+        <option value="C">Center (C)</option>
+        <option value="LW">Left Wing (LW)</option>
+        <option value="RW">Right Wing (RW)</option>
+        <option value="LD">Left D (LD)</option>
+        <option value="RD">Right D (RD)</option>
+      </select>
+    </label>
+
+    <label>
+      Difficulty:
+      <select id="diff">
+        <option value="easy">Beginner</option>
+        <option value="med" selected>Intermediate</option>
+        <option value="hard">Advanced</option>
+      </select>
+    </label>
+
+    <button id="newBtn">New Play</button>
+    <button id="lockBtn">Lock In</button>
+  </div>
+
+  <div style="margin-top:10px;">
+    <span class="pill">Streak: <b id="streak">0</b></span>
+    <span class="pill">Phase: <b id="phase">—</b></span>
+    <span class="pill">Pressure: <b id="pressure">—</b></span>
+  </div>
+
+  <p id="prompt" style="margin:10px 0 8px 0;">Tap “New Play” to start.</p>
+
+  <canvas id="rink" width="900" height="500"></canvas>
+
+  <div id="status"></div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('rink');
+  const ctx = canvas.getContext('2d');
+
+  const roleSel = document.getElementById('role');
+  const diffSel = document.getElementById('diff');
+  const newBtn  = document.getElementById('newBtn');
+  const lockBtn = document.getElementById('lockBtn');
+
+  const streakEl = document.getElementById('streak');
+  const phaseEl = document.getElementById('phase');
+  const pressureEl = document.getElementById('pressure');
+  const promptEl = document.getElementById('prompt');
+  const statusEl = document.getElementById('status');
+
+  // --- Game State ---
+  let streak = 0;
+  let scenario = null;
+
+  // Player marker (kid controls)
+  const player = { x: 450, y: 250, r: 16, dragging: false };
+
+  // Puck marker (fixed per scenario)
+  const puck = { x: 450, y: 250, r: 10 };
+
+  // Good zone is a circle for MVP; later you can use polygons.
+  let goodZone = { x: 450, y: 250, r: 80 };
+
+  // --- Scenario Templates (very small set for MVP) ---
+  // Coordinates are in canvas space: 0..900 (x), 0..500 (y)
+  // Rink: left side = D-zone, right side = O-zone
+  const TEMPLATES = [
+    {
+      id: "breakout_wall_left",
+      phase: "Breakout",
+      pressure: ["High","Med","Low"],
+      puck: { x: 160, y: 350 }, // left corner-ish
+      prompt: (role) => `Breakout: puck in left corner. You are ${role}. Find support/coverage to keep the play alive.`,
+      goodFor: (role) => {
+        // Simple principle zones:
+        // C supports low-middle; strong wing wall; weak wing higher middle; D stays inside.
+        if (role === "C")  return { x: 260, y: 300, r: 80 };
+        if (role === "LW") return { x: 220, y: 360, r: 70 };
+        if (role === "RW") return { x: 360, y: 220, r: 85 };
+        if (role === "LD") return { x: 210, y: 250, r: 70 };
+        if (role === "RD") return { x: 300, y: 230, r: 80 };
+        return { x: 260, y: 300, r: 80 };
+      }
+    },
+    {
+      id: "rush_middle",
+      phase: "Rush",
+      pressure: ["Med","Low","High"],
+      puck: { x: 480, y: 250 }, // neutral/middle
+      prompt: (role) => `Rush: puck through the middle. You are ${role}. Get to a spot that supports the attack with good spacing.`,
+      goodFor: (role) => {
+        if (role === "C")  return { x: 520, y: 250, r: 85 };
+        if (role === "LW") return { x: 560, y: 330, r: 80 };
+        if (role === "RW") return { x: 560, y: 170, r: 80 };
+        if (role === "LD") return { x: 430, y: 290, r: 85 };
+        if (role === "RD") return { x: 430, y: 210, r: 85 };
+        return { x: 520, y: 250, r: 85 };
+      }
+    },
+    {
+      id: "ozone_cycle_halfwall",
+      phase: "O-zone cycle",
+      pressure: ["Low","Med","High"],
+      puck: { x: 740, y: 330 }, // right half wall low
+      prompt: (role) => `O-zone: puck on right half wall. You are ${role}. Support the puck and protect against a turnover.`,
+      goodFor: (role) => {
+        if (role === "C")  return { x: 650, y: 270, r: 90 }; // high slot support
+        if (role === "LW") return { x: 690, y: 180, r: 90 }; // weak-side soft ice
+        if (role === "RW") return { x: 760, y: 320, r: 70 }; // close support
+        if (role === "LD") return { x: 650, y: 200, r: 85 }; // inside point-ish
+        if (role === "RD") return { x: 690, y: 240, r: 85 };
+        return { x: 650, y: 270, r: 90 };
+      }
+    },
+    {
+      id: "dzone_slot_coverage",
+      phase: "Defend",
+      pressure: ["High","Med","Low"],
+      puck: { x: 220, y: 170 }, // left half wall high
+      prompt: (role) => `Defend: puck on left half wall. You are ${role}. Protect the middle/slot and be ready to support a breakout.`,
+      goodFor: (role) => {
+        if (role === "C")  return { x: 260, y: 250, r: 85 }; // inside support
+        if (role === "LW") return { x: 230, y: 190, r: 70 }; // strong side coverage
+        if (role === "RW") return { x: 320, y: 220, r: 95 }; // weak side inside
+        if (role === "LD") return { x: 210, y: 260, r: 80 }; // net-front/inside
+        if (role === "RD") return { x: 280, y: 250, r: 90 };
+        return { x: 260, y: 250, r: 85 };
+      }
+    }
+  ];
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function difficultyTighten(radius, diff) {
+    if (diff === "easy") return radius * 1.25;
+    if (diff === "hard") return radius * 0.75;
+    return radius;
+  }
+
+  function newScenario() {
+    const role = roleSel.value;
+    const diff = diffSel.value;
+
+    const tpl = pick(TEMPLATES);
+    const pressure = pick(tpl.pressure);
+
+    puck.x = tpl.puck.x;
+    puck.y = tpl.puck.y;
+
+    const baseZone = tpl.goodFor(role);
+    goodZone = {
+      x: baseZone.x,
+      y: baseZone.y,
+      r: difficultyTighten(baseZone.r, diff)
+    };
+
+    // Reset player near center each play
+    player.x = 450; player.y = 250;
+
+    scenario = {
+      id: tpl.id,
+      phase: tpl.phase,
+      pressure,
+      prompt: tpl.prompt(role),
+      role,
+      diff
+    };
+
+    phaseEl.textContent = scenario.phase;
+    pressureEl.textContent = scenario.pressure;
+    promptEl.textContent = scenario.prompt;
+    statusEl.textContent = "Drag your player to where you should be, then tap Lock In.";
+    draw();
+  }
+
+  function dist(a,b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+  function lockIn() {
+    if (!scenario) return;
+
+    const d = dist(player, goodZone);
+    const ok = d <= goodZone.r;
+
+    if (ok) {
+      streak += 1;
+      if (streak >= 3) {
+        statusEl.innerHTML = "<b>GOAL!</b> You kept the play alive long enough to create a scoring chance. Streak resets.";
+        streak = 0;
+      } else {
+        statusEl.innerHTML = "<b>PLAY ALIVE ✅</b> Good positioning. New situation!";
+      }
+      streakEl.textContent = streak;
+      draw(true, ok);
+      setTimeout(newScenario, 900);
+    } else {
+      statusEl.innerHTML = "<b>TURNOVER ❌</b> That spot didn’t support the play. Try again.";
+      streak = 0;
+      streakEl.textContent = streak;
+      draw(true, ok);
+    }
+  }
+
+  // --- Drawing ---
+  function draw(showZones=false, wasOk=null) {
+    // background
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+
+    // rink outline (simple)
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#111";
+    roundRect(ctx, 20, 20, 860, 460, 80);
+    ctx.stroke();
+
+    // center line
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(450, 40); ctx.lineTo(450, 460);
+    ctx.stroke();
+
+    // blue lines
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(300, 40); ctx.lineTo(300, 460); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(600, 40); ctx.lineTo(600, 460); ctx.stroke();
+
+    // goal creases (simple arcs)
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(70, 250, 55, -Math.PI/2, Math.PI/2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(830, 250, 55, Math.PI/2, -Math.PI/2);
+    ctx.stroke();
+
+    // show good zone overlay only after lock in OR in easy mode
+    const diff = diffSel.value;
+    const reveal = showZones || diff === "easy";
+    if (scenario && reveal) {
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "#00aa00";
+      ctx.beginPath();
+      ctx.arc(goodZone.x, goodZone.y, goodZone.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+
+      // Outline after lock
+      if (showZones) {
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = (wasOk ? "#0a0" : "#a00");
+        ctx.beginPath();
+        ctx.arc(goodZone.x, goodZone.y, goodZone.r, 0, Math.PI*2);
+        ctx.stroke();
+      }
+    }
+
+    // puck
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI*2);
+    ctx.fill();
+
+    // player
+    ctx.fillStyle = "#1e4fff";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.r, 0, Math.PI*2);
+    ctx.fill();
+
+    // label
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 14px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(roleSel.value, player.x, player.y);
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
+
+  // --- Drag handling (mouse + touch) ---
+  function getPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const isTouch = evt.touches && evt.touches.length;
+    const clientX = isTouch ? evt.touches[0].clientX : evt.clientX;
+    const clientY = isTouch ? evt.touches[0].clientY : evt.clientY;
+
+    // Scale to canvas coordinates
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    const y = (clientY - rect.top) * (canvas.height / rect.height);
+    return { x, y };
+  }
+
+  function pointerDown(evt) {
+    if (!scenario) return;
+    const p = getPos(evt);
+    const inside = Math.hypot(p.x - player.x, p.y - player.y) <= player.r + 10;
+    if (inside) player.dragging = true;
+  }
+  function pointerMove(evt) {
+    if (!player.dragging) return;
+    evt.preventDefault();
+    const p = getPos(evt);
+    player.x = clamp(p.x, 40, 860);
+    player.y = clamp(p.y, 40, 460);
+    draw();
+  }
+  function pointerUp() { player.dragging = false; }
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+  canvas.addEventListener('mousedown', pointerDown);
+  window.addEventListener('mousemove', pointerMove);
+  window.addEventListener('mouseup', pointerUp);
+
+  canvas.addEventListener('touchstart', pointerDown, {passive:false});
+  window.addEventListener('touchmove', pointerMove, {passive:false});
+  window.addEventListener('touchend', pointerUp);
+
+  // Buttons
+  newBtn.addEventListener('click', newScenario);
+  lockBtn.addEventListener('click', lockIn);
+  roleSel.addEventListener('change', () => { if (scenario) newScenario(); });
+  diffSel.addEventListener('change', () => { if (scenario) newScenario(); });
+
+  // initial draw
+  draw();
+})();
+</script>
+</body>
+</html>
