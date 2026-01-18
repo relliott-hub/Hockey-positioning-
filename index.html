@@ -3,24 +3,59 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hockey Positioning MVP</title>
+  <title>Hockey IQ Trainer (Coach-Grade MVP)</title>
   <style>
     body { font-family: system-ui, Arial, sans-serif; margin: 16px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    button, select { font-size: 16px; padding: 10px 12px; }
-    #wrap { max-width: 720px; }
-    #status { margin-top: 10px; font-size: 16px; }
+    #wrap { max-width: 1020px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    button, select { font-size: 15px; padding: 9px 10px; }
     canvas { width: 100%; height: auto; border: 2px solid #222; border-radius: 12px; touch-action: none; }
-    .pill { display: inline-block; padding: 4px 10px; border: 1px solid #aaa; border-radius: 999px; margin-right: 6px; }
+    .pill { display:inline-block; padding:4px 10px; border:1px solid #aaa; border-radius:999px; margin-right:6px; }
+    .legend { font-size: 13px; color:#333; margin-top: 8px; }
+    .legend span { display:inline-flex; align-items:center; margin-right: 10px; gap:6px; }
+    .dot { width:12px; height:12px; border-radius: 999px; display:inline-block; border:1px solid #111; }
+    #status { margin-top: 10px; font-size: 16px; }
+    details { margin-top: 10px; }
+    table { width:100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align:left; }
+    .muted { color:#555; font-size: 13px; }
+    .chip { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; margin-right:6px; font-size:12px; }
+    .warn { color:#7a3b00; }
   </style>
 </head>
 <body>
 <div id="wrap">
-  <h2>Hockey Positioning MVP</h2>
+  <h2>Hockey IQ Trainer (Coach-Grade MVP)</h2>
 
   <div class="row">
     <label>
-      Position:
+      Age group:
+      <select id="age">
+        <option value="6-8">6–8 (Learn basics)</option>
+        <option value="9-11" selected>9–11 (Develop hockey IQ)</option>
+        <option value="12-14">12–14 (Advanced reads)</option>
+      </select>
+    </label>
+
+    <label>
+      Game format:
+      <select id="format">
+        <option value="5v5" selected>5v5 (Even Strength)</option>
+        <option value="5v4">5v4 (Power Play)</option>
+        <option value="4v5">4v5 (Penalty Kill)</option>
+      </select>
+    </label>
+
+    <label>
+      Control mode:
+      <select id="mode">
+        <option value="single" selected>Single Player</option>
+        <option value="multi">Multi (Control your whole team)</option>
+      </select>
+    </label>
+
+    <label id="roleWrap">
+      You play:
       <select id="role">
         <option value="C">Center (C)</option>
         <option value="LW">Left Wing (LW)</option>
@@ -43,117 +78,172 @@
     <button id="lockBtn">Lock In</button>
   </div>
 
+  <div class="row" style="margin-top:10px;">
+    <label>
+      Phase filter:
+      <select id="phaseFilter">
+        <option value="any" selected>Any</option>
+        <option value="Breakout">Breakout</option>
+        <option value="Rush">Rush</option>
+        <option value="O-zone">O-zone</option>
+        <option value="Defend">Defend</option>
+        <option value="Special">Special Teams</option>
+      </select>
+    </label>
+
+    <label>
+      Pressure:
+      <select id="pressureFilter">
+        <option value="any" selected>Any</option>
+        <option value="Low">Low</option>
+        <option value="Med">Med</option>
+        <option value="High">High</option>
+      </select>
+    </label>
+
+    <label id="ppStructWrap">
+      PP structure:
+      <select id="ppStruct">
+        <option value="umbrella" selected>Umbrella</option>
+        <option value="one3one">1-3-1</option>
+      </select>
+    </label>
+
+    <label id="pkStructWrap">
+      PK structure:
+      <select id="pkStruct">
+        <option value="box" selected>Box</option>
+        <option value="diamond">Diamond</option>
+      </select>
+    </label>
+
+    <label>
+      Coach overlays:
+      <select id="overlay">
+        <option value="off" selected>Off</option>
+        <option value="lanes">Show lanes</option>
+        <option value="house">Show slot/house</option>
+      </select>
+    </label>
+  </div>
+
   <div style="margin-top:10px;">
     <span class="pill">Streak: <b id="streak">0</b></span>
     <span class="pill">Phase: <b id="phase">—</b></span>
     <span class="pill">Pressure: <b id="pressure">—</b></span>
+    <span class="pill">Structure: <b id="structure">—</b></span>
+    <span class="pill">Score: <b id="score">—</b></span>
   </div>
 
   <p id="prompt" style="margin:10px 0 8px 0;">Tap “New Play” to start.</p>
 
-  <canvas id="rink" width="900" height="500"></canvas>
+  <canvas id="rink" width="1100" height="620"></canvas>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#1e4fff"></i> Controlled</span>
+    <span><i class="dot" style="background:#f08a24"></i> Offence (your team)</span>
+    <span><i class="dot" style="background:#cc2b2b"></i> Defence (opponents)</span>
+    <span><i class="dot" style="background:#000"></i> Puck</span>
+    <span><i class="dot" style="background:#00aa00; opacity:.25"></i> Guidance (Beginner always shows)</span>
+  </div>
 
   <div id="status"></div>
+
+  <details>
+    <summary><b>Coach Report (this session)</b> <span class="muted">— performance + common misses</span></summary>
+    <div style="margin-top:8px;">
+      <div id="reportSummary" class="muted"></div>
+      <div style="margin-top:8px;" id="reportChips"></div>
+      <table style="margin-top:10px;">
+        <thead>
+          <tr>
+            <th>Time</th><th>Format</th><th>Phase</th><th>Mode</th><th>Role</th><th>Result</th><th>Top miss</th>
+          </tr>
+        </thead>
+        <tbody id="reportRows"></tbody>
+      </table>
+      <div class="muted warn" style="margin-top:8px;">
+        Tip: For younger kids, use Beginner difficulty + 6–8 age group. They’ll see guidance areas and get simpler scoring.
+      </div>
+    </div>
+  </details>
 </div>
 
 <script>
 (() => {
+  // Canvas / UI
   const canvas = document.getElementById('rink');
   const ctx = canvas.getContext('2d');
 
+  const ageSel = document.getElementById('age');
+  const formatSel = document.getElementById('format');
+  const modeSel = document.getElementById('mode');
   const roleSel = document.getElementById('role');
+  const roleWrap = document.getElementById('roleWrap');
   const diffSel = document.getElementById('diff');
+
+  const phaseFilterSel = document.getElementById('phaseFilter');
+  const pressureFilterSel = document.getElementById('pressureFilter');
+
+  const ppStructSel = document.getElementById('ppStruct');
+  const pkStructSel = document.getElementById('pkStruct');
+  const ppStructWrap = document.getElementById('ppStructWrap');
+  const pkStructWrap = document.getElementById('pkStructWrap');
+
+  const overlaySel = document.getElementById('overlay');
+
   const newBtn  = document.getElementById('newBtn');
   const lockBtn = document.getElementById('lockBtn');
 
   const streakEl = document.getElementById('streak');
   const phaseEl = document.getElementById('phase');
   const pressureEl = document.getElementById('pressure');
+  const structureEl = document.getElementById('structure');
+  const scoreEl = document.getElementById('score');
   const promptEl = document.getElementById('prompt');
   const statusEl = document.getElementById('status');
 
-  // --- Game State ---
+  const reportSummaryEl = document.getElementById('reportSummary');
+  const reportRowsEl = document.getElementById('reportRows');
+  const reportChipsEl = document.getElementById('reportChips');
+
+  // --- Rink landmarks (for scoring + overlays)
+  const LANDMARKS = {
+    leftNet:  { x: 95,   y: 310 },
+    rightNet: { x: 1005, y: 310 },
+    leftSlot: { x: 220,  y: 310 },
+    rightSlot:{ x: 880,  y: 310 },
+    center:   { x: 550,  y: 310 }
+  };
+
+  // --- State
   let streak = 0;
   let scenario = null;
 
-  // Player marker (kid controls)
-  const player = { x: 450, y: 250, r: 16, dragging: false };
+  // Pieces
+  let controlled = []; // draggable (blue)
+  let offense = [];    // static offense (orange)
+  let defense = [];    // opponents (red)
+  const puck = { x: 550, y: 310, r: 10 };
 
-  // Puck marker (fixed per scenario)
-  const puck = { x: 450, y: 250, r: 10 };
+  // Guidance circle (single-player visual support)
+  let guidance = { x: 550, y: 310, r: 90 };
 
-  // Good zone is a circle for MVP; later you can use polygons.
-  let goodZone = { x: 450, y: 250, r: 80 };
+  // Session report
+  const report = []; // last 25
 
-  // --- Scenario Templates (very small set for MVP) ---
-  // Coordinates are in canvas space: 0..900 (x), 0..500 (y)
-  // Rink: left side = D-zone, right side = O-zone
-  const TEMPLATES = [
-    {
-      id: "breakout_wall_left",
-      phase: "Breakout",
-      pressure: ["High","Med","Low"],
-      puck: { x: 160, y: 350 }, // left corner-ish
-      prompt: (role) => `Breakout: puck in left corner. You are ${role}. Find support/coverage to keep the play alive.`,
-      goodFor: (role) => {
-        // Simple principle zones:
-        // C supports low-middle; strong wing wall; weak wing higher middle; D stays inside.
-        if (role === "C")  return { x: 260, y: 300, r: 80 };
-        if (role === "LW") return { x: 220, y: 360, r: 70 };
-        if (role === "RW") return { x: 360, y: 220, r: 85 };
-        if (role === "LD") return { x: 210, y: 250, r: 70 };
-        if (role === "RD") return { x: 300, y: 230, r: 80 };
-        return { x: 260, y: 300, r: 80 };
-      }
-    },
-    {
-      id: "rush_middle",
-      phase: "Rush",
-      pressure: ["Med","Low","High"],
-      puck: { x: 480, y: 250 }, // neutral/middle
-      prompt: (role) => `Rush: puck through the middle. You are ${role}. Get to a spot that supports the attack with good spacing.`,
-      goodFor: (role) => {
-        if (role === "C")  return { x: 520, y: 250, r: 85 };
-        if (role === "LW") return { x: 560, y: 330, r: 80 };
-        if (role === "RW") return { x: 560, y: 170, r: 80 };
-        if (role === "LD") return { x: 430, y: 290, r: 85 };
-        if (role === "RD") return { x: 430, y: 210, r: 85 };
-        return { x: 520, y: 250, r: 85 };
-      }
-    },
-    {
-      id: "ozone_cycle_halfwall",
-      phase: "O-zone cycle",
-      pressure: ["Low","Med","High"],
-      puck: { x: 740, y: 330 }, // right half wall low
-      prompt: (role) => `O-zone: puck on right half wall. You are ${role}. Support the puck and protect against a turnover.`,
-      goodFor: (role) => {
-        if (role === "C")  return { x: 650, y: 270, r: 90 }; // high slot support
-        if (role === "LW") return { x: 690, y: 180, r: 90 }; // weak-side soft ice
-        if (role === "RW") return { x: 760, y: 320, r: 70 }; // close support
-        if (role === "LD") return { x: 650, y: 200, r: 85 }; // inside point-ish
-        if (role === "RD") return { x: 690, y: 240, r: 85 };
-        return { x: 650, y: 270, r: 90 };
-      }
-    },
-    {
-      id: "dzone_slot_coverage",
-      phase: "Defend",
-      pressure: ["High","Med","Low"],
-      puck: { x: 220, y: 170 }, // left half wall high
-      prompt: (role) => `Defend: puck on left half wall. You are ${role}. Protect the middle/slot and be ready to support a breakout.`,
-      goodFor: (role) => {
-        if (role === "C")  return { x: 260, y: 250, r: 85 }; // inside support
-        if (role === "LW") return { x: 230, y: 190, r: 70 }; // strong side coverage
-        if (role === "RW") return { x: 320, y: 220, r: 95 }; // weak side inside
-        if (role === "LD") return { x: 210, y: 260, r: 80 }; // net-front/inside
-        if (role === "RD") return { x: 280, y: 250, r: 90 };
-        return { x: 260, y: 250, r: 85 };
-      }
-    }
-  ];
+  // --- Helpers
+  const nowTime = () => {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    const ss = String(d.getSeconds()).padStart(2,'0');
+    return `${hh}:${mm}:${ss}`;
+  };
 
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function dist(x1,y1,x2,y2) { return Math.hypot(x1-x2, y1-y2); }
 
   function difficultyTighten(radius, diff) {
     if (diff === "easy") return radius * 1.25;
@@ -161,142 +251,878 @@
     return radius;
   }
 
-  function newScenario() {
+  // Age settings: changes guidance and strictness and rule complexity
+  function getAgeSettings() {
+    const age = ageSel.value;
+    if (age === "6-8") {
+      return {
+        guidanceScale: 1.35,
+        passScore: { easy: 55, med: 60, hard: 65 },
+        maxRulesToEnforce: 2, // keep simple
+        showSecondCue: false
+      };
+    }
+    if (age === "12-14") {
+      return {
+        guidanceScale: 0.95,
+        passScore: { easy: 65, med: 75, hard: 85 },
+        maxRulesToEnforce: 4,
+        showSecondCue: true
+      };
+    }
+    // 9–11 default
+    return {
+      guidanceScale: 1.10,
+      passScore: { easy: 60, med: 70, hard: 80 },
+      maxRulesToEnforce: 3,
+      showSecondCue: true
+    };
+  }
+
+  // --- Overlays
+  function drawOverlays() {
+    const ov = overlaySel.value;
+    if (ov === "off") return;
+
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#444";
+
+    if (ov === "lanes") {
+      const xs = [360, 550, 740];
+      for (const x of xs) {
+        ctx.beginPath();
+        ctx.moveTo(x, 40);
+        ctx.lineTo(x, 600-20);
+        ctx.stroke();
+      }
+    }
+
+    if (ov === "house") {
+      const drawHouse = (slotX) => {
+        ctx.beginPath();
+        ctx.moveTo(slotX-30, 250);
+        ctx.lineTo(slotX+40, 220);
+        ctx.lineTo(slotX+80, 310);
+        ctx.lineTo(slotX+40, 400);
+        ctx.lineTo(slotX-30, 370);
+        ctx.closePath();
+        ctx.stroke();
+      };
+      drawHouse(LANDMARKS.leftSlot.x);
+      drawHouse(LANDMARKS.rightSlot.x);
+    }
+
+    ctx.restore();
+  }
+
+  // --- Scoring rules engine (principles)
+  // Each scenario can define rules per role; scoring is consistent.
+  // Supports both single-player and multi-player.
+  function scorePlacement(role, pos, scen) {
+    const ageCfg = getAgeSettings();
+    const rules = (scen.rulesByRole && scen.rulesByRole[role]) ? scen.rulesByRole[role] : {};
+    const failures = [];
+    let score = 100;
+
+    const fail = (key, pts, msg) => { score -= pts; failures.push({key, msg, pts}); };
+
+    // Rule: spacing from puck
+    if (rules.spacingFromPuck) {
+      const d = dist(pos.x, pos.y, puck.x, puck.y);
+      const { min, max } = rules.spacingFromPuck;
+      if (d < min) fail("spacing", 25, "Too close to puck (bad spacing).");
+      if (d > max) fail("spacing", 25, "Too far from puck (not an option).");
+    }
+
+    // Rule: outlet / support side (simple availability heuristic)
+    if (rules.beOutlet) {
+      const { preferX } = rules.beOutlet; // "greater" or "less"
+      if (preferX === "greater" && pos.x < puck.x - 15) fail("outlet", 25, "Not a good outlet (behind the puck).");
+      if (preferX === "less"    && pos.x > puck.x + 15) fail("outlet", 25, "Not a good outlet (behind the puck).");
+    }
+
+    // Rule: protect slot (defensive principle)
+    if (rules.protectSlot) {
+      const { slotSide, radius } = rules.protectSlot;
+      const slot = (slotSide === "left") ? LANDMARKS.leftSlot : LANDMARKS.rightSlot;
+      const d = dist(pos.x, pos.y, slot.x, slot.y);
+      if (d > radius) fail("slot", 30, "Left the slot too open (protect middle ice).");
+    }
+
+    // Rule: stay above puck (simple forward-commit guard)
+    if (rules.stayAbovePuck) {
+      const margin = rules.stayAbovePuck.margin ?? 25;
+      if (scen.attackDir === "right") {
+        if (pos.x > puck.x + margin && !rules.stayAbovePuck.allowDeeper) fail("above", 20, "Got too deep/too far ahead; stay above the puck.");
+      } else {
+        if (pos.x < puck.x - margin && !rules.stayAbovePuck.allowDeeper) fail("above", 20, "Got too deep/too far ahead; stay above the puck.");
+      }
+    }
+
+    // Guidance penalty (soft) – helps keep scoring stable for kids
+    if (scen.guidanceByRole && scen.guidanceByRole[role]) {
+      const g = scen.guidanceByRole[role];
+      const d = dist(pos.x, pos.y, g.x, g.y);
+      const r = (difficultyTighten(g.r, scen.diff) * ageCfg.guidanceScale);
+      if (d > r * 1.35) fail("guidance", 20, "Too far from ideal support/coverage area.");
+    }
+
+    // Enforce only top N failures for younger groups (keeps feedback simple)
+    failures.sort((a,b)=>b.pts-a.pts);
+    const enforced = failures.slice(0, ageCfg.maxRulesToEnforce);
+
+    // Recompute score based on enforced failures only (kids don’t get punished for 6 mistakes at once)
+    if (failures.length > enforced.length) {
+      score = 100;
+      for (const f of enforced) score -= f.pts;
+      score = Math.max(0, Math.min(100, score));
+    } else {
+      score = Math.max(0, Math.min(100, score));
+    }
+
+    return { score, failures: enforced, allFailures: failures };
+  }
+
+  function passThreshold() {
+    const ageCfg = getAgeSettings();
+    const d = diffSel.value;
+    return ageCfg.passScore[d];
+  }
+
+  // --- Special Teams Structures
+  function ppPositions(structure) {
+    if (structure === "one3one") {
+      // point, flanks, bumper, net-front proxy
+      return [
+        { role:"LD", x: 740, y: 310 }, // point
+        { role:"LW", x: 860, y: 200 }, // flank
+        { role:"RW", x: 860, y: 420 }, // flank
+        { role:"C",  x: 880, y: 310 }, // bumper
+        { role:"RD", x: 980, y: 310 }, // net-front proxy / goal-line
+      ];
+    }
+    // umbrella
+    return [
+      { role:"LD", x: 720, y: 200 },
+      { role:"RD", x: 720, y: 420 },
+      { role:"LW", x: 860, y: 200 },
+      { role:"RW", x: 860, y: 420 },
+      { role:"C",  x: 860, y: 310 }, // bumper/half-wall support
+    ];
+  }
+
+  function pkPositions(structure) {
+    if (structure === "diamond") {
+      return [
+        { role:"C",  x: 840, y: 310 }, // top
+        { role:"LW", x: 900, y: 240 }, // side
+        { role:"RW", x: 900, y: 380 }, // side
+        { role:"LD", x: 960, y: 310 }, // bottom
+        { role:"RD", x: 920, y: 310 }, // helper (5th marker, but formats will trim)
+      ];
+    }
+    // box
+    return [
+      { role:"C",  x: 900, y: 260 },
+      { role:"LW", x: 900, y: 360 },
+      { role:"LD", x: 960, y: 260 },
+      { role:"RD", x: 960, y: 360 },
+      { role:"RW", x: 930, y: 310 }, // helper
+    ];
+  }
+
+  function buildSpecialTeamsScenario(fmt, ppStruct, pkStruct) {
+    // Use multiple puck locations to create variety
+    const puckSpotsPP = [
+      { x: 860, y: 200, label: "half wall" },
+      { x: 740, y: 310, label: "point" },
+      { x: 860, y: 420, label: "half wall" },
+      { x: 980, y: 310, label: "net-front/goal-line" },
+      { x: 910, y: 520, label: "goal line/corner" }
+    ];
+    const puckSpot = pick(puckSpotsPP);
+
+    if (fmt === "5v4") {
+      const off = ppPositions(ppStruct);
+      const def = (pkStruct === "diamond")
+        ? [
+            { role:"PK1", x: 900, y: 250 },
+            { role:"PK2", x: 900, y: 370 },
+            { role:"PK3", x: 960, y: 310 },
+            { role:"PK4", x: 840, y: 310 },
+            { role:"G",   x: 1040,y: 310 }
+          ]
+        : [
+            { role:"PK1", x: 900, y: 260 },
+            { role:"PK2", x: 900, y: 360 },
+            { role:"PK3", x: 960, y: 260 },
+            { role:"PK4", x: 960, y: 360 },
+            { role:"G",   x: 1040,y: 310 }
+          ];
+
+      return {
+        id: `PP_${ppStruct}_${pkStruct}_${puckSpot.label}`,
+        phase: "Special",
+        pressures: ["Low","Med","High"],
+        allowedFormats: ["5v4"],
+        attackDir: "right",
+        puck: { x: puckSpot.x, y: puckSpot.y },
+        offenseFull: off,
+        defenseFull: def,
+        prompt: (role, fmt) => `${fmt} — Power Play (${ppStruct === "one3one" ? "1-3-1" : "Umbrella"}). Puck at ${puckSpot.label}. You are ${role}. Keep structure and options.`,
+        guidanceByRole: {
+          C:  { x: 860, y: 310, r: 100 },
+          LW: { x: 860, y: 200, r: 95 },
+          RW: { x: 860, y: 420, r: 95 },
+          LD: { x: 720, y: 200, r: 120 },
+          RD: { x: 720, y: 420, r: 120 },
+        },
+        rulesByRole: {
+          // Keep PP rules mostly spacing + availability
+          LW: { spacingFromPuck:{min:40,max:220}, beOutlet:{preferX:"less"}, stayAbovePuck:{margin:80, allowDeeper:true} },
+          C:  { spacingFromPuck:{min:70,max:260}, beOutlet:{preferX:"less"} },
+          RW: { spacingFromPuck:{min:120,max:420} },
+          LD: { spacingFromPuck:{min:220,max:560} },
+          RD: { spacingFromPuck:{min:220,max:560} },
+        }
+      };
+    }
+
+    if (fmt === "4v5") {
+      const off = pkPositions(pkStruct);
+      const oppPP = ppPositions(ppStruct);
+      const def = oppPP.map(p => ({ role:`PP-${p.role}`, x:p.x, y:p.y })).concat([{ role:"G", x:1040, y:310 }]);
+
+      return {
+        id: `PK_${pkStruct}_${ppStruct}_${puckSpot.label}`,
+        phase: "Special",
+        pressures: ["Low","Med","High"],
+        allowedFormats: ["4v5"],
+        attackDir: "right",
+        puck: { x: puckSpot.x, y: puckSpot.y },
+        offenseFull: off,   // your team (PK)
+        defenseFull: def,   // opponents (PP)
+        prompt: (role, fmt) => `${fmt} — Penalty Kill (${pkStruct}). Puck at ${puckSpot.label}. You are ${role}. Protect middle ice; stay in lanes.`,
+        guidanceByRole: {
+          C:  { x: 900, y: 260, r: 120 },
+          LW: { x: 900, y: 360, r: 120 },
+          RW: { x: 960, y: 260, r: 120 },
+          LD: { x: 960, y: 360, r: 120 },
+          RD: { x: 930, y: 310, r: 140 },
+        },
+        rulesByRole: {
+          // PK rules: protect slot + reasonable spacing
+          C:  { protectSlot:{slotSide:"right", radius:210}, spacingFromPuck:{min:120,max:360} },
+          LW: { protectSlot:{slotSide:"right", radius:210}, spacingFromPuck:{min:120,max:360} },
+          RW: { protectSlot:{slotSide:"right", radius:200}, spacingFromPuck:{min:140,max:420} },
+          LD: { protectSlot:{slotSide:"right", radius:200}, spacingFromPuck:{min:140,max:420} },
+          RD: { protectSlot:{slotSide:"right", radius:190}, spacingFromPuck:{min:120,max:380} },
+        }
+      };
+    }
+
+    return null;
+  }
+
+  // Apply format counts (trim skaters to match 5v5 / 5v4 / 4v5)
+  function applyFormat(offenseFull, defenseFull, fmt) {
+    const off = offenseFull.map(p => ({...p}));
+    const def = defenseFull.map(p => ({...p}));
+
+    const defSkaters = def.filter(p => p.role !== "G");
+    const defGoalies = def.filter(p => p.role === "G");
+
+    if (fmt === "5v5") {
+      return { off: off.slice(0,5), def: defSkaters.slice(0,5).concat(defGoalies) };
+    }
+    if (fmt === "5v4") {
+      return { off: off.slice(0,5), def: defSkaters.slice(0,4).concat(defGoalies) };
+    }
+    if (fmt === "4v5") {
+      return { off: off.slice(0,4), def: defSkaters.slice(0,5).concat(defGoalies) };
+    }
+    return { off: off.slice(0,5), def: defSkaters.slice(0,5).concat(defGoalies) };
+  }
+
+  function structureLabel(fmt) {
+    if (fmt === "5v4") return `PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"} vs PK ${pkStructSel.value}`;
+    if (fmt === "4v5") return `PK ${pkStructSel.value} vs PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"}`;
+    return "—";
+  }
+
+  // --- TEMPLATE LIBRARY (Even strength scenarios; all include defenders)
+  const TEMPLATES_EVEN = [
+    // Core set
+    {
+      id: "breakout_left_corner_pressure",
+      phase: "Breakout",
+      pressures: ["High","Med","Low"],
+      allowedFormats: ["5v5"],
+      attackDir: "right",
+      puck: { x: 210, y: 500 },
+      offenseFull: [
+        { role:"C",  x: 320, y: 390 },
+        { role:"LW", x: 270, y: 520 },
+        { role:"RW", x: 430, y: 200 },
+        { role:"LD", x: 190, y: 470 },
+        { role:"RD", x: 320, y: 280 },
+      ],
+      defenseFull: [
+        { role:"F1", x: 240, y: 480 },
+        { role:"F2", x: 310, y: 430 },
+        { role:"F3", x: 410, y: 320 },
+        { role:"D1", x: 410, y: 420 },
+        { role:"D2", x: 470, y: 260 },
+        { role:"G",  x: 70,  y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — Breakout under pressure (puck corner). You are ${role}. Be a usable outlet AND protect inside ice.`,
+      guidanceByRole: {
+        C:  { x: 320, y: 390, r: 90 },
+        LW: { x: 270, y: 520, r: 75 },
+        RW: { x: 430, y: 210, r: 95 },
+        LD: { x: 220, y: 450, r: 85 },
+        RD: { x: 320, y: 280, r: 95 },
+      },
+      rulesByRole: {
+        C:  { spacingFromPuck:{min:70,max:220}, beOutlet:{preferX:"greater"} },
+        LW: { spacingFromPuck:{min:40,max:170}, beOutlet:{preferX:"greater"} },
+        RW: { spacingFromPuck:{min:120,max:360} },
+        LD: { spacingFromPuck:{min:30,max:180} },
+        RD: { spacingFromPuck:{min:90,max:260}, beOutlet:{preferX:"greater"} },
+      }
+    },
+    {
+      id: "rush_middle_lane",
+      phase: "Rush",
+      pressures: ["Low","Med","High"],
+      allowedFormats: ["5v5"],
+      attackDir: "right",
+      puck: { x: 560, y: 310 },
+      offenseFull: [
+        { role:"C",  x: 590, y: 310 },
+        { role:"LW", x: 700, y: 430 },
+        { role:"RW", x: 700, y: 190 },
+        { role:"LD", x: 490, y: 370 },
+        { role:"RD", x: 490, y: 250 },
+      ],
+      defenseFull: [
+        { role:"D1", x: 790, y: 280 },
+        { role:"D2", x: 790, y: 340 },
+        { role:"F1", x: 640, y: 300 },
+        { role:"F2", x: 520, y: 260 },
+        { role:"F3", x: 520, y: 380 },
+        { role:"G",  x: 1040,y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — Rush through neutral zone. You are ${role}. Keep spacing and be a passing option.`,
+      guidanceByRole: {
+        C:  { x: 590, y: 310, r: 85 },
+        LW: { x: 700, y: 430, r: 95 },
+        RW: { x: 700, y: 190, r: 95 },
+        LD: { x: 490, y: 370, r: 95 },
+        RD: { x: 490, y: 250, r: 95 },
+      },
+      rulesByRole: {
+        C:  { spacingFromPuck:{min:40,max:160}, stayAbovePuck:{margin:55, allowDeeper:true} },
+        LW: { spacingFromPuck:{min:120,max:320}, beOutlet:{preferX:"greater"}, stayAbovePuck:{margin:70, allowDeeper:true} },
+        RW: { spacingFromPuck:{min:120,max:320}, beOutlet:{preferX:"greater"}, stayAbovePuck:{margin:70, allowDeeper:true} },
+        LD: { spacingFromPuck:{min:80,max:260} },
+        RD: { spacingFromPuck:{min:80,max:260} },
+      }
+    },
+    {
+      id: "ozone_right_wall_cycle",
+      phase: "O-zone",
+      pressures: ["Low","Med","High"],
+      allowedFormats: ["5v5"],
+      attackDir: "right",
+      puck: { x: 900, y: 410 },
+      offenseFull: [
+        { role:"C",  x: 790, y: 320 },
+        { role:"LW", x: 800, y: 190 },
+        { role:"RW", x: 910, y: 400 },
+        { role:"LD", x: 710, y: 180 },
+        { role:"RD", x: 740, y: 260 },
+      ],
+      defenseFull: [
+        { role:"F1", x: 880, y: 395 },
+        { role:"F2", x: 820, y: 360 },
+        { role:"F3", x: 760, y: 440 },
+        { role:"D1", x: 820, y: 260 },
+        { role:"D2", x: 770, y: 290 },
+        { role:"G",  x: 1040,y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — O-zone puck on right wall. You are ${role}. Create support AND protect against turnover.`,
+      guidanceByRole: {
+        C:  { x: 790, y: 320, r: 95 },
+        LW: { x: 800, y: 200, r: 95 },
+        RW: { x: 900, y: 395, r: 70 },
+        LD: { x: 710, y: 210, r: 95 },
+        RD: { x: 745, y: 270, r: 85 },
+      },
+      rulesByRole: {
+        C:  { spacingFromPuck:{min:90,max:260}, beOutlet:{preferX:"less"} },
+        LW: { spacingFromPuck:{min:120,max:320} },
+        RW: { spacingFromPuck:{min:30,max:160}, beOutlet:{preferX:"less"}, stayAbovePuck:{margin:60, allowDeeper:true} },
+        LD: { spacingFromPuck:{min:220,max:540} },
+        RD: { spacingFromPuck:{min:180,max:420} },
+      }
+    },
+    {
+      id: "dzone_halfwall_defend",
+      phase: "Defend",
+      pressures: ["High","Med","Low"],
+      allowedFormats: ["5v5"],
+      attackDir: "left",
+      puck: { x: 290, y: 180 },
+      offenseFull: [
+        { role:"C",  x: 370, y: 310 },
+        { role:"LW", x: 320, y: 230 },
+        { role:"RW", x: 450, y: 270 },
+        { role:"LD", x: 240, y: 320 },
+        { role:"RD", x: 290, y: 390 },
+      ],
+      defenseFull: [
+        { role:"O1", x: 290, y: 180 },
+        { role:"O2", x: 360, y: 240 },
+        { role:"O3", x: 250, y: 410 },
+        { role:"O4", x: 420, y: 160 },
+        { role:"O5", x: 440, y: 330 },
+        { role:"G",  x: 70,  y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — Defend half-wall. You are ${role}. Protect the slot first; don’t chase the puck.`,
+      guidanceByRole: {
+        C:  { x: 370, y: 310, r: 95 },
+        LW: { x: 320, y: 230, r: 75 },
+        RW: { x: 450, y: 270, r: 95 },
+        LD: { x: 240, y: 320, r: 90 },
+        RD: { x: 290, y: 390, r: 90 },
+      },
+      rulesByRole: {
+        C:  { protectSlot:{slotSide:"left", radius:170}, spacingFromPuck:{min:80,max:260} },
+        LW: { protectSlot:{slotSide:"left", radius:210}, spacingFromPuck:{min:40,max:190} },
+        RW: { protectSlot:{slotSide:"left", radius:210}, spacingFromPuck:{min:120,max:320} },
+        LD: { protectSlot:{slotSide:"left", radius:150}, spacingFromPuck:{min:60,max:230} },
+        RD: { protectSlot:{slotSide:"left", radius:190}, spacingFromPuck:{min:100,max:300} },
+      }
+    },
+
+    // Extra “pack” scenarios (variety)
+    {
+      id: "breakout_d2d_reverse",
+      phase: "Breakout",
+      pressures: ["Med","High","Low"],
+      allowedFormats: ["5v5"],
+      attackDir: "right",
+      puck: { x: 240, y: 520 },
+      offenseFull: [
+        { role:"LD", x: 210, y: 520 },
+        { role:"RD", x: 280, y: 340 },
+        { role:"C",  x: 340, y: 400 },
+        { role:"LW", x: 290, y: 560 },
+        { role:"RW", x: 460, y: 200 },
+      ],
+      defenseFull: [
+        { role:"F1", x: 250, y: 500 },
+        { role:"F2", x: 320, y: 450 },
+        { role:"F3", x: 430, y: 340 },
+        { role:"D1", x: 420, y: 470 },
+        { role:"D2", x: 500, y: 260 },
+        { role:"G",  x: 70,  y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — Breakout: D-to-D/reverse look. You are ${role}. Be an outlet and protect inside ice.`,
+      guidanceByRole: {
+        C:  { x: 350, y: 410, r: 95 },
+        LW: { x: 290, y: 560, r: 75 },
+        RW: { x: 470, y: 210, r: 95 },
+        LD: { x: 240, y: 490, r: 85 },
+        RD: { x: 300, y: 340, r: 95 },
+      },
+      rulesByRole: {
+        C:  { spacingFromPuck:{min:80,max:240}, beOutlet:{preferX:"greater"} },
+        LW: { spacingFromPuck:{min:40,max:180}, beOutlet:{preferX:"greater"} },
+        RW: { spacingFromPuck:{min:150,max:380} },
+        LD: { spacingFromPuck:{min:30,max:190} },
+        RD: { spacingFromPuck:{min:90,max:270}, beOutlet:{preferX:"greater"} },
+      }
+    },
+    {
+      id: "breakout_center_swing_low",
+      phase: "Breakout",
+      pressures: ["Low","Med","High"],
+      allowedFormats: ["5v5"],
+      attackDir: "right",
+      puck: { x: 190, y: 310 },
+      offenseFull: [
+        { role:"LD", x: 210, y: 360 },
+        { role:"RD", x: 260, y: 270 },
+        { role:"C",  x: 300, y: 320 },
+        { role:"LW", x: 260, y: 430 },
+        { role:"RW", x: 420, y: 210 },
+      ],
+      defenseFull: [
+        { role:"F1", x: 220, y: 310 },
+        { role:"F2", x: 300, y: 290 },
+        { role:"F3", x: 380, y: 320 },
+        { role:"D1", x: 420, y: 420 },
+        { role:"D2", x: 500, y: 220 },
+        { role:"G",  x: 70,  y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — Breakout: Center swing low. You are ${role}. Give an angled outlet and don’t crowd the puck.`,
+      guidanceByRole: {
+        C:  { x: 310, y: 320, r: 90 },
+        LW: { x: 270, y: 430, r: 80 },
+        RW: { x: 430, y: 220, r: 90 },
+        LD: { x: 240, y: 350, r: 85 },
+        RD: { x: 290, y: 270, r: 85 },
+      },
+      rulesByRole: {
+        C:  { spacingFromPuck:{min:70,max:210}, beOutlet:{preferX:"greater"} },
+        LW: { spacingFromPuck:{min:90,max:260} },
+        RW: { spacingFromPuck:{min:140,max:360} },
+        LD: { spacingFromPuck:{min:40,max:180} },
+        RD: { spacingFromPuck:{min:60,max:220} },
+      }
+    },
+    {
+      id: "rush_wide_drive_trailer",
+      phase: "Rush",
+      pressures: ["Low","Med","High"],
+      allowedFormats: ["5v5"],
+      attackDir: "right",
+      puck: { x: 610, y: 420 },
+      offenseFull: [
+        { role:"LW", x: 660, y: 450 },
+        { role:"C",  x: 640, y: 320 },
+        { role:"RW", x: 660, y: 200 },
+        { role:"LD", x: 520, y: 360 },
+        { role:"RD", x: 520, y: 260 },
+      ],
+      defenseFull: [
+        { role:"D1", x: 760, y: 300 },
+        { role:"D2", x: 760, y: 360 },
+        { role:"F1", x: 650, y: 380 },
+        { role:"F2", x: 560, y: 280 },
+        { role:"F3", x: 580, y: 430 },
+        { role:"G",  x: 1040,y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — Rush: wide drive with a trailer option. You are ${role}. Keep spacing and be available.`,
+      guidanceByRole: {
+        LW: { x: 680, y: 460, r: 90 },
+        C:  { x: 650, y: 330, r: 90 },
+        RW: { x: 680, y: 190, r: 90 },
+        LD: { x: 530, y: 370, r: 95 },
+        RD: { x: 530, y: 250, r: 95 },
+      },
+      rulesByRole: {
+        LW: { spacingFromPuck:{min:40,max:170}, stayAbovePuck:{margin:80, allowDeeper:true} },
+        C:  { spacingFromPuck:{min:100,max:260}, beOutlet:{preferX:"greater"} },
+        RW: { spacingFromPuck:{min:160,max:420} },
+        LD: { spacingFromPuck:{min:140,max:360} },
+        RD: { spacingFromPuck:{min:140,max:360} },
+      }
+    },
+    {
+      id: "ozone_low_to_high_point",
+      phase: "O-zone",
+      pressures: ["Low","Med","High"],
+      allowedFormats: ["5v5"],
+      attackDir: "right",
+      puck: { x: 930, y: 520 },
+      offenseFull: [
+        { role:"RW", x: 930, y: 500 },
+        { role:"C",  x: 820, y: 360 },
+        { role:"LW", x: 820, y: 190 },
+        { role:"LD", x: 760, y: 200 },
+        { role:"RD", x: 760, y: 420 },
+      ],
+      defenseFull: [
+        { role:"D1", x: 900, y: 410 },
+        { role:"D2", x: 880, y: 300 },
+        { role:"F1", x: 820, y: 440 },
+        { role:"F2", x: 820, y: 260 },
+        { role:"F3", x: 780, y: 320 },
+        { role:"G",  x: 1040,y: 310 },
+      ],
+      prompt: (role, fmt) => `${fmt} — O-zone: low-to-high cycle. You are ${role}. Create shot lane/rebound support and protect vs turnover.`,
+      guidanceByRole: {
+        C:  { x: 820, y: 350, r: 95 },
+        LW: { x: 820, y: 200, r: 95 },
+        RW: { x: 920, y: 490, r: 75 },
+        LD: { x: 760, y: 220, r: 95 },
+        RD: { x: 760, y: 410, r: 95 },
+      },
+      rulesByRole: {
+        C:  { spacingFromPuck:{min:120,max:320}, beOutlet:{preferX:"less"} },
+        LW: { spacingFromPuck:{min:200,max:520} },
+        RW: { spacingFromPuck:{min:30,max:180}, beOutlet:{preferX:"less"} },
+        LD: { spacingFromPuck:{min:220,max:540} },
+        RD: { spacingFromPuck:{min:220,max:540} },
+      }
+    }
+  ];
+
+  // --- Scenario selection
+  function getCandidateTemplates(fmt) {
+    // Even strength uses library; special teams built dynamically
+    if (fmt === "5v4" || fmt === "4v5") {
+      const st = buildSpecialTeamsScenario(fmt, ppStructSel.value, pkStructSel.value);
+      return st ? [st] : [];
+    }
+    return TEMPLATES_EVEN.filter(t => t.allowedFormats.includes("5v5"));
+  }
+
+  function buildScenario() {
+    const fmt = formatSel.value;
+    const mode = modeSel.value;
     const role = roleSel.value;
     const diff = diffSel.value;
 
-    const tpl = pick(TEMPLATES);
-    const pressure = pick(tpl.pressure);
+    // Structure selectors visible only for special teams
+    const isSpecial = (fmt === "5v4" || fmt === "4v5");
+    ppStructWrap.style.display = isSpecial ? "" : "none";
+    pkStructWrap.style.display = isSpecial ? "" : "none";
+    roleWrap.style.display = ""; // keep visible in both modes
 
-    puck.x = tpl.puck.x;
-    puck.y = tpl.puck.y;
+    // Candidates + filters
+    let candidates = getCandidateTemplates(fmt);
+    const phaseFilter = phaseFilterSel.value;
+    const pressureFilter = pressureFilterSel.value;
 
-    const baseZone = tpl.goodFor(role);
-    goodZone = {
-      x: baseZone.x,
-      y: baseZone.y,
-      r: difficultyTighten(baseZone.r, diff)
-    };
+    candidates = candidates.filter(t => {
+      if (phaseFilter !== "any" && t.phase !== phaseFilter) return false;
+      return true;
+    });
 
-    // Reset player near center each play
-    player.x = 450; player.y = 250;
+    if (candidates.length === 0) candidates = getCandidateTemplates(fmt);
+    if (candidates.length === 0) {
+      statusEl.textContent = "No scenarios available for those filters.";
+      return;
+    }
+
+    const tpl = pick(candidates);
+    const pressure = (pressureFilter === "any") ? pick(tpl.pressures || ["Med"]) : pressureFilter;
 
     scenario = {
       id: tpl.id,
       phase: tpl.phase,
       pressure,
-      prompt: tpl.prompt(role),
+      fmt,
+      mode,
       role,
-      diff
+      diff,
+      attackDir: tpl.attackDir || "right",
+      rulesByRole: tpl.rulesByRole || {},
+      guidanceByRole: tpl.guidanceByRole || {},
+      prompt: tpl.prompt ? tpl.prompt(role, fmt) : `${fmt} — ${tpl.phase}. You are ${role}.`
     };
 
+    // puck
+    puck.x = tpl.puck.x;
+    puck.y = tpl.puck.y;
+
+    // apply format
+    const applied = applyFormat(tpl.offenseFull, tpl.defenseFull, fmt);
+
+    // pieces
+    controlled = [];
+    offense = [];
+    defense = applied.def.map(p => ({...p, r: 16}));
+
+    if (mode === "single") {
+      controlled = [{ role, x: 550, y: 310, r: 18, dragging:false }];
+      offense = applied.off.filter(p => p.role !== role).map(p => ({...p, r: 16}));
+    } else {
+      controlled = applied.off.map(p => ({...p, r: 18, dragging:false}));
+      offense = [];
+    }
+
+    // guidance (scaled by age + difficulty)
+    const ageCfg = getAgeSettings();
+    const g = scenario.guidanceByRole?.[role] || { x: 550, y: 310, r: 90 };
+    guidance = {
+      x: g.x,
+      y: g.y,
+      r: difficultyTighten(g.r, diff) * ageCfg.guidanceScale
+    };
+
+    // UI
     phaseEl.textContent = scenario.phase;
     pressureEl.textContent = scenario.pressure;
+    structureEl.textContent = structureLabel(fmt);
     promptEl.textContent = scenario.prompt;
-    statusEl.textContent = "Drag your player to where you should be, then tap Lock In.";
+    scoreEl.textContent = "—";
+    statusEl.textContent = (mode === "single")
+      ? "Drag your blue player to the best position. Tap Lock In for coaching feedback."
+      : "Drag your team (blue) into a better shape. Tap Lock In for a team score.";
+
     draw();
   }
 
-  function dist(a,b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  // --- Reporting
+  function addReportEntry(entry) {
+    report.push(entry);
+    if (report.length > 25) report.shift();
+    renderReport();
+  }
 
+  function renderReport() {
+    const total = report.length;
+    const correct = report.filter(r => r.ok).length;
+    const pct = total ? Math.round((correct/total)*100) : 0;
+
+    const byPhase = {};
+    const missKeys = {};
+    for (const r of report) {
+      byPhase[r.phase] = byPhase[r.phase] || { t:0, c:0 };
+      byPhase[r.phase].t += 1;
+      if (r.ok) byPhase[r.phase].c += 1;
+      if (!r.ok && r.topMissKey) missKeys[r.topMissKey] = (missKeys[r.topMissKey] || 0) + 1;
+    }
+
+    reportSummaryEl.textContent = `Attempts: ${total} | Correct: ${correct} (${pct}%)`;
+
+    reportChipsEl.innerHTML = "";
+    Object.keys(byPhase).sort().forEach(ph => {
+      const v = byPhase[ph];
+      const p = Math.round((v.c/v.t)*100);
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = `${ph}: ${p}%`;
+      reportChipsEl.appendChild(chip);
+    });
+
+    const topMiss = Object.entries(missKeys).sort((a,b)=>b[1]-a[1])[0];
+    if (topMiss) {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = `Most common miss: ${topMiss[0]} (${topMiss[1]})`;
+      reportChipsEl.appendChild(chip);
+    }
+
+    reportRowsEl.innerHTML = "";
+    for (let i = report.length - 1; i >= 0; i--) {
+      const r = report[i];
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.time}</td>
+        <td>${r.fmt}</td>
+        <td>${r.phase}</td>
+        <td>${r.mode}</td>
+        <td>${r.role}</td>
+        <td>${r.ok ? "✅" : "❌"} ${r.score}</td>
+        <td>${r.topMissMsg || (r.ok ? "Good principles" : "—")}</td>
+      `;
+      reportRowsEl.appendChild(tr);
+    }
+  }
+
+  // --- Lock In (single + multi scoring)
   function lockIn() {
     if (!scenario) return;
 
-    const d = dist(player, goodZone);
-    const ok = d <= goodZone.r;
+    const fmt = scenario.fmt;
+    const mode = scenario.mode;
+    const role = scenario.role;
 
-    if (ok) {
+    const pass = passThreshold();
+
+    if (mode === "single") {
+      const you = controlled[0];
+      const res = scorePlacement(role, {x:you.x, y:you.y}, scenario);
+      const ok = res.score >= pass;
+
+      scoreEl.textContent = `${res.score}`;
+
+      if (ok) {
+        streak += 1;
+        if (streak >= 3) {
+          statusEl.innerHTML = "<b>GOAL!</b> Great positioning reps. Streak resets.";
+          streak = 0;
+        } else {
+          statusEl.innerHTML = "<b>PLAY ALIVE ✅</b> Good principles. New situation!";
+        }
+        streakEl.textContent = streak;
+
+        addReportEntry({ time: nowTime(), fmt, phase: scenario.phase, mode: "single", role, ok: true, score: res.score, topMissKey:null, topMissMsg:null });
+        draw(true, true);
+        setTimeout(buildScenario, 900);
+      } else {
+        streak = 0;
+        streakEl.textContent = streak;
+
+        const ageCfg = getAgeSettings();
+        const top = res.failures[0];
+        const second = res.failures[1];
+
+        const cues = [];
+        if (top) cues.push(top.msg);
+        if (ageCfg.showSecondCue && second) cues.push(second.msg);
+
+        statusEl.innerHTML = `<b>TURNOVER ❌</b> ${cues.join(" ")}<br/><span class="muted">Coach cue: protect middle ice, keep spacing, be an outlet.</span>`;
+
+        addReportEntry({
+          time: nowTime(), fmt, phase: scenario.phase, mode: "single", role, ok: false, score: res.score,
+          topMissKey: top?.key || null,
+          topMissMsg: top?.msg || null
+        });
+        draw(true, false);
+      }
+      return;
+    }
+
+    // Multi-player scoring: score each controlled player using their role rules, average the score.
+    // Players lacking rules are scored primarily by guidance (still useful).
+    const results = controlled.map(p => scorePlacement(p.role, {x:p.x, y:p.y}, scenario));
+    const avgScore = Math.round(results.reduce((a,r)=>a+r.score,0) / Math.max(1, results.length));
+
+    // Find the most common miss key across players (for coach feedback)
+    const missCounts = {};
+    for (const r of results) {
+      for (const f of r.failures) {
+        missCounts[f.key] = (missCounts[f.key] || 0) + 1;
+      }
+    }
+    const topMiss = Object.entries(missCounts).sort((a,b)=>b[1]-a[1])[0];
+    const topMissKey = topMiss ? topMiss[0] : null;
+
+    // Provide a coach-style message for team
+    const teamOk = avgScore >= pass;
+    scoreEl.textContent = `${avgScore}`;
+
+    if (teamOk) {
       streak += 1;
       if (streak >= 3) {
-        statusEl.innerHTML = "<b>GOAL!</b> You kept the play alive long enough to create a scoring chance. Streak resets.";
+        statusEl.innerHTML = "<b>GOAL!</b> Great team shape. Streak resets.";
         streak = 0;
       } else {
-        statusEl.innerHTML = "<b>PLAY ALIVE ✅</b> Good positioning. New situation!";
+        statusEl.innerHTML = "<b>PLAY ALIVE ✅</b> Good team structure. New situation!";
       }
       streakEl.textContent = streak;
-      draw(true, ok);
-      setTimeout(newScenario, 900);
+
+      addReportEntry({ time: nowTime(), fmt, phase: scenario.phase, mode: "multi", role: "TEAM", ok: true, score: avgScore, topMissKey:null, topMissMsg:null });
+      draw(true, true);
+      setTimeout(buildScenario, 900);
     } else {
-      statusEl.innerHTML = "<b>TURNOVER ❌</b> That spot didn’t support the play. Try again.";
       streak = 0;
       streakEl.textContent = streak;
-      draw(true, ok);
+
+      let msg = "Team shape needs work.";
+      if (topMissKey === "slot") msg = "Too much middle/slot exposure. Protect inside ice.";
+      if (topMissKey === "spacing") msg = "Spacing is off. Don’t crowd the puck; don’t disappear.";
+      if (topMissKey === "outlet") msg = "Not enough usable outlets. Create passing options.";
+      if (topMissKey === "above") msg = "Too many players got too deep. Stay above the puck.";
+      if (topMissKey === "guidance") msg = "Players are drifting out of structure. Stay in your lanes/shape.";
+
+      statusEl.innerHTML = `<b>TURNOVER ❌</b> ${msg} <br/><span class="muted">Coach cue: shape → lanes → outlets → protect middle.</span>`;
+
+      addReportEntry({ time: nowTime(), fmt, phase: scenario.phase, mode: "multi", role: "TEAM", ok: false, score: avgScore, topMissKey: topMissKey, topMissMsg: msg });
+      draw(true, false);
     }
   }
 
-  // --- Drawing ---
-  function draw(showZones=false, wasOk=null) {
-    // background
-    ctx.clearRect(0,0,canvas.width, canvas.height);
-
-    // rink outline (simple)
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#111";
-    roundRect(ctx, 20, 20, 860, 460, 80);
-    ctx.stroke();
-
-    // center line
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(450, 40); ctx.lineTo(450, 460);
-    ctx.stroke();
-
-    // blue lines
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(300, 40); ctx.lineTo(300, 460); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(600, 40); ctx.lineTo(600, 460); ctx.stroke();
-
-    // goal creases (simple arcs)
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(70, 250, 55, -Math.PI/2, Math.PI/2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(830, 250, 55, Math.PI/2, -Math.PI/2);
-    ctx.stroke();
-
-    // show good zone overlay only after lock in OR in easy mode
-    const diff = diffSel.value;
-    const reveal = showZones || diff === "easy";
-    if (scenario && reveal) {
-      ctx.save();
-      ctx.globalAlpha = 0.18;
-      ctx.fillStyle = "#00aa00";
-      ctx.beginPath();
-      ctx.arc(goodZone.x, goodZone.y, goodZone.r, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-
-      // Outline after lock
-      if (showZones) {
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = (wasOk ? "#0a0" : "#a00");
-        ctx.beginPath();
-        ctx.arc(goodZone.x, goodZone.y, goodZone.r, 0, Math.PI*2);
-        ctx.stroke();
-      }
-    }
-
-    // puck
-    ctx.fillStyle = "#000";
-    ctx.beginPath();
-    ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI*2);
-    ctx.fill();
-
-    // player
-    ctx.fillStyle = "#1e4fff";
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.r, 0, Math.PI*2);
-    ctx.fill();
-
-    // label
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 14px system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(roleSel.value, player.x, player.y);
-  }
-
+  // --- Drawing
   function roundRect(ctx, x, y, w, h, r) {
     const rr = Math.min(r, w/2, h/2);
     ctx.beginPath();
@@ -308,52 +1134,156 @@
     ctx.closePath();
   }
 
-  // --- Drag handling (mouse + touch) ---
+  function drawMarker(x, y, label, fill, radius, stroke="#111", strokeW=2) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.lineWidth = strokeW;
+    ctx.strokeStyle = stroke;
+    ctx.stroke();
+
+    if (label) {
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 13px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x, y);
+    }
+  }
+
+  function draw(showGuidance=false, ok=null) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // rink outline
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#111";
+    roundRect(ctx, 20, 20, 1060, 580, 100);
+    ctx.stroke();
+
+    // center line
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(550, 40); ctx.lineTo(550, 600-20);
+    ctx.stroke();
+
+    // blue lines
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(360, 40); ctx.lineTo(360, 600-20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(740, 40); ctx.lineTo(740, 600-20); ctx.stroke();
+
+    // creases
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(95, 310, 65, -Math.PI/2, Math.PI/2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(1005, 310, 65, Math.PI/2, -Math.PI/2); ctx.stroke();
+
+    drawOverlays();
+
+    // guidance overlay (beginner always shows)
+    if (scenario && scenario.mode === "single") {
+      const reveal = (diffSel.value === "easy") || showGuidance;
+      if (reveal) {
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = "#00aa00";
+        ctx.beginPath();
+        ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+
+        if (showGuidance) {
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = (ok ? "#0a0" : "#a00");
+          ctx.beginPath();
+          ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI*2);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Defence (red)
+    defense.forEach(p => drawMarker(p.x, p.y, p.role, "#cc2b2b", p.r || 16));
+
+    // Offence static (orange)
+    offense.forEach(p => drawMarker(p.x, p.y, p.role, "#f08a24", p.r || 16));
+
+    // Controlled (blue)
+    controlled.forEach(p => drawMarker(p.x, p.y, p.role, "#1e4fff", p.r || 18, "#0b1b55", 3));
+
+    // puck
+    drawMarker(puck.x, puck.y, "", "#000", puck.r, "#000", 1);
+  }
+
+  // --- Dragging
   function getPos(evt) {
     const rect = canvas.getBoundingClientRect();
     const isTouch = evt.touches && evt.touches.length;
     const clientX = isTouch ? evt.touches[0].clientX : evt.clientX;
     const clientY = isTouch ? evt.touches[0].clientY : evt.clientY;
-
-    // Scale to canvas coordinates
     const x = (clientX - rect.left) * (canvas.width / rect.width);
     const y = (clientY - rect.top) * (canvas.height / rect.height);
     return { x, y };
   }
 
+  function findControlledAt(x, y) {
+    for (let i = controlled.length - 1; i >= 0; i--) {
+      const p = controlled[i];
+      if (dist(x, y, p.x, p.y) <= (p.r || 18) + 12) return p;
+    }
+    return null;
+  }
+
+  let activeDrag = null;
+
   function pointerDown(evt) {
     if (!scenario) return;
     const p = getPos(evt);
-    const inside = Math.hypot(p.x - player.x, p.y - player.y) <= player.r + 10;
-    if (inside) player.dragging = true;
+    activeDrag = findControlledAt(p.x, p.y);
+    if (activeDrag) activeDrag.dragging = true;
   }
+
   function pointerMove(evt) {
-    if (!player.dragging) return;
+    if (!activeDrag || !activeDrag.dragging) return;
     evt.preventDefault();
     const p = getPos(evt);
-    player.x = clamp(p.x, 40, 860);
-    player.y = clamp(p.y, 40, 460);
+    activeDrag.x = clamp(p.x, 50, 1050);
+    activeDrag.y = clamp(p.y, 50, 570);
     draw();
   }
-  function pointerUp() { player.dragging = false; }
 
-  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function pointerUp() {
+    if (activeDrag) activeDrag.dragging = false;
+    activeDrag = null;
+  }
 
   canvas.addEventListener('mousedown', pointerDown);
   window.addEventListener('mousemove', pointerMove);
   window.addEventListener('mouseup', pointerUp);
 
-  canvas.addEventListener('touchstart', pointerDown, {passive:false});
-  window.addEventListener('touchmove', pointerMove, {passive:false});
+  canvas.addEventListener('touchstart', pointerDown, { passive:false });
+  window.addEventListener('touchmove', pointerMove, { passive:false });
   window.addEventListener('touchend', pointerUp);
 
-  // Buttons
-  newBtn.addEventListener('click', newScenario);
+  // --- Controls
+  newBtn.addEventListener('click', buildScenario);
   lockBtn.addEventListener('click', lockIn);
-  roleSel.addEventListener('change', () => { if (scenario) newScenario(); });
-  diffSel.addEventListener('change', () => { if (scenario) newScenario(); });
 
-  // initial draw
+  function onSettingChange() {
+    const fmt = formatSel.value;
+    const isSpecial = (fmt === "5v4" || fmt === "4v5");
+    ppStructWrap.style.display = isSpecial ? "" : "none";
+    pkStructWrap.style.display = isSpecial ? "" : "none";
+    if (scenario) buildScenario();
+    draw();
+  }
+
+  [ageSel, formatSel, modeSel, roleSel, diffSel, phaseFilterSel, pressureFilterSel, ppStructSel, pkStructSel, overlaySel]
+    .forEach(el => el.addEventListener('change', onSettingChange));
+
+  // init
+  ppStructWrap.style.display = "none";
+  pkStructWrap.style.display = "none";
   draw();
 })();
 </script>
