@@ -41,6 +41,17 @@
   const reportRowsEl = document.getElementById("reportRows");
   const reportChipsEl = document.getElementById("reportChips");
 
+  const pNameEl = document.getElementById("pName");
+  const pNumEl = document.getElementById("pNum");
+  const pColorEl = document.getElementById("pColor");
+  const levelEl = document.getElementById("level");
+  const xpFillEl = document.getElementById("xpfill");
+  const coachFaceEl = document.getElementById("coachFace");
+  const badgeGridEl = document.getElementById("badgeGrid");
+  const trophySummaryEl = document.getElementById("trophySummary");
+  const toastsEl = document.getElementById("toasts");
+  const dotTeamEl = document.getElementById("dotTeam");
+
   // --- State
   let streak = 0;
   let goalsFor = 0;
@@ -64,6 +75,106 @@
   let lastTick = 0;
 
   const report = [];
+
+  // --- Player profile, XP, and badges (persisted)
+  const XP_PER_LEVEL = 300;
+
+  function loadStore(key, fallback) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return (v && typeof v === "object") ? { ...fallback, ...v } : fallback;
+    } catch (e) { return fallback; }
+  }
+  function saveStore(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* private mode etc. */ }
+  }
+
+  const profile = loadStore("hiq_profile", { name: "", number: 9, color: "blue" });
+  const stats = loadStore("hiq_stats", {
+    xp: 0, goals: 0, corrects: 0, greats: 0, perfects: 0, bestStreak: 0,
+    byPhase: {}, pkCorrect: 0, ppCorrect: 0, badges: {}
+  });
+  let sessionGoals = 0;
+  let recentMisses = 0;
+
+  const PRESET_COLORS = {
+    blue:   { jersey: "#2456ff", trim: "#0a1c56", helmet: "#0a1c56" },
+    green:  { jersey: "#22c55e", trim: "#14532d", helmet: "#14532d" },
+    purple: { jersey: "#8b5cf6", trim: "#3b0764", helmet: "#3b0764" },
+    teal:   { jersey: "#06b6d4", trim: "#164e63", helmet: "#164e63" },
+    gold:   { jersey: "#eab308", trim: "#713f12", helmet: "#713f12" }
+  };
+  function teamStyle() { return PRESET_COLORS[profile.color] || PRESET_COLORS.blue; }
+
+  const BADGES = [
+    { id: "first_goal",    emoji: "🚨", name: "First Goal",      desc: "Score your first goal",            test: s => s.goals >= 1 },
+    { id: "hat_trick",     emoji: "🎩", name: "Hat Trick",       desc: "3 goals in one session",           test: () => sessionGoals >= 3 },
+    { id: "sniper",        emoji: "🎯", name: "Sniper",          desc: "Score 10 goals",                   test: s => s.goals >= 10 },
+    { id: "breakout_boss", emoji: "🧊", name: "Breakout Boss",   desc: "5 correct breakout reads",         test: s => (s.byPhase["Breakout"] || 0) >= 5 },
+    { id: "rush_master",   emoji: "💨", name: "Rush Master",     desc: "5 correct rush reads",             test: s => (s.byPhase["Rush"] || 0) >= 5 },
+    { id: "ozone_pro",     emoji: "🔁", name: "O-Zone Pro",      desc: "5 correct offensive-zone reads",   test: s => (s.byPhase["O-zone"] || 0) >= 5 },
+    { id: "lockdown",      emoji: "🛡️", name: "Lockdown D",      desc: "5 correct defensive reads",        test: s => (s.byPhase["Defend"] || 0) >= 5 },
+    { id: "pk_wall",       emoji: "🧱", name: "PK Wall",         desc: "5 correct penalty-kill reads",     test: s => s.pkCorrect >= 5 },
+    { id: "pp_qb",         emoji: "⚡", name: "PP Quarterback",  desc: "5 correct power-play reads",       test: s => s.ppCorrect >= 5 },
+    { id: "on_fire",       emoji: "🔥", name: "On Fire",         desc: "Get a streak of 5",                test: s => s.bestStreak >= 5 },
+    { id: "comeback",      emoji: "💪", name: "Comeback Kid",    desc: "Bounce back after 2 misses",       test: (s, ev) => !!ev.comeback },
+    { id: "perfect",       emoji: "💯", name: "Perfect 100",     desc: "Score a perfect 100",              test: s => s.perfects >= 1 },
+  ];
+
+  function toast(emoji, title, sub) {
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.innerHTML = `<span class="t-emoji">${emoji}</span><span>${title}<br/><span class="t-sub">${sub || ""}</span></span>`;
+    toastsEl.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  function levelFromXp(xp) { return Math.floor(xp / XP_PER_LEVEL) + 1; }
+
+  function renderProgress() {
+    levelEl.textContent = levelFromXp(stats.xp);
+    xpFillEl.style.width = `${Math.round(((stats.xp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100)}%`;
+  }
+
+  function awardXP(amount) {
+    const before = levelFromXp(stats.xp);
+    stats.xp += amount;
+    const after = levelFromXp(stats.xp);
+    renderProgress();
+    if (after > before) {
+      HIQ.audio.play("levelup");
+      toast("⭐", `LEVEL UP! Level ${after}`, "Keep making smart reads!");
+    }
+  }
+
+  function checkBadges(ev = {}) {
+    for (const b of BADGES) {
+      if (stats.badges[b.id]) continue;
+      if (b.test(stats, ev)) {
+        stats.badges[b.id] = Date.now();
+        HIQ.audio.play("badge");
+        toast(b.emoji, `Badge unlocked: ${b.name}`, b.desc);
+      }
+    }
+    renderTrophies();
+  }
+
+  function renderTrophies() {
+    const earned = Object.keys(stats.badges).length;
+    trophySummaryEl.textContent = `— ${earned}/${BADGES.length} earned`;
+    badgeGridEl.innerHTML = "";
+    for (const b of BADGES) {
+      const card = document.createElement("div");
+      card.className = "badge-card" + (stats.badges[b.id] ? "" : " locked");
+      card.innerHTML = `<div class="b-emoji">${b.emoji}</div><div class="b-name">${b.name}</div><div class="b-desc">${b.desc}</div>`;
+      badgeGridEl.appendChild(card);
+    }
+  }
+
+  const COACH_FACES = { neutral: "😀", watch: "👀", happy: "😄", goal: "🤩", sad: "😧", think: "🧐" };
+  function setCoach(mood) {
+    coachFaceEl.textContent = COACH_FACES[mood] || COACH_FACES.neutral;
+  }
 
   // --- Helpers
   const nowTime = () => {
@@ -293,6 +404,7 @@
 
     renderState.intro = { text: `${scenario.phase.toUpperCase()}  •  ${fmt}`, at: performance.now() };
     HIQ.audio.play("faceoff");
+    setCoach("think");
   }
 
   // --- A/B/C choice generation
@@ -612,6 +724,24 @@
     if (tier === "great") { goalsFor += 1; gfEl.textContent = goalsFor; }
     if (tier === "bad") { goalsAgainst += 1; gaEl.textContent = goalsAgainst; }
 
+    // Progression (persisted): XP, counters, badges
+    const wasComeback = ok && recentMisses >= 2;
+    if (ok) {
+      stats.corrects += 1;
+      stats.byPhase[scenario.phase] = (stats.byPhase[scenario.phase] || 0) + 1;
+      if (scenario.fmt === "4v5") stats.pkCorrect += 1;
+      if (scenario.fmt === "5v4") stats.ppCorrect += 1;
+      recentMisses = 0;
+    } else {
+      recentMisses += 1;
+    }
+    if (tier === "great") { stats.goals += 1; stats.greats += 1; sessionGoals += 1; }
+    if (score === 100) stats.perfects += 1;
+    stats.bestStreak = Math.max(stats.bestStreak, streak);
+    awardXP(tier === "great" ? 100 : tier === "good" ? 60 : 15);
+    checkBadges({ comeback: wasComeback });
+    saveStore("hiq_stats", stats);
+
     addReportEntry({
       time: nowTime(), fmt: scenario.fmt, phase: scenario.phase,
       mode, role: reportRole, ok, score,
@@ -624,6 +754,7 @@
     choice.active = false;
     const steps = buildSimScript(tier, receiver, subMsg);
 
+    setCoach("watch");
     HIQ.Sim.run(steps, {
       onFrame: (banner) => { setBanner(banner); },
       onMsg: (m) => { statusEl.textContent = m; },
@@ -633,6 +764,7 @@
       },
       onDone: (banner) => {
         setBanner(banner);
+        setCoach(ok ? (tier === "great" ? "goal" : "happy") : "sad");
         if (ok) {
           statusEl.innerHTML = tier === "great"
             ? "<b>NICE READ ✅</b> You finished the play with a goal! Next play coming…"
@@ -1038,7 +1170,11 @@
   };
 
   function drawRoleChip(p, style, t) {
-    const label = p.role;
+    let label = p.role;
+    if (style.isYou) {
+      const nm = (profile.name || "").trim().toUpperCase();
+      label = `${p.role} · ${nm ? nm + " " : ""}#${profile.number || 9}`;
+    }
     if (!label) return;
     ctx.font = "bold 10px system-ui";
     const tw = ctx.measureText(label).width;
@@ -1383,14 +1519,14 @@
       else drawSkater(p, TEAM_STYLES.opponent, t);
     });
 
-    // Teammates
+    // Teammates (your chosen team color)
     offense.forEach(p => {
       if (p.role === "G") drawGoalie(p, TEAM_STYLES.ourGoalie, t);
-      else drawSkater(p, TEAM_STYLES.teammate, t);
+      else drawSkater(p, teamStyle(), t);
     });
 
     // You
-    controlled.forEach(p => drawSkater(p, { ...TEAM_STYLES.you, isYou: true }, t));
+    controlled.forEach(p => drawSkater(p, { ...teamStyle(), isYou: true }, t));
 
     drawPuck(t);
     drawEffects(t);
@@ -1493,6 +1629,27 @@
     muteBtn.textContent = HIQ.audio.isMuted() ? "🔇" : "🔊";
   });
 
+  // Player profile controls (instant — no scenario rebuild needed)
+  function syncProfileUI() {
+    pNameEl.value = profile.name || "";
+    pNumEl.value = profile.number || 9;
+    pColorEl.value = profile.color || "blue";
+    dotTeamEl.style.background = teamStyle().jersey;
+  }
+  pNameEl.addEventListener("input", () => {
+    profile.name = pNameEl.value.slice(0, 12);
+    saveStore("hiq_profile", profile);
+  });
+  pNumEl.addEventListener("input", () => {
+    profile.number = clamp(parseInt(pNumEl.value, 10) || 9, 1, 99);
+    saveStore("hiq_profile", profile);
+  });
+  pColorEl.addEventListener("change", () => {
+    profile.color = pColorEl.value;
+    saveStore("hiq_profile", profile);
+    dotTeamEl.style.background = teamStyle().jersey;
+  });
+
   function onSettingChange() {
     const fmt = formatSel.value;
     const isSpecial = (fmt === "5v4" || fmt === "4v5");
@@ -1513,12 +1670,17 @@
     place: (x, y) => { if (controlled[0]) { controlled[0].x = x; controlled[0].y = y; } },
     lock: () => lockIn(),
     newPlay: () => buildScenario(),
-    simRunning: () => HIQ.Sim.isRunning()
+    simRunning: () => HIQ.Sim.isRunning(),
+    getStats: () => stats,
+    getProfile: () => profile
   };
 
   // Init
   ppStructWrap.style.display = "none";
   pkStructWrap.style.display = "none";
+  syncProfileUI();
+  renderProgress();
+  renderTrophies();
   buildRinkLayer();
   buildScenario();
   requestAnimationFrame(tick);

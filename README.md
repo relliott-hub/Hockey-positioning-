@@ -17,6 +17,14 @@ The scoreboard tracks goals for/against, your streak, and the **Coach Report** l
 
 ## Features
 
+### Make it yours
+- **Player profile** — kids enter their name, jersey number, and pick a team color; the whole team skates in their colors and their player wears a gold name tag (saved on the device)
+- **XP & levels** — every play earns XP; level up with a fanfare
+- **Trophy Case** — 12 unlockable badges (First Goal, Hat Trick, Breakout Boss, PK Wall, On Fire, Comeback Kid…) with pop-up unlock toasts, saved between sessions
+- **Coach character** — an animated coach with a speech bubble who sets up each play, watches nervously, and celebrates (or groans) with you
+
+### Gameplay
+
 - **A/B/C choice mode** — kid-friendly: tap the best option and watch it play out
 - **Free-drag mode** — advanced: position yourself (or your whole team in Multi mode) anywhere
 - **Real player sprites** — top-down skaters with helmets, jerseys, and sticks that turn to face the puck and their skating direction; goalies with masks and leg pads

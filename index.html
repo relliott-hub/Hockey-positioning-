@@ -111,6 +111,26 @@
       <button id="lockBtn">Lock In</button>
       <button id="muteBtn" title="Sound on/off">🔊</button>
     </div>
+
+    <div class="row" id="profileRow">
+      <label>Your name
+        <input id="pName" maxlength="12" placeholder="Your name" autocomplete="off" />
+      </label>
+      <label>Number
+        <input id="pNum" type="number" min="1" max="99" value="9" />
+      </label>
+      <label>Team color
+        <select id="pColor">
+          <option value="blue" selected>Ice Blue</option>
+          <option value="green">Lime Green</option>
+          <option value="purple">Power Purple</option>
+          <option value="teal">Aqua Teal</option>
+          <option value="gold">Golden</option>
+        </select>
+      </label>
+      <span class="pill">⭐ Level <b id="level">1</b></span>
+      <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
+    </div>
   </div>
 
   <div class="row">
@@ -127,17 +147,27 @@
 
   <canvas id="rink" width="1100" height="620"></canvas>
 
+  <div id="coachBox">
+    <div id="coachAvatar"><span id="coachFace">😀</span><span id="coachCap">🧢</span></div>
+    <div class="bubble">
+      <div id="coachName">COACH</div>
+      <div id="status"></div>
+    </div>
+  </div>
+
   <div class="legend">
-    <span><i class="dot" style="background:#1e4fff"></i> You (blue)</span>
-    <span><i class="dot" style="background:#f08a24"></i> Your teammates</span>
-    <span><i class="dot" style="background:#0d9488"></i> Your goalie</span>
+    <span><i class="dot" id="dotTeam" style="background:#2456ff"></i> Your team (gold ring = you)</span>
     <span><i class="dot" style="background:#cc2b2b"></i> Opponents</span>
+    <span><i class="dot" style="background:#0d9488"></i> Your goalie</span>
     <span><i class="dot" style="background:#111"></i> Puck</span>
     <span><i class="dot" style="background:#fffbeb; border-color:#f59e0b"></i> A/B/C choices</span>
     <span><i class="dot" style="background:#00aa00; opacity:.3"></i> Coach's area (Beginner)</span>
   </div>
 
-  <div id="status"></div>
+  <details>
+    <summary><b>🏆 Trophy Case</b> <span class="muted" id="trophySummary"></span></summary>
+    <div id="badgeGrid"></div>
+  </details>
 
   <details>
     <summary><b>Coach Report (this session)</b> <span class="muted">— performance + common misses</span></summary>
@@ -158,6 +188,8 @@
     </div>
   </details>
 </div>
+
+<div id="toasts"></div>
 
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>

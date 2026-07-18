@@ -68,7 +68,12 @@ HIQ.audio = (() => {
     good()        { tone(523, 0.12, "triangle", 0.12); tone(659, 0.12, "triangle", 0.12, 0.12); tone(784, 0.2, "triangle", 0.12, 0.24); noiseBurst(0.6, 0.03, 0.2, 1600); },
     clear()       { tone(523, 0.15, "triangle", 0.12); tone(784, 0.25, "triangle", 0.12, 0.15); },
     save()        { tone(140, 0.09, "square", 0.14); noiseBurst(0.25, 0.05, 0, 900); },
-    faceoff()     { tone(180, 0.05, "square", 0.10); tone(180, 0.05, "square", 0.10, 0.12); }
+    faceoff()     { tone(180, 0.05, "square", 0.10); tone(180, 0.05, "square", 0.10, 0.12); },
+    levelup() {
+      [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, "triangle", 0.13, i * 0.11));
+      noiseBurst(0.7, 0.03, 0.35, 1800);
+    },
+    badge()       { tone(988, 0.12, "triangle", 0.12); tone(1319, 0.3, "triangle", 0.12, 0.13); }
   };
 
   return {
