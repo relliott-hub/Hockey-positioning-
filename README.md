@@ -19,6 +19,8 @@ The scoreboard tracks goals for/against, your streak, and the **Coach Report** l
 
 - **A/B/C choice mode** — kid-friendly: tap the best option and watch it play out
 - **Free-drag mode** — advanced: position yourself (or your whole team in Multi mode) anywhere
+- **Real player sprites** — top-down skaters with helmets, jerseys, and sticks that turn to face the puck and their skating direction; goalies with masks and leg pads
+- **Living presentation** — 60 fps animation loop, puck trails, pulsing choice buttons, pop-in banners, goal-light flashes, and confetti goal celebrations
 - **Animated play simulation** with sound effects (mutable) — passes, interceptions, counter-attacks, goal lights
 - **All game states**: breakouts, rushes, o-zone cycles, d-zone coverage, PP (umbrella / 1-3-1), PK (box / diamond)
 - **Age-aware coaching** — younger groups get bigger target areas, simpler feedback, and coach hints

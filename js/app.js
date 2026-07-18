@@ -1,4 +1,4 @@
-/* Hockey IQ Trainer — main application: scenario building, scoring, drawing, input, and outcomes. */
+/* Hockey IQ Trainer — main application: scenario building, scoring, rendering, input, and outcomes. */
 (() => {
   const { pick, clamp, dist, toward, shuffle } = HIQ.util;
   const LM = HIQ.LANDMARKS;
@@ -50,13 +50,17 @@
   let controlled = [];
   let offense = [];
   let defense = [];
-  const puck = { x: 550, y: 310, r: 10 };
+  const puck = { x: 550, y: 310, r: 9 };
   let guidance = { x: 550, y: 310, r: 90 };
 
   let choice = { active: false, options: [] };
   let snapshot = null;
   let pendingTimer = null;
-  let lastBanner = null;
+
+  const renderState = { banner: null, bannerAt: 0, showGuidance: false, guidanceOk: null };
+  let particles = [];
+  const puckTrail = [];
+  let lastTick = 0;
 
   const report = [];
 
@@ -201,7 +205,9 @@
   function buildScenario() {
     if (HIQ.Sim.isRunning()) HIQ.Sim.cancel();
     clearTimeout(pendingTimer);
-    lastBanner = null;
+    setBanner(null);
+    renderState.showGuidance = false;
+    puckTrail.length = 0;
 
     const fmt = formatSel.value;
     const mode = modeSel.value;
@@ -282,8 +288,6 @@
     } else {
       statusEl.textContent = "Drag your whole team (blue) into a better shape, then tap Lock In.";
     }
-
-    draw();
   }
 
   // --- A/B/C choice generation
@@ -357,6 +361,7 @@
     offense.forEach((p, i) => { p.x = snapshot.offense[i].x; p.y = snapshot.offense[i].y; });
     defense.forEach((p, i) => { p.x = snapshot.defense[i].x; p.y = snapshot.defense[i].y; });
     puck.x = snapshot.puck.x; puck.y = snapshot.puck.y;
+    puckTrail.length = 0;
   }
 
   // --- Simulation script building
@@ -392,7 +397,7 @@
           const carryTo = toward(receiver, slotFor(atk), 0.6);
           steps.push({ d: 650, sound: "catch", movers: [mv(receiver, carryTo.x, carryTo.y), mv(puck, carryTo.x, carryTo.y)] });
           steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
-          steps.push({ d: 1400, sound: "goal", banner: { text: "GOAL! 🚨", sub: "Perfect positioning!", color: "#4ade80", light: atk } });
+          steps.push({ d: 1400, sound: "goal", banner: { text: "GOAL! 🚨", sub: "Perfect positioning!", color: "#4ade80", light: atk, fx: "confetti" } });
         } else {
           let next = null, bd = Infinity;
           for (const p of friendlySk) {
@@ -436,7 +441,7 @@
           const counter = slotFor(atk);
           steps.push({ d: 850, banner: null, movers: [mv(receiver, counter.x, counter.y), mv(puck, counter.x, counter.y)] });
           steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
-          steps.push({ d: 1500, sound: "goal", banner: { text: "COUNTER-ATTACK GOAL! 🚨", sub: "Defense turned into offense!", color: "#4ade80", light: atk } });
+          steps.push({ d: 1500, sound: "goal", banner: { text: "COUNTER-ATTACK GOAL! 🚨", sub: "Defense turned into offense!", color: "#4ade80", light: atk, fx: "confetti" } });
         } else {
           const clearTo = { x: ownS === "right" ? 320 : 780, y: 80 };
           steps.push({ d: 650, banner: null, sound: "clear", movers: [mv(puck, clearTo.x, clearTo.y)] });
@@ -472,6 +477,7 @@
   function lockIn(chosen = null) {
     if (!scenario || HIQ.Sim.isRunning()) return;
     clearTimeout(pendingTimer);
+    renderState.showGuidance = false;
 
     const mode = scenario.mode;
     const pass = passThreshold();
@@ -541,11 +547,10 @@
     const steps = buildSimScript(tier, receiver, subMsg);
 
     HIQ.Sim.run(steps, {
-      onFrame: (banner) => { lastBanner = banner; draw({ banner }); },
+      onFrame: (banner) => { setBanner(banner); },
       onMsg: (m) => { statusEl.textContent = m; },
       onDone: (banner) => {
-        lastBanner = banner;
-        draw({ banner });
+        setBanner(banner);
         if (ok) {
           statusEl.innerHTML = tier === "great"
             ? "<b>NICE READ ✅</b> You finished the play with a goal! Next play coming…"
@@ -555,9 +560,10 @@
           statusEl.innerHTML = `<b>NOT THIS TIME ❌</b> ${cues.join(" ")}<br/><span class="muted">Coach cue: protect middle ice, keep spacing, be an option. Try again!</span>`;
           pendingTimer = setTimeout(() => {
             restoreSnapshot();
-            lastBanner = null;
+            setBanner(null);
             if (isChoiceMode() && choice.options.length) choice.active = true;
-            draw({ showGuidance: true, ok: false });
+            renderState.showGuidance = true;
+            renderState.guidanceOk = false;
           }, 1600);
         }
       }
@@ -621,8 +627,97 @@
     }
   }
 
-  // --- Drawing
-  function roundRect(c, x, y, w, h, r) {
+  // =========================================================================
+  // RENDERING — persistent animation loop, sprite players, particles
+  // =========================================================================
+
+  function setBanner(b) {
+    if (renderState.banner === b) return;
+    renderState.banner = b;
+    renderState.bannerAt = performance.now();
+    if (b && b.fx === "confetti") spawnConfetti();
+  }
+
+  function spawnConfetti() {
+    const colors = ["#fbbf24", "#34d399", "#60a5fa", "#f87171", "#f472b6", "#ffffff"];
+    for (let i = 0; i < 90; i++) {
+      particles.push({
+        x: 550 + (Math.random() - 0.5) * 340,
+        y: 130 + (Math.random() - 0.5) * 70,
+        vx: (Math.random() - 0.5) * 280,
+        vy: -Math.random() * 240 - 40,
+        size: 4 + Math.random() * 5,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 10,
+        color: colors[i % colors.length],
+        life: 1.5 + Math.random() * 0.9
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (const p of particles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 320 * dt;
+      p.rot += p.vr * dt;
+    }
+    particles = particles.filter(p => p.life > 0 && p.y < 660);
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.save();
+      ctx.globalAlpha = clamp(p.life, 0, 1);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66);
+      ctx.restore();
+    }
+  }
+
+  // Smoothly rotate players toward their movement direction (or the puck when idle)
+  function updateHeadings(dt) {
+    const all = [...controlled, ...offense, ...defense];
+    for (const p of all) {
+      const dx = p.x - (p._px ?? p.x);
+      const dy = p.y - (p._py ?? p.y);
+      let target;
+      if (Math.hypot(dx, dy) > 0.6) {
+        target = Math.atan2(dy, dx);
+        p._moving = true;
+      } else {
+        p._moving = false;
+        target = Math.atan2(puck.y - p.y, puck.x - p.x);
+      }
+      if (p.angle === undefined) p.angle = target;
+      let d = target - p.angle;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      p.angle += d * Math.min(1, dt * 8);
+      p._px = p.x;
+      p._py = p.y;
+    }
+  }
+
+  function updatePuckTrail() {
+    const last = puckTrail[puckTrail.length - 1];
+    if (!last || dist(last.x, last.y, puck.x, puck.y) > 3) {
+      puckTrail.push({ x: puck.x, y: puck.y });
+      if (puckTrail.length > 10) puckTrail.shift();
+    } else if (puckTrail.length) {
+      puckTrail.shift(); // fade the trail out when the puck stops
+    }
+  }
+
+  // --- Static rink pre-rendered once to an offscreen layer
+  const rinkLayer = document.createElement("canvas");
+  rinkLayer.width = 1100;
+  rinkLayer.height = 620;
+
+  function roundRectPath(c, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
     c.beginPath();
     c.moveTo(x + rr, y);
@@ -633,83 +728,99 @@
     c.closePath();
   }
 
-  function drawRink() {
-    // Ice
-    roundRect(ctx, 20, 20, 1060, 580, 110);
-    const grad = ctx.createLinearGradient(0, 20, 0, 600);
-    grad.addColorStop(0, "#f7fbff");
-    grad.addColorStop(1, "#e6f1fb");
-    ctx.fillStyle = grad;
-    ctx.fill();
+  function buildRinkLayer() {
+    const c = rinkLayer.getContext("2d");
+    c.clearRect(0, 0, 1100, 620);
 
-    ctx.save();
-    roundRect(ctx, 20, 20, 1060, 580, 110);
-    ctx.clip();
+    // Ice with subtle vertical sheen
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    const grad = c.createLinearGradient(0, 20, 0, 600);
+    grad.addColorStop(0, "#f8fcff");
+    grad.addColorStop(0.5, "#eef6fd");
+    grad.addColorStop(1, "#e3eff9");
+    c.fillStyle = grad;
+    c.fill();
+
+    c.save();
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    c.clip();
+
+    // Ice texture: faint skate-scuff speckles
+    for (let i = 0; i < 420; i++) {
+      c.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,0.5)" : "rgba(160,190,220,0.18)";
+      const sx = 20 + Math.random() * 1060;
+      const sy = 20 + Math.random() * 580;
+      c.fillRect(sx, sy, 1 + Math.random() * 2, 1);
+    }
 
     // Goal lines
-    ctx.strokeStyle = "#d94141";
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(95, 20); ctx.lineTo(95, 600); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(1005, 20); ctx.lineTo(1005, 600); ctx.stroke();
+    c.strokeStyle = "#d94141";
+    c.lineWidth = 3;
+    c.beginPath(); c.moveTo(95, 20); c.lineTo(95, 600); c.stroke();
+    c.beginPath(); c.moveTo(1005, 20); c.lineTo(1005, 600); c.stroke();
 
     // Blue lines + center red line
-    ctx.fillStyle = "rgba(37, 99, 235, 0.75)";
-    ctx.fillRect(354, 20, 12, 580);
-    ctx.fillRect(734, 20, 12, 580);
-    ctx.fillStyle = "rgba(220, 60, 60, 0.75)";
-    ctx.fillRect(544, 20, 12, 580);
+    c.fillStyle = "rgba(37, 99, 235, 0.75)";
+    c.fillRect(354, 20, 12, 580);
+    c.fillRect(734, 20, 12, 580);
+    c.fillStyle = "rgba(220, 60, 60, 0.75)";
+    c.fillRect(544, 20, 12, 580);
 
     // Center circle
-    ctx.strokeStyle = "rgba(37, 99, 235, 0.6)";
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(550, 310, 65, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = "rgba(220, 60, 60, 0.8)";
-    ctx.beginPath(); ctx.arc(550, 310, 5, 0, Math.PI * 2); ctx.fill();
+    c.strokeStyle = "rgba(37, 99, 235, 0.6)";
+    c.lineWidth = 3;
+    c.beginPath(); c.arc(550, 310, 65, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = "rgba(220, 60, 60, 0.8)";
+    c.beginPath(); c.arc(550, 310, 5, 0, Math.PI * 2); c.fill();
 
     // Zone faceoff circles + dots
-    ctx.strokeStyle = "rgba(217, 65, 65, 0.55)";
-    ctx.fillStyle = "rgba(217, 65, 65, 0.8)";
+    c.strokeStyle = "rgba(217, 65, 65, 0.55)";
+    c.fillStyle = "rgba(217, 65, 65, 0.8)";
     for (const [fx, fy] of [[222, 170], [222, 450], [878, 170], [878, 450]]) {
-      ctx.beginPath(); ctx.arc(fx, fy, 55, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(fx, fy, 6, 0, Math.PI * 2); ctx.fill();
+      c.beginPath(); c.arc(fx, fy, 55, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.arc(fx, fy, 6, 0, Math.PI * 2); c.fill();
     }
     // Neutral zone dots
     for (const [fx, fy] of [[460, 170], [460, 450], [640, 170], [640, 450]]) {
-      ctx.beginPath(); ctx.arc(fx, fy, 6, 0, Math.PI * 2); ctx.fill();
+      c.beginPath(); c.arc(fx, fy, 6, 0, Math.PI * 2); c.fill();
     }
 
     // Creases
-    ctx.fillStyle = "rgba(147, 197, 253, 0.55)";
-    ctx.strokeStyle = "#d94141";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(95, 310, 45, -Math.PI / 2, Math.PI / 2); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(1005, 310, 45, Math.PI / 2, -Math.PI / 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    c.fillStyle = "rgba(147, 197, 253, 0.55)";
+    c.strokeStyle = "#d94141";
+    c.lineWidth = 2;
+    c.beginPath(); c.arc(95, 310, 45, -Math.PI / 2, Math.PI / 2); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.arc(1005, 310, 45, Math.PI / 2, -Math.PI / 2); c.closePath(); c.fill(); c.stroke();
 
     // Nets
     for (const side of ["left", "right"]) {
       const n = netFor(side);
       const w = 30, h = 58;
       const x0 = side === "left" ? n.x - w : n.x;
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.fillRect(x0, n.y - h / 2, w, h);
-      ctx.strokeStyle = "#b93030";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x0, n.y - h / 2, w, h);
-      ctx.strokeStyle = "rgba(120,120,120,0.5)";
-      ctx.lineWidth = 1;
+      c.fillStyle = "rgba(255,255,255,0.9)";
+      c.fillRect(x0, n.y - h / 2, w, h);
+      c.strokeStyle = "#b93030";
+      c.lineWidth = 3;
+      c.strokeRect(x0, n.y - h / 2, w, h);
+      c.strokeStyle = "rgba(120,120,120,0.5)";
+      c.lineWidth = 1;
       for (let i = 1; i < 4; i++) {
-        ctx.beginPath(); ctx.moveTo(x0 + (w / 4) * i, n.y - h / 2); ctx.lineTo(x0 + (w / 4) * i, n.y + h / 2); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x0, n.y - h / 2 + (h / 4) * i); ctx.lineTo(x0 + w, n.y - h / 2 + (h / 4) * i); ctx.stroke();
+        c.beginPath(); c.moveTo(x0 + (w / 4) * i, n.y - h / 2); c.lineTo(x0 + (w / 4) * i, n.y + h / 2); c.stroke();
+        c.beginPath(); c.moveTo(x0, n.y - h / 2 + (h / 4) * i); c.lineTo(x0 + w, n.y - h / 2 + (h / 4) * i); c.stroke();
       }
     }
 
-    ctx.restore();
+    c.restore();
 
-    // Boards
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "#12263a";
-    roundRect(ctx, 20, 20, 1060, 580, 110);
-    ctx.stroke();
+    // Boards with inner glow
+    c.lineWidth = 9;
+    c.strokeStyle = "rgba(18, 38, 58, 0.12)";
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    c.stroke();
+    c.lineWidth = 5;
+    c.strokeStyle = "#12263a";
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    c.stroke();
   }
 
   function drawOverlays() {
@@ -741,30 +852,182 @@
     ctx.restore();
   }
 
-  function drawMarker(x, y, label, fill, radius, stroke = "#111", strokeW = 2) {
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.25)";
-    ctx.shadowBlur = 5;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+  const TEAM_STYLES = {
+    you:       { jersey: "#2456ff", trim: "#0a1c56", helmet: "#0a1c56" },
+    teammate:  { jersey: "#f08a24", trim: "#8a4d0f", helmet: "#6b3a0c" },
+    opponent:  { jersey: "#cc2b2b", trim: "#5e1111", helmet: "#3f0b0b" },
+    ourGoalie: { jersey: "#0d9488", trim: "#06463f", helmet: "#06463f" },
+    oppGoalie: { jersey: "#a11d1d", trim: "#4a0d0d", helmet: "#380808" }
+  };
 
-    ctx.lineWidth = strokeW;
-    ctx.strokeStyle = stroke;
+  function drawRoleChip(p, style, t) {
+    const label = p.role;
+    if (!label) return;
+    ctx.font = "bold 10px system-ui";
+    const tw = ctx.measureText(label).width;
+    const w = tw + 10, h = 14;
+    const y = p.y + (p.r || 16) + 8;
+    ctx.save();
+    roundRectPath(ctx, p.x - w / 2, y, w, h, 6);
+    ctx.fillStyle = style.isYou ? "#facc15" : "rgba(15, 23, 42, 0.75)";
+    ctx.fill();
+    ctx.fillStyle = style.isYou ? "#1f2937" : "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, p.x, y + h / 2 + 0.5);
+    ctx.restore();
+  }
+
+  function drawSkater(p, style, t) {
+    p._ph ??= Math.random() * Math.PI * 2;
+    const R = p.r || 16;
+    const s = R / 16;
+    const a = p.angle || 0;
+    const stride = p._moving ? Math.sin(t / 70 + p._ph) * 2.2 : 0;
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+
+    // Shadow on the ice
+    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
     ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.ellipse(2 * s, 4 * s, 15 * s, 11 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.rotate(a);
+    ctx.scale(s, s);
+
+    // Stick (shaft + blade), waggling slightly while skating
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#8a5a2b";
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(3, 9);
+    ctx.lineTo(21, 13 + stride);
+    ctx.stroke();
+    ctx.strokeStyle = "#3d2b1f";
+    ctx.lineWidth = 3.8;
+    ctx.beginPath();
+    ctx.moveTo(21, 13 + stride);
+    ctx.lineTo(27, 10.5 + stride);
     ctx.stroke();
 
-    if (label) {
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 12px system-ui";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, x, y);
+    // Body: shoulder pads (wide across the direction of travel)
+    ctx.fillStyle = style.jersey;
+    ctx.strokeStyle = style.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 11, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Jersey shoulder stripe
+    ctx.strokeStyle = "rgba(255,255,255,0.65)";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-3.5, -13);
+    ctx.lineTo(-3.5, 13);
+    ctx.stroke();
+
+    // Gloves at the shoulder tips
+    ctx.fillStyle = style.trim;
+    ctx.beginPath(); ctx.arc(3, -13.5, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, 13.5, 3.6, 0, Math.PI * 2); ctx.fill();
+
+    // Helmet with a shine
+    ctx.fillStyle = style.helmet;
+    ctx.beginPath(); ctx.arc(1.5, 0, 6.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.arc(3.4, -1.8, 2.2, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+
+    drawRoleChip(p, style, t);
+  }
+
+  function drawGoalie(p, style, t) {
+    const R = (p.r || 16) + 2;
+    const s = R / 16;
+    const a = p.angle || 0;
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(2 * s, 4 * s, 16 * s, 13 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.rotate(a);
+    ctx.scale(s, s);
+
+    // Leg pads out front
+    ctx.fillStyle = "#efe3cd";
+    ctx.strokeStyle = "#b7a27b";
+    ctx.lineWidth = 1.5;
+    roundRectPath(ctx, 5, -15, 8, 12, 3); ctx.fill(); ctx.stroke();
+    roundRectPath(ctx, 5, 3, 8, 12, 3); ctx.fill(); ctx.stroke();
+
+    // Goalie stick held across
+    ctx.strokeStyle = "#3d2b1f";
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(12, -12);
+    ctx.lineTo(12, 12);
+    ctx.stroke();
+
+    // Body
+    ctx.fillStyle = style.jersey;
+    ctx.strokeStyle = style.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 15.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Mask
+    ctx.fillStyle = "#f5f5f5";
+    ctx.strokeStyle = style.trim;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(1.5, 0, 6.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(80,80,80,0.7)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-1, -4); ctx.lineTo(-1, 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2, -4.5); ctx.lineTo(2, 4.5); ctx.stroke();
+
+    ctx.restore();
+
+    drawRoleChip(p, style, t);
+  }
+
+  function drawPuck(t) {
+    // Motion trail
+    for (let i = 0; i < puckTrail.length; i++) {
+      const q = puckTrail[i];
+      const k = (i + 1) / puckTrail.length;
+      ctx.fillStyle = `rgba(30, 41, 59, ${0.05 + k * 0.16})`;
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, puck.r * (0.4 + k * 0.5), 0, Math.PI * 2);
+      ctx.fill();
     }
+    // Disc
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    const g = ctx.createRadialGradient(puck.x - 2, puck.y - 2, 1, puck.x, puck.y, puck.r);
+    g.addColorStop(0, "#3a3a3a");
+    g.addColorStop(1, "#0b0b0b");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(puck.x, puck.y, puck.r - 2.5, -2.4, -0.9);
+    ctx.stroke();
   }
 
   function drawDirectionTag() {
@@ -781,116 +1044,158 @@
     ctx.fillText(text, 550, 52);
   }
 
-  function drawBanner(b) {
+  function drawGuidance(t) {
+    if (!scenario || scenario.mode !== "single") return;
+    const reveal = (diffSel.value === "easy" && !choice.active) || renderState.showGuidance;
+    if (!reveal) return;
+    ctx.save();
+    ctx.globalAlpha = 0.14 + Math.sin(t / 500) * 0.03;
+    ctx.fillStyle = "#00aa00";
+    ctx.beginPath();
+    ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (renderState.showGuidance) {
+      ctx.save();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = renderState.guidanceOk ? "#0a0" : "#c22";
+      ctx.setLineDash([10, 8]);
+      ctx.lineDashOffset = -t / 30;
+      ctx.beginPath();
+      ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawChoices(t) {
+    if (!choice.active) return;
+    for (const o of choice.options) {
+      const pulse = Math.sin(t / 280 + o.label.charCodeAt(0)) * 2.5;
+      const r = 25 + pulse;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = 7;
+      ctx.shadowOffsetY = 2;
+      ctx.fillStyle = "#fffbeb";
+      ctx.beginPath();
+      ctx.arc(o.pos.x, o.pos.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#f59e0b";
+      ctx.beginPath();
+      ctx.arc(o.pos.x, o.pos.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#b45309";
+      ctx.font = "bold 22px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(o.label, o.pos.x, o.pos.y);
+    }
+  }
+
+  function drawYouHalo(t) {
+    if (HIQ.Sim.isRunning() || choice.active) return;
+    for (const p of controlled) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.9)";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 5]);
+      ctx.lineDashOffset = -t / 40;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (p.r || 19) + 8 + Math.sin(t / 350) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function easeOutBack(k) {
+    const c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
+  }
+
+  function drawBanner(t) {
+    const b = renderState.banner;
     if (!b) return;
+
     if (b.light) {
       const n = netFor(b.light);
-      const g = ctx.createRadialGradient(n.x, n.y, 10, n.x, n.y, 120);
-      g.addColorStop(0, "rgba(255, 40, 40, 0.55)");
+      const pulse = 0.45 + Math.sin(t / 120) * 0.2;
+      const g = ctx.createRadialGradient(n.x, n.y, 10, n.x, n.y, 130);
+      g.addColorStop(0, `rgba(255, 40, 40, ${pulse})`);
       g.addColorStop(1, "rgba(255, 40, 40, 0)");
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(n.x, n.y, 120, 0, Math.PI * 2);
+      ctx.arc(n.x, n.y, 130, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    const age = t - renderState.bannerAt;
+    const k = clamp(age / 240, 0, 1);
+    const scale = 0.75 + 0.25 * easeOutBack(k);
+
     ctx.save();
+    ctx.globalAlpha = clamp(age / 160, 0, 1);
+    ctx.translate(550, 130);
+    ctx.scale(scale, scale);
     ctx.font = "bold 44px system-ui";
     const w = Math.max(360, ctx.measureText(b.text).width + 90);
     const h = b.sub ? 108 : 78;
-    roundRect(ctx, 550 - w / 2, 92, w, h, 22);
-    ctx.fillStyle = "rgba(10, 18, 32, 0.85)";
+    roundRectPath(ctx, -w / 2, -38, w, h, 22);
+    ctx.fillStyle = "rgba(10, 18, 32, 0.86)";
     ctx.fill();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = b.color || "#fff";
-    ctx.fillText(b.text, 550, 132);
+    ctx.fillText(b.text, 0, 2);
     if (b.sub) {
       ctx.font = "600 19px system-ui";
       ctx.fillStyle = "#e2e8f0";
-      ctx.fillText(b.sub, 550, 172);
+      ctx.fillText(b.sub, 0, 42);
     }
     ctx.restore();
   }
 
-  function draw(opts = {}) {
+  function draw(t) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawRink();
+    ctx.drawImage(rinkLayer, 0, 0);
     drawOverlays();
     drawDirectionTag();
+    drawGuidance(t);
 
-    // Guidance area
-    if (scenario && scenario.mode === "single") {
-      const reveal = (diffSel.value === "easy" && !choice.active) || opts.showGuidance;
-      if (reveal) {
-        ctx.save();
-        ctx.globalAlpha = 0.16;
-        ctx.fillStyle = "#00aa00";
-        ctx.beginPath();
-        ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        if (opts.showGuidance) {
-          ctx.lineWidth = 4;
-          ctx.strokeStyle = opts.ok ? "#0a0" : "#c22";
-          ctx.setLineDash([10, 8]);
-          ctx.beginPath();
-          ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-      }
-    }
+    drawYouHalo(t);
 
-    // Pieces
+    // Opponents (their goalie in dark red; our goalie may live in this array on PK/defense)
     defense.forEach(p => {
       const friendlyG = isFriendlyGoalie(p);
-      drawMarker(p.x, p.y, p.role, friendlyG ? "#0d9488" : "#cc2b2b", p.r || 16, friendlyG ? "#064e46" : "#5e1111");
-    });
-    offense.forEach(p => drawMarker(p.x, p.y, p.role, p.role === "G" ? "#0d9488" : "#f08a24", p.r || 16, "#7a4310"));
-
-    controlled.forEach(p => {
-      if (!HIQ.Sim.isRunning() && !choice.active) {
-        ctx.save();
-        ctx.strokeStyle = "rgba(250, 204, 21, 0.9)";
-        ctx.lineWidth = 3;
-        ctx.setLineDash([6, 5]);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, (p.r || 19) + 7, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-      drawMarker(p.x, p.y, p.role, "#1e4fff", p.r || 19, "#0b1b55", 3);
+      if (p.role === "G") drawGoalie(p, friendlyG ? TEAM_STYLES.ourGoalie : TEAM_STYLES.oppGoalie, t);
+      else drawSkater(p, TEAM_STYLES.opponent, t);
     });
 
-    // Puck
-    drawMarker(puck.x, puck.y, "", "#111", puck.r, "#444", 1);
+    // Teammates
+    offense.forEach(p => {
+      if (p.role === "G") drawGoalie(p, TEAM_STYLES.ourGoalie, t);
+      else drawSkater(p, TEAM_STYLES.teammate, t);
+    });
 
-    // A/B/C options
-    if (choice.active) {
-      for (const o of choice.options) {
-        ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.3)";
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetY = 2;
-        ctx.fillStyle = "#fffbeb";
-        ctx.beginPath();
-        ctx.arc(o.pos.x, o.pos.y, 26, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = "#f59e0b";
-        ctx.beginPath();
-        ctx.arc(o.pos.x, o.pos.y, 26, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = "#b45309";
-        ctx.font = "bold 22px system-ui";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(o.label, o.pos.x, o.pos.y);
-      }
-    }
+    // You
+    controlled.forEach(p => drawSkater(p, { ...TEAM_STYLES.you, isYou: true }, t));
 
-    drawBanner(opts.banner ?? null);
+    drawPuck(t);
+    drawChoices(t);
+    drawParticles();
+    drawBanner(t);
+  }
+
+  function tick(t) {
+    const dt = Math.min(0.05, lastTick ? (t - lastTick) / 1000 : 0.016);
+    lastTick = t;
+    updateHeadings(dt);
+    updatePuckTrail();
+    updateParticles(dt);
+    draw(t);
+    requestAnimationFrame(tick);
   }
 
   // --- Input (drag + choice taps)
@@ -920,8 +1225,8 @@
     takeSnapshot();
     choice.active = false;
     const you = controlled[0];
-    HIQ.Sim.run([{ d: 320, movers: [{ obj: you, to: { x: opt.pos.x, y: opt.pos.y } }] }], {
-      onFrame: () => draw(),
+    HIQ.Sim.run([{ d: 340, movers: [{ obj: you, to: { x: opt.pos.x, y: opt.pos.y } }] }], {
+      onFrame: () => {},
       onDone: () => lockIn(opt)
     });
   }
@@ -951,7 +1256,6 @@
     const p = getPos(evt);
     activeDrag.x = clamp(p.x, 50, 1050);
     activeDrag.y = clamp(p.y, 50, 570);
-    draw();
   }
 
   function pointerUp() {
@@ -980,7 +1284,6 @@
     ppStructWrap.style.display = isSpecial ? "" : "none";
     pkStructWrap.style.display = isSpecial ? "" : "none";
     if (scenario) buildScenario();
-    else draw();
   }
 
   [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, pressureFilterSel, ppStructSel, pkStructSel, overlaySel]
@@ -992,7 +1295,7 @@
     getPieces: () => ({ controlled, offense, defense, puck: { x: puck.x, y: puck.y }, guidance: { ...guidance } }),
     getChoices: () => choice.options,
     choiceActive: () => choice.active,
-    place: (x, y) => { if (controlled[0]) { controlled[0].x = x; controlled[0].y = y; draw(); } },
+    place: (x, y) => { if (controlled[0]) { controlled[0].x = x; controlled[0].y = y; } },
     lock: () => lockIn(),
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning()
@@ -1001,5 +1304,7 @@
   // Init
   ppStructWrap.style.display = "none";
   pkStructWrap.style.display = "none";
+  buildRinkLayer();
   buildScenario();
+  requestAnimationFrame(tick);
 })();
