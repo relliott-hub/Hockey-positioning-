@@ -57,8 +57,9 @@
   let snapshot = null;
   let pendingTimer = null;
 
-  const renderState = { banner: null, bannerAt: 0, showGuidance: false, guidanceOk: null };
+  const renderState = { banner: null, bannerAt: 0, showGuidance: false, guidanceOk: null, shakeAt: 0, shakeMag: 0, intro: null };
   let particles = [];
+  let effects = [];
   const puckTrail = [];
   let lastTick = 0;
 
@@ -208,6 +209,7 @@
     setBanner(null);
     renderState.showGuidance = false;
     puckTrail.length = 0;
+    effects = [];
 
     const fmt = formatSel.value;
     const mode = modeSel.value;
@@ -288,6 +290,9 @@
     } else {
       statusEl.textContent = "Drag your whole team (blue) into a better shape, then tap Lock In.";
     }
+
+    renderState.intro = { text: `${scenario.phase.toUpperCase()}  •  ${fmt}`, at: performance.now() };
+    HIQ.audio.play("faceoff");
   }
 
   // --- A/B/C choice generation
@@ -376,6 +381,14 @@
     return best;
   }
 
+  // Ambient team motion: everyone drifts part-way toward a point so the whole
+  // play feels alive, not just the puck carriers.
+  function driftAll(list, exclude, target, amt) {
+    return list
+      .filter(p => !exclude.includes(p))
+      .map(p => mv(p, p.x + (target.x - p.x) * amt, p.y + (target.y - p.y) * amt));
+  }
+
   function buildSimScript(tier, receiver, subMsg) {
     const scen = scenario;
     const atk = attackSideOf(scen);
@@ -388,16 +401,33 @@
     const friendlySk = friendly.filter(p => p.role !== "G");
     const oppSk = defense.filter(p => p.role !== "G");
 
+    const atkSlot = slotFor(atk);
+
     if (!scen.isDefense) {
       // We have the puck.
       if (tier === "great" || tier === "good") {
         steps.push({ d: 450, msg: "Good spot! Watch the play…" });
-        steps.push({ d: 520, sound: "pass", movers: [mv(puck, receiver.x, receiver.y)] });
+        steps.push({
+          d: 520, sound: "pass",
+          movers: [
+            mv(puck, receiver.x, receiver.y),
+            ...driftAll(friendlySk, [receiver], atkSlot, 0.10),
+            ...driftAll(oppSk, [], atkSlot, 0.08)
+          ],
+          fx: { type: "ring", x: receiver.x, y: receiver.y, color: "96, 165, 250" }
+        });
         if (tier === "great") {
-          const carryTo = toward(receiver, slotFor(atk), 0.6);
-          steps.push({ d: 650, sound: "catch", movers: [mv(receiver, carryTo.x, carryTo.y), mv(puck, carryTo.x, carryTo.y)] });
+          const carryTo = toward(receiver, atkSlot, 0.6);
+          steps.push({
+            d: 650, sound: "catch",
+            movers: [
+              mv(receiver, carryTo.x, carryTo.y), mv(puck, carryTo.x, carryTo.y),
+              ...driftAll(friendlySk, [receiver], atkSlot, 0.15),
+              ...driftAll(oppSk, [], atkSlot, 0.12)
+            ]
+          });
           steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
-          steps.push({ d: 1400, sound: "goal", banner: { text: "GOAL! 🚨", sub: "Perfect positioning!", color: "#4ade80", light: atk, fx: "confetti" } });
+          steps.push({ d: 1400, sound: "goal", shake: 1, banner: { text: "GOAL! 🚨", sub: "Perfect positioning!", color: "#4ade80", light: atk, fx: "confetti" } });
         } else {
           let next = null, bd = Infinity;
           for (const p of friendlySk) {
@@ -407,7 +437,15 @@
           }
           if (next) {
             steps.push({ d: 240, sound: "catch" });
-            steps.push({ d: 520, sound: "pass", movers: [mv(puck, next.x, next.y)] });
+            steps.push({
+              d: 520, sound: "pass",
+              movers: [
+                mv(puck, next.x, next.y),
+                ...driftAll(friendlySk, [receiver, next], atkSlot, 0.08),
+                ...driftAll(oppSk, [], atkSlot, 0.08)
+              ],
+              fx: { type: "ring", x: next.x, y: next.y, color: "96, 165, 250" }
+            });
             steps.push({ d: 1300, sound: "good", banner: { text: "PLAY ALIVE! ⚡", sub: "Great option — the play continues!", color: "#7dd3fc" } });
           } else {
             steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
@@ -418,15 +456,28 @@
         steps.push({ d: 450, msg: "Hmm… watch what happens." });
         const mid = toward(puck, receiver, 0.55);
         const D = nearestTo(oppSk, mid.x, mid.y) || { x: mid.x, y: mid.y };
-        steps.push({ d: 560, sound: "pass", movers: [mv(puck, mid.x, mid.y), mv(D, mid.x, mid.y)] });
+        steps.push({
+          d: 560, sound: "pass",
+          movers: [
+            mv(puck, mid.x, mid.y), mv(D, mid.x, mid.y),
+            ...driftAll(oppSk, [D], mid, 0.10)
+          ]
+        });
         if (tier === "miss") {
           steps.push({ d: 1400, sound: "whistle", banner: { text: "TURNOVER ❌", sub: subMsg, color: "#fca5a5" } });
         } else {
           const counter = slotFor(ownS);
           steps.push({ d: 300, banner: { text: "TURNOVER ❌", sub: "They're coming back the other way!", color: "#fca5a5" } });
-          steps.push({ d: 700, movers: [mv(D, counter.x, counter.y), mv(puck, counter.x, counter.y)] });
+          steps.push({
+            d: 700,
+            movers: [
+              mv(D, counter.x, counter.y), mv(puck, counter.x, counter.y),
+              ...driftAll(oppSk, [D], counter, 0.18),
+              ...driftAll(friendlySk, [receiver], counter, 0.10)
+            ]
+          });
           steps.push({ d: 260, sound: "shot", movers: [mv(puck, ownNet.x, ownNet.y)] });
-          steps.push({ d: 1500, sound: "goalAgainst", banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
+          steps.push({ d: 1500, sound: "goalAgainst", shake: 0.7, banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
         }
       }
     } else {
@@ -435,16 +486,33 @@
       if (tier === "great" || tier === "good") {
         steps.push({ d: 450, msg: "They attack — watch your read…" });
         const cut = toward(puck, dangerSpot, 0.5);
-        steps.push({ d: 560, sound: "pass", movers: [mv(puck, cut.x, cut.y), mv(receiver, cut.x, cut.y)] });
-        steps.push({ d: 400, sound: "catch", banner: { text: "TAKEAWAY! 🛡️", sub: "You read the play!", color: "#4ade80" } });
+        steps.push({
+          d: 560, sound: "pass",
+          movers: [
+            mv(puck, cut.x, cut.y), mv(receiver, cut.x, cut.y),
+            ...driftAll(oppSk, [], dangerSpot, 0.10),
+            ...driftAll(friendlySk, [receiver], dangerSpot, 0.08)
+          ]
+        });
+        steps.push({ d: 400, sound: "catch", banner: { text: "TAKEAWAY! 🛡️", sub: "You read the play!", color: "#4ade80" }, fx: { type: "ring", x: cut.x, y: cut.y, color: "74, 222, 128" } });
         if (tier === "great") {
           const counter = slotFor(atk);
-          steps.push({ d: 850, banner: null, movers: [mv(receiver, counter.x, counter.y), mv(puck, counter.x, counter.y)] });
+          steps.push({
+            d: 850, banner: null,
+            movers: [
+              mv(receiver, counter.x, counter.y), mv(puck, counter.x, counter.y),
+              ...driftAll(friendlySk, [receiver], counter, 0.15),
+              ...driftAll(oppSk, [], counter, 0.12)
+            ]
+          });
           steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
-          steps.push({ d: 1500, sound: "goal", banner: { text: "COUNTER-ATTACK GOAL! 🚨", sub: "Defense turned into offense!", color: "#4ade80", light: atk, fx: "confetti" } });
+          steps.push({ d: 1500, sound: "goal", shake: 1, banner: { text: "COUNTER-ATTACK GOAL! 🚨", sub: "Defense turned into offense!", color: "#4ade80", light: atk, fx: "confetti" } });
         } else {
           const clearTo = { x: ownS === "right" ? 320 : 780, y: 80 };
-          steps.push({ d: 650, banner: null, sound: "clear", movers: [mv(puck, clearTo.x, clearTo.y)] });
+          steps.push({
+            d: 650, banner: null, sound: "clear",
+            movers: [mv(puck, clearTo.x, clearTo.y), ...driftAll(oppSk, [], clearTo, 0.06)]
+          });
           steps.push({ d: 1200, banner: { text: "CLEARED! ✅", sub: "Great defensive position!", color: "#4ade80" } });
         }
       } else {
@@ -452,15 +520,25 @@
         const carrier = nearestTo(oppSk, puck.x, puck.y);
         const others = oppSk.filter(p => p !== carrier);
         const open = nearestTo(others.length ? others : oppSk, dangerSpot.x, dangerSpot.y) || carrier;
-        steps.push({ d: 520, sound: "pass", movers: [mv(puck, open.x, open.y)] });
-        steps.push({ d: 450, sound: "pass", movers: [mv(puck, dangerSpot.x, dangerSpot.y), mv(open, dangerSpot.x, dangerSpot.y)] });
+        steps.push({
+          d: 520, sound: "pass",
+          movers: [mv(puck, open.x, open.y), ...driftAll(oppSk, [open], dangerSpot, 0.08)]
+        });
+        steps.push({
+          d: 450, sound: "pass",
+          movers: [
+            mv(puck, dangerSpot.x, dangerSpot.y), mv(open, dangerSpot.x, dangerSpot.y),
+            ...driftAll(friendlySk, [], dangerSpot, 0.12)
+          ]
+        });
         if (tier === "miss") {
           const savePt = toward(dangerSpot, ownNet, 0.75);
           steps.push({ d: 240, sound: "shot", movers: [mv(puck, savePt.x, savePt.y)] });
-          steps.push({ d: 1400, sound: "whistle", banner: { text: "BIG CHANCE AGAINST ⚠️", sub: (subMsg || "") + " Lucky save by your goalie!", color: "#fcd34d" } });
+          steps.push({ d: 200, sound: "save", fx: { type: "ring", x: savePt.x, y: savePt.y, color: "252, 211, 77" } });
+          steps.push({ d: 1300, sound: "whistle", banner: { text: "BIG CHANCE AGAINST ⚠️", sub: (subMsg || "") + " Lucky save by your goalie!", color: "#fcd34d" } });
         } else {
           steps.push({ d: 240, sound: "shot", movers: [mv(puck, ownNet.x, ownNet.y)] });
-          steps.push({ d: 1500, sound: "goalAgainst", banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
+          steps.push({ d: 1500, sound: "goalAgainst", shake: 0.7, banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
         }
       }
     }
@@ -549,6 +627,10 @@
     HIQ.Sim.run(steps, {
       onFrame: (banner) => { setBanner(banner); },
       onMsg: (m) => { statusEl.textContent = m; },
+      onStep: (s) => {
+        if (s.shake) { renderState.shakeAt = performance.now(); renderState.shakeMag = s.shake; }
+        if (s.fx) effects.push({ ...s.fx, at: performance.now() });
+      },
       onDone: (banner) => {
         setBanner(banner);
         if (ok) {
@@ -642,6 +724,7 @@
     const colors = ["#fbbf24", "#34d399", "#60a5fa", "#f87171", "#f472b6", "#ffffff"];
     for (let i = 0; i < 90; i++) {
       particles.push({
+        kind: "confetti",
         x: 550 + (Math.random() - 0.5) * 340,
         y: 130 + (Math.random() - 0.5) * 70,
         vx: (Math.random() - 0.5) * 280,
@@ -655,12 +738,31 @@
     }
   }
 
+  // Little puff of snow when a skater stops hard
+  function spawnSpray(x, y) {
+    for (let i = 0; i < 7; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 25 + Math.random() * 55;
+      particles.push({
+        kind: "spray",
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        size: 1.5 + Math.random() * 2.5,
+        rot: 0, vr: 0,
+        color: "#ffffff",
+        life: 0.35 + Math.random() * 0.25
+      });
+    }
+  }
+
   function updateParticles(dt) {
     for (const p of particles) {
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vy += 320 * dt;
+      if (p.kind === "confetti") p.vy += 320 * dt;
+      else { p.vx *= 0.92; p.vy *= 0.92; }
       p.rot += p.vr * dt;
     }
     particles = particles.filter(p => p.life > 0 && p.y < 660);
@@ -669,12 +771,30 @@
   function drawParticles() {
     for (const p of particles) {
       ctx.save();
-      ctx.globalAlpha = clamp(p.life, 0, 1);
+      ctx.globalAlpha = clamp(p.kind === "spray" ? p.life * 2 : p.life, 0, 1);
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
       ctx.fillStyle = p.color;
-      ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66);
+      if (p.kind === "confetti") {
+        ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
+    }
+  }
+
+  function drawEffects(t) {
+    effects = effects.filter(e => t - e.at < 600);
+    for (const e of effects) {
+      const k = (t - e.at) / 600;
+      ctx.strokeStyle = `rgba(${e.color || "255, 255, 255"}, ${1 - k})`;
+      ctx.lineWidth = 3.5 * (1 - k) + 1;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 10 + k * 36, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 
@@ -697,8 +817,51 @@
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
       p.angle += d * Math.min(1, dt * 8);
+
+      // Skate trail carving + snow spray on hard stops
+      p._trail ??= [];
+      if (p._moving) {
+        const lt = p._trail[p._trail.length - 1];
+        if (!lt || dist(lt.x, lt.y, p.x, p.y) > 4) p._trail.push({ x: p.x, y: p.y });
+        if (p._trail.length > 9) p._trail.shift();
+      } else if (p._trail.length) {
+        p._trail.shift();
+      }
+      if (p._wasMoving && !p._moving && Math.hypot(dx, dy) < 0.6) spawnSpray(p.x, p.y);
+      p._wasMoving = p._moving;
+
       p._px = p.x;
       p._py = p.y;
+    }
+  }
+
+  // Goalies always square up to the puck and hug their crease
+  function updateGoalies(dt) {
+    for (const p of [...defense, ...offense]) {
+      if (p.role !== "G") continue;
+      const net = dist(p.x, p.y, LM.leftNet.x, LM.leftNet.y) < dist(p.x, p.y, LM.rightNet.x, LM.rightNet.y)
+        ? LM.leftNet : LM.rightNet;
+      const ty = clamp(puck.y, net.y - 26, net.y + 26);
+      const tx = net.x + (net.x < 550 ? 8 : -8);
+      p.y += (ty - p.y) * Math.min(1, dt * 3);
+      p.x += (tx - p.x) * Math.min(1, dt * 1.5);
+    }
+  }
+
+  function drawTrails() {
+    for (const p of [...controlled, ...offense, ...defense]) {
+      const tr = p._trail;
+      if (!tr || tr.length < 2) continue;
+      for (let i = 1; i < tr.length; i++) {
+        const k = i / tr.length;
+        ctx.strokeStyle = `rgba(125, 170, 215, ${0.28 * k})`;
+        ctx.lineWidth = 3 * k + 1;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(tr[i - 1].x, tr[i - 1].y);
+        ctx.lineTo(tr[i].x, tr[i].y);
+        ctx.stroke();
+      }
     }
   }
 
@@ -766,12 +929,26 @@
     c.fillStyle = "rgba(220, 60, 60, 0.75)";
     c.fillRect(544, 20, 12, 580);
 
-    // Center circle
+    // Center circle with a faint home logo
     c.strokeStyle = "rgba(37, 99, 235, 0.6)";
     c.lineWidth = 3;
     c.beginPath(); c.arc(550, 310, 65, 0, Math.PI * 2); c.stroke();
+    c.font = "bold 34px system-ui";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillStyle = "rgba(37, 99, 235, 0.12)";
+    c.fillText("HIQ", 550, 310);
     c.fillStyle = "rgba(220, 60, 60, 0.8)";
     c.beginPath(); c.arc(550, 310, 5, 0, Math.PI * 2); c.fill();
+
+    // Board advertising strips (arena feel)
+    c.font = "bold 13px system-ui";
+    c.fillStyle = "rgba(18, 38, 58, 0.22)";
+    for (const y of [34, 588]) {
+      for (const x of [300, 550, 800]) {
+        c.fillText(x === 550 ? "★ HOCKEY IQ TRAINER ★" : "GO  TEAM  GO!", x, y);
+      }
+    }
 
     // Zone faceoff circles + dots
     c.strokeStyle = "rgba(217, 65, 65, 0.55)";
@@ -1115,6 +1292,26 @@
     return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
   }
 
+  function drawIntro(t) {
+    const i = renderState.intro;
+    if (!i || renderState.banner) return;
+    const age = t - i.at;
+    if (age > 1500) return;
+    const a = age < 200 ? age / 200 : (age > 1200 ? (1500 - age) / 300 : 1);
+    ctx.save();
+    ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.font = "bold 26px system-ui";
+    const w = ctx.measureText(i.text).width + 64;
+    roundRectPath(ctx, 550 - w / 2, 96, w, 46, 14);
+    ctx.fillStyle = "rgba(15, 42, 74, 0.82)";
+    ctx.fill();
+    ctx.fillStyle = "#ffd76a";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(i.text, 550, 120);
+    ctx.restore();
+  }
+
   function drawBanner(t) {
     const b = renderState.banner;
     if (!b) return;
@@ -1159,10 +1356,23 @@
 
   function draw(t) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Screen shake on big moments
+    let shx = 0, shy = 0;
+    const shAge = t - renderState.shakeAt;
+    if (renderState.shakeAt && shAge < 450) {
+      const k = (1 - shAge / 450) * renderState.shakeMag;
+      shx = (Math.random() - 0.5) * 12 * k;
+      shy = (Math.random() - 0.5) * 8 * k;
+    }
+    ctx.save();
+    ctx.translate(shx, shy);
+
     ctx.drawImage(rinkLayer, 0, 0);
     drawOverlays();
     drawDirectionTag();
     drawGuidance(t);
+    drawTrails();
 
     drawYouHalo(t);
 
@@ -1183,15 +1393,20 @@
     controlled.forEach(p => drawSkater(p, { ...TEAM_STYLES.you, isYou: true }, t));
 
     drawPuck(t);
+    drawEffects(t);
     drawChoices(t);
     drawParticles();
+    drawIntro(t);
     drawBanner(t);
+
+    ctx.restore();
   }
 
   function tick(t) {
     const dt = Math.min(0.05, lastTick ? (t - lastTick) / 1000 : 0.016);
     lastTick = t;
     updateHeadings(dt);
+    updateGoalies(dt);
     updatePuckTrail();
     updateParticles(dt);
     draw(t);

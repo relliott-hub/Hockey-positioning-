@@ -1,7 +1,8 @@
 /* Hockey IQ Trainer — play simulation runner.
    Runs a sequential list of steps; each step tweens pieces toward targets over its duration.
-   Step: { d: ms, movers: [{obj, to:{x,y}}], sound: name, msg: text, banner: {text,sub,color,light}|null }
-   A step without a `banner` key keeps the previous banner on screen. */
+   Step: { d: ms, movers: [{obj, to:{x,y}}], sound, msg, banner: {…}|null, fx: {…}, shake: n }
+   A step without a `banner` key keeps the previous banner on screen.
+   opts.onStep(step) fires once when each step begins (for effects like rings/shake). */
 window.HIQ = window.HIQ || {};
 
 HIQ.Sim = (() => {
@@ -30,6 +31,7 @@ HIQ.Sim = (() => {
         if (s.sound && HIQ.audio) HIQ.audio.play(s.sound);
         if ("banner" in s) banner = s.banner;
         if (s.msg && opts.onMsg) opts.onMsg(s.msg);
+        if (opts.onStep) opts.onStep(s);
         starts = (s.movers || []).map(m => ({ m, x0: m.obj.x, y0: m.obj.y }));
       }
       const p = Math.min(1, (now - t0) / (s.d || 1));
