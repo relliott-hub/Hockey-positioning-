@@ -13,8 +13,42 @@
 </header>
 
 <div id="wrap">
-  <div class="card">
-    <div class="row">
+  <div class="row" id="scorebar">
+    <span class="pill scoreboard">🥅 You <b id="gf">0</b> — <b id="ga">0</b> Opponent</span>
+    <span class="pill">🔥 Streak: <b id="streak">0</b></span>
+    <span class="pill">⭐ Level <b id="level">1</b></span>
+    <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
+    <span class="pill">Phase: <b id="phase">—</b></span>
+    <span class="pill">Pressure: <b id="pressure">—</b></span>
+    <span class="pill">Structure: <b id="structure">—</b></span>
+    <span class="pill">Last score: <b id="score">—</b></span>
+  </div>
+
+  <p id="prompt">Loading play…</p>
+  <p id="hint" style="display:none;"></p>
+
+  <div id="rotateHint">📱 Tip: turn your phone sideways for a bigger rink!</div>
+
+  <canvas id="rink" width="1100" height="620"></canvas>
+
+  <div class="row" id="actionRow">
+    <button id="newBtn">New Play</button>
+    <button id="lockBtn">Lock In</button>
+    <button id="muteBtn" title="Sound on/off">🔊</button>
+  </div>
+
+  <div id="coachBox">
+    <div id="coachAvatar"><span id="coachFace">😀</span><span id="coachCap">🧢</span></div>
+    <div class="bubble">
+      <div id="coachName">COACH</div>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <details id="settingsPanel" class="card" open>
+    <summary><b>⚙️ Game settings &amp; my player</b></summary>
+
+    <div class="row" style="margin-top:10px;">
       <label>Age group
         <select id="age">
           <option value="6-8">6–8 (Learn basics)</option>
@@ -106,10 +140,6 @@
           <option value="house">Show slot/house</option>
         </select>
       </label>
-
-      <button id="newBtn">New Play</button>
-      <button id="lockBtn">Lock In</button>
-      <button id="muteBtn" title="Sound on/off">🔊</button>
     </div>
 
     <div class="row" id="profileRow">
@@ -128,32 +158,8 @@
           <option value="gold">Golden</option>
         </select>
       </label>
-      <span class="pill">⭐ Level <b id="level">1</b></span>
-      <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
     </div>
-  </div>
-
-  <div class="row">
-    <span class="pill scoreboard">🥅 You <b id="gf">0</b> — <b id="ga">0</b> Opponent</span>
-    <span class="pill">🔥 Streak: <b id="streak">0</b></span>
-    <span class="pill">Phase: <b id="phase">—</b></span>
-    <span class="pill">Pressure: <b id="pressure">—</b></span>
-    <span class="pill">Structure: <b id="structure">—</b></span>
-    <span class="pill">Last score: <b id="score">—</b></span>
-  </div>
-
-  <p id="prompt">Loading play…</p>
-  <p id="hint" style="display:none;"></p>
-
-  <canvas id="rink" width="1100" height="620"></canvas>
-
-  <div id="coachBox">
-    <div id="coachAvatar"><span id="coachFace">😀</span><span id="coachCap">🧢</span></div>
-    <div class="bubble">
-      <div id="coachName">COACH</div>
-      <div id="status"></div>
-    </div>
-  </div>
+  </details>
 
   <div class="legend">
     <span><i class="dot" id="dotTeam" style="background:#2456ff"></i> Your team (gold ring = you)</span>

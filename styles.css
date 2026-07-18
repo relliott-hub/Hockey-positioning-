@@ -214,3 +214,54 @@ th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
 .toast .t-sub { font-weight: 500; font-size: 12.5px; color: #cbd5e1; }
 @keyframes toastIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
 @keyframes toastOut { to { transform: translateX(130%); opacity: 0; } }
+
+/* Game-first layout */
+#scorebar { margin-bottom: 4px; }
+canvas { margin-top: 6px; }
+#actionRow { margin-top: 10px; }
+#actionRow button { min-width: 120px; }
+#settingsPanel { margin-top: 12px; }
+#settingsPanel summary { cursor: pointer; font-size: 15px; color: #0f2a4a; }
+#profileRow label { min-width: 120px; }
+
+/* --- Mobile --- */
+#rotateHint {
+  display: none;
+  background: #fff7e0;
+  border: 1px solid #f0d48a;
+  color: #7a5b12;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 760px) {
+  header { padding: 10px 14px; }
+  header h1 { font-size: 18px; }
+  header .tag { display: none; }
+  #wrap { padding: 8px; }
+  .card { padding: 10px; }
+  .row { gap: 8px; }
+  label { font-size: 11px; flex: 1 1 44%; min-width: 130px; }
+  label select, #pName { width: 100%; font-size: 14px; padding: 10px 8px; }
+  #pNum { width: 100%; }
+  #actionRow button { flex: 1 1 30%; min-width: 0; padding: 13px 8px; font-size: 15px; }
+  #muteBtn { flex: 0 0 52px; }
+  .pill { font-size: 12px; padding: 4px 9px; }
+  #prompt { font-size: 14.5px; }
+  #hint { font-size: 12.5px; }
+  #status { font-size: 14px; }
+  #coachAvatar { width: 46px; height: 46px; flex-basis: 46px; font-size: 24px; }
+  #xpwrap { width: 110px; }
+  .legend { font-size: 11.5px; }
+  #toasts { left: 12px; right: 12px; top: 10px; }
+  .toast { font-size: 13.5px; padding: 8px 12px; }
+  #badgeGrid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  table { font-size: 11px; }
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  #rotateHint { display: block; }
+}

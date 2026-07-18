@@ -951,7 +951,7 @@
       p.angle += d * Math.min(1, dt * 8);
 
       // Skate trail carving + snow spray on hard stops
-      p._trail ??= [];
+      if (!p._trail) p._trail = [];
       if (p._moving) {
         const lt = p._trail[p._trail.length - 1];
         if (!lt || dist(lt.x, lt.y, p.x, p.y) > 4) p._trail.push({ x: p.x, y: p.y });
@@ -1192,7 +1192,7 @@
   }
 
   function drawSkater(p, style, t) {
-    p._ph ??= Math.random() * Math.PI * 2;
+    if (p._ph === undefined) p._ph = Math.random() * Math.PI * 2;
     const R = p.r || 16;
     const s = R / 16;
     const a = p.angle || 0;
@@ -1678,6 +1678,9 @@
   // Init
   ppStructWrap.style.display = "none";
   pkStructWrap.style.display = "none";
+  // Phones: start with the settings panel collapsed so the rink is front and center
+  const settingsPanel = document.getElementById("settingsPanel");
+  if (settingsPanel && window.innerWidth <= 760) settingsPanel.open = false;
   syncProfileUI();
   renderProgress();
   renderTrophies();
