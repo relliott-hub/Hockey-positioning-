@@ -13,7 +13,11 @@ body {
   margin: 0;
   background: var(--ice);
   color: #12263a;
+  -webkit-text-size-adjust: 100%;
 }
+
+/* Kill the mobile double-tap-zoom delay so buttons respond instantly */
+button, select, input, summary { touch-action: manipulation; }
 
 header {
   background: linear-gradient(135deg, #0f2a4a, #14477e);

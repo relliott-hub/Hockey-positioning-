@@ -1,3 +1,1240 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hockey IQ Trainer</title>
+<style>
+:root {
+  --navy: #0f2a4a;
+  --ice: #eef5fb;
+  --accent: #1e4fff;
+  --good: #16a34a;
+  --bad: #dc2626;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", system-ui, Arial, sans-serif;
+  margin: 0;
+  background: var(--ice);
+  color: #12263a;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Kill the mobile double-tap-zoom delay so buttons respond instantly */
+button, select, input, summary { touch-action: manipulation; }
+
+header {
+  background: linear-gradient(135deg, #0f2a4a, #14477e);
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+header h1 { font-size: 22px; margin: 0; }
+header .tag { font-size: 13px; opacity: 0.85; }
+
+#wrap { max-width: 1080px; margin: 0 auto; padding: 14px; }
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 8px rgba(15, 42, 74, 0.08);
+  margin-bottom: 12px;
+}
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.row + .row { margin-top: 10px; }
+
+label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #33506b;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+select {
+  font-size: 15px;
+  font-weight: 400;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #c5d4e4;
+  background: #fff;
+  color: #12263a;
+}
+
+button {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+}
+button:active { transform: scale(0.97); }
+#newBtn { background: var(--good); }
+#lockBtn { background: var(--accent); }
+#muteBtn { background: #e5eef7; color: #12263a; padding: 10px 12px; }
+
+.pill {
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #eef4fb;
+  border: 1px solid #d7e3f0;
+  border-radius: 999px;
+  font-size: 14px;
+  align-items: center;
+}
+.pill b { color: var(--navy); }
+.pill.scoreboard { background: #0f2a4a; color: #fff; border-color: #0f2a4a; }
+.pill.scoreboard b { color: #ffd76a; }
+
+#prompt { margin: 12px 0 4px; font-size: 17px; font-weight: 600; }
+#hint { font-size: 14px; font-weight: 600; color: #0b6b3a; margin: 0 0 8px; }
+
+canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  touch-action: none;
+  display: block;
+  box-shadow: 0 3px 12px rgba(15, 42, 74, 0.15);
+  background: #fff;
+}
+
+#status { margin-top: 10px; font-size: 16px; min-height: 24px; }
+
+.legend { font-size: 13px; color: #33506b; margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; margin-right: 12px; gap: 6px; }
+.dot { width: 12px; height: 12px; border-radius: 999px; display: inline-block; border: 1px solid #111; }
+
+details { margin-top: 12px; }
+summary { cursor: pointer; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
+.muted { color: #555; font-size: 13px; }
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  margin-right: 6px;
+  font-size: 12px;
+}
+.warn { color: #7a3b00; }
+
+/* Player profile */
+#profileRow { margin-top: 10px; border-top: 1px dashed #d7e3f0; padding-top: 10px; }
+#pName { font-size: 15px; padding: 8px 10px; border-radius: 10px; border: 1px solid #c5d4e4; width: 140px; }
+#pNum { font-size: 15px; padding: 8px 6px; border-radius: 10px; border: 1px solid #c5d4e4; width: 64px; }
+#xpwrap {
+  width: 150px; height: 12px; border-radius: 999px;
+  background: #dbe7f3; overflow: hidden; border: 1px solid #c5d4e4;
+  align-self: center;
+}
+#xpfill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+/* Coach box */
+#coachBox { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; }
+#coachAvatar {
+  position: relative;
+  width: 58px; height: 58px; flex: 0 0 58px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ffe9c7, #f5c98a);
+  border: 3px solid #0f2a4a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px;
+  box-shadow: 0 2px 6px rgba(15, 42, 74, 0.25);
+}
+#coachCap {
+  position: absolute; top: -14px; left: 4px;
+  font-size: 24px;
+  transform: rotate(-15deg);
+}
+#coachBox .bubble {
+  position: relative;
+  background: #fff;
+  border: 2px solid #c5d4e4;
+  border-radius: 14px;
+  padding: 8px 14px;
+  flex: 1;
+  min-height: 44px;
+  box-shadow: 0 2px 8px rgba(15, 42, 74, 0.08);
+}
+#coachBox .bubble::before {
+  content: "";
+  position: absolute; left: -10px; top: 20px;
+  border: 6px solid transparent;
+  border-right-color: #c5d4e4;
+}
+#coachName { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: #64809c; }
+#status { margin-top: 2px; font-size: 16px; min-height: 22px; }
+
+/* Trophy case */
+#badgeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.badge-card {
+  border: 1px solid #d7e3f0;
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(180deg, #fff, #f4f9ff);
+  text-align: center;
+}
+.badge-card .b-emoji { font-size: 30px; }
+.badge-card .b-name { font-weight: 800; font-size: 13px; margin-top: 4px; color: #0f2a4a; }
+.badge-card .b-desc { font-size: 11.5px; color: #64809c; margin-top: 2px; }
+.badge-card.locked { opacity: 0.45; filter: grayscale(1); }
+.badge-card.locked .b-emoji { filter: blur(1px); }
+
+/* Toasts */
+#toasts {
+  position: fixed;
+  top: 16px; right: 16px;
+  z-index: 50;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  background: #0f2a4a;
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(15, 42, 74, 0.35);
+  display: flex; align-items: center; gap: 10px;
+  animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), toastOut 0.4s ease 3.4s forwards;
+}
+.toast .t-emoji { font-size: 26px; }
+.toast .t-sub { font-weight: 500; font-size: 12.5px; color: #cbd5e1; }
+@keyframes toastIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
+@keyframes toastOut { to { transform: translateX(130%); opacity: 0; } }
+
+/* Game-first layout */
+#scorebar { margin-bottom: 4px; }
+canvas { margin-top: 6px; }
+#actionRow { margin-top: 10px; }
+#actionRow button { min-width: 120px; }
+#settingsPanel { margin-top: 12px; }
+#settingsPanel summary { cursor: pointer; font-size: 15px; color: #0f2a4a; }
+#profileRow label { min-width: 120px; }
+
+/* --- Mobile --- */
+#rotateHint {
+  display: none;
+  background: #fff7e0;
+  border: 1px solid #f0d48a;
+  color: #7a5b12;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 760px) {
+  header { padding: 10px 14px; }
+  header h1 { font-size: 18px; }
+  header .tag { display: none; }
+  #wrap { padding: 8px; }
+  .card { padding: 10px; }
+  .row { gap: 8px; }
+  label { font-size: 11px; flex: 1 1 44%; min-width: 130px; }
+  label select, #pName { width: 100%; font-size: 14px; padding: 10px 8px; }
+  #pNum { width: 100%; }
+  #actionRow button { flex: 1 1 30%; min-width: 0; padding: 13px 8px; font-size: 15px; }
+  #muteBtn { flex: 0 0 52px; }
+  .pill { font-size: 12px; padding: 4px 9px; }
+  #prompt { font-size: 14.5px; }
+  #hint { font-size: 12.5px; }
+  #status { font-size: 14px; }
+  #coachAvatar { width: 46px; height: 46px; flex-basis: 46px; font-size: 24px; }
+  #xpwrap { width: 110px; }
+  .legend { font-size: 11.5px; }
+  #toasts { left: 12px; right: 12px; top: 10px; }
+  .toast { font-size: 13.5px; padding: 8px 12px; }
+  #badgeGrid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  table { font-size: 11px; }
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  #rotateHint { display: block; }
+}
+
+</style>
+
+<header>
+  <h1>🏒 Hockey IQ Trainer</h1>
+  <span class="tag">Learn where to be on the ice — pick your spot, then watch the play!</span>
+</header>
+
+<div id="wrap">
+  <div class="row" id="scorebar">
+    <span class="pill scoreboard">🥅 You <b id="gf">0</b> — <b id="ga">0</b> Opponent</span>
+    <span class="pill">🔥 Streak: <b id="streak">0</b></span>
+    <span class="pill">⭐ Level <b id="level">1</b></span>
+    <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
+    <span class="pill">Phase: <b id="phase">—</b></span>
+    <span class="pill">Pressure: <b id="pressure">—</b></span>
+    <span class="pill">Structure: <b id="structure">—</b></span>
+    <span class="pill">Last score: <b id="score">—</b></span>
+  </div>
+
+  <p id="prompt">Loading play…</p>
+  <p id="hint" style="display:none;"></p>
+
+  <div id="rotateHint">📱 Tip: turn your phone sideways for a bigger rink!</div>
+
+  <canvas id="rink" width="1100" height="620"></canvas>
+
+  <div class="row" id="actionRow">
+    <button id="newBtn">New Play</button>
+    <button id="lockBtn">Lock In</button>
+    <button id="muteBtn" title="Sound on/off">🔊</button>
+  </div>
+
+  <div id="coachBox">
+    <div id="coachAvatar"><span id="coachFace">😀</span><span id="coachCap">🧢</span></div>
+    <div class="bubble">
+      <div id="coachName">COACH</div>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <details id="settingsPanel" class="card" open>
+    <summary><b>⚙️ Game settings &amp; my player</b></summary>
+
+    <div class="row" style="margin-top:10px;">
+      <label>Age group
+        <select id="age">
+          <option value="6-8">6–8 (Learn basics)</option>
+          <option value="9-11" selected>9–11 (Develop hockey IQ)</option>
+          <option value="12-14">12–14 (Advanced reads)</option>
+        </select>
+      </label>
+
+      <label>Game format
+        <select id="format">
+          <option value="5v5" selected>5v5 (Even Strength)</option>
+          <option value="5v4">5v4 (Power Play)</option>
+          <option value="4v5">4v5 (Penalty Kill)</option>
+        </select>
+      </label>
+
+      <label>Control mode
+        <select id="mode">
+          <option value="single" selected>Single Player</option>
+          <option value="multi">Multi (Control your whole team)</option>
+        </select>
+      </label>
+
+      <label id="roleWrap">You play
+        <select id="role">
+          <option value="C">Center (C)</option>
+          <option value="LW">Left Wing (LW)</option>
+          <option value="RW">Right Wing (RW)</option>
+          <option value="LD">Left D (LD)</option>
+          <option value="RD">Right D (RD)</option>
+        </select>
+      </label>
+
+      <label>Answer style
+        <select id="answerStyle">
+          <option value="choices" selected>Tap A / B / C</option>
+          <option value="drag">Free drag (advanced)</option>
+        </select>
+      </label>
+
+      <label>Difficulty
+        <select id="diff">
+          <option value="easy">Beginner</option>
+          <option value="med" selected>Intermediate</option>
+          <option value="hard">Advanced</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>Phase filter
+        <select id="phaseFilter">
+          <option value="any" selected>Any</option>
+          <option value="Breakout">Breakout</option>
+          <option value="Rush">Rush</option>
+          <option value="O-zone">O-zone</option>
+          <option value="Defend">Defend</option>
+          <option value="Special">Special Teams</option>
+        </select>
+      </label>
+
+      <label>Pressure
+        <select id="pressureFilter">
+          <option value="any" selected>Any</option>
+          <option value="Low">Low</option>
+          <option value="Med">Med</option>
+          <option value="High">High</option>
+        </select>
+      </label>
+
+      <label id="ppStructWrap">PP structure
+        <select id="ppStruct">
+          <option value="umbrella" selected>Umbrella</option>
+          <option value="one3one">1-3-1</option>
+        </select>
+      </label>
+
+      <label id="pkStructWrap">PK structure
+        <select id="pkStruct">
+          <option value="box" selected>Box</option>
+          <option value="diamond">Diamond</option>
+        </select>
+      </label>
+
+      <label>Coach overlays
+        <select id="overlay">
+          <option value="off" selected>Off</option>
+          <option value="lanes">Show lanes</option>
+          <option value="house">Show slot/house</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row" id="profileRow">
+      <label>Your name
+        <input id="pName" maxlength="12" placeholder="Your name" autocomplete="off" />
+      </label>
+      <label>Number
+        <input id="pNum" type="number" min="1" max="99" value="9" />
+      </label>
+      <label>Team color
+        <select id="pColor">
+          <option value="blue" selected>Ice Blue</option>
+          <option value="green">Lime Green</option>
+          <option value="purple">Power Purple</option>
+          <option value="teal">Aqua Teal</option>
+          <option value="gold">Golden</option>
+        </select>
+      </label>
+    </div>
+  </details>
+
+  <div class="legend">
+    <span><i class="dot" id="dotTeam" style="background:#2456ff"></i> Your team (gold ring = you)</span>
+    <span><i class="dot" style="background:#cc2b2b"></i> Opponents</span>
+    <span><i class="dot" style="background:#0d9488"></i> Your goalie</span>
+    <span><i class="dot" style="background:#111"></i> Puck</span>
+    <span><i class="dot" style="background:#fffbeb; border-color:#f59e0b"></i> A/B/C choices</span>
+    <span><i class="dot" style="background:#00aa00; opacity:.3"></i> Coach's area (Beginner)</span>
+  </div>
+
+  <details>
+    <summary><b>🏆 Trophy Case</b> <span class="muted" id="trophySummary"></span></summary>
+    <div id="badgeGrid"></div>
+  </details>
+
+  <details>
+    <summary><b>Coach Report (this session)</b> <span class="muted">— performance + common misses</span></summary>
+    <div style="margin-top:8px;">
+      <div id="reportSummary" class="muted"></div>
+      <div style="margin-top:8px;" id="reportChips"></div>
+      <table style="margin-top:10px;">
+        <thead>
+          <tr>
+            <th>Time</th><th>Format</th><th>Phase</th><th>Mode</th><th>Role</th><th>Result</th><th>Top miss</th>
+          </tr>
+        </thead>
+        <tbody id="reportRows"></tbody>
+      </table>
+      <div class="muted warn" style="margin-top:8px;">
+        Tip: For younger kids, use Beginner difficulty + 6–8 age group with Tap A/B/C. They'll see coach hints and simpler scoring.
+      </div>
+    </div>
+  </details>
+</div>
+
+<div id="toasts"></div>
+
+
+<script>
+/* Hockey IQ Trainer — scenario data & shared utilities
+   All coordinates are in canvas space: 1100 x 620, rink 20..1080 x 20..600. */
+window.HIQ = window.HIQ || {};
+
+HIQ.util = {
+  pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
+  clamp(v, min, max) { return Math.max(min, Math.min(max, v)); },
+  dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); },
+  toward(a, b, t) { return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; },
+  shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+};
+
+HIQ.LANDMARKS = {
+  leftNet:   { x: 95,   y: 310 },
+  rightNet:  { x: 1005, y: 310 },
+  leftSlot:  { x: 220,  y: 310 },
+  rightSlot: { x: 880,  y: 310 },
+  center:    { x: 550,  y: 310 }
+};
+
+/* Even-strength scenario templates.
+   isDefense: true means the OPPONENTS have the puck and the player's job is coverage. */
+HIQ.TEMPLATES_EVEN = [
+  {
+    id: "breakout_left_corner_pressure",
+    phase: "Breakout",
+    pressures: ["High", "Med", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 210, y: 500 },
+    offenseFull: [
+      { role: "C",  x: 320, y: 390 },
+      { role: "LW", x: 270, y: 520 },
+      { role: "RW", x: 430, y: 200 },
+      { role: "LD", x: 190, y: 470 },
+      { role: "RD", x: 320, y: 280 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 240, y: 480 },
+      { role: "F2", x: 310, y: 430 },
+      { role: "F3", x: 410, y: 320 },
+      { role: "D1", x: 410, y: 420 },
+      { role: "D2", x: 470, y: 260 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout under pressure (puck in the corner). You are ${role}. Where should you go to help your team break out?`,
+    guidanceByRole: {
+      C:  { x: 320, y: 390, r: 90 },
+      LW: { x: 270, y: 520, r: 75 },
+      RW: { x: 430, y: 210, r: 95 },
+      LD: { x: 220, y: 450, r: 85 },
+      RD: { x: 320, y: 280, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 70, max: 220 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 40, max: 170 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 120, max: 360 } },
+      LD: { spacingFromPuck: { min: 30, max: 180 } },
+      RD: { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "greater" } },
+    }
+  },
+  {
+    id: "rush_middle_lane",
+    phase: "Rush",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 560, y: 310 },
+    offenseFull: [
+      { role: "C",  x: 590, y: 310 },
+      { role: "LW", x: 700, y: 430 },
+      { role: "RW", x: 700, y: 190 },
+      { role: "LD", x: 490, y: 370 },
+      { role: "RD", x: 490, y: 250 },
+    ],
+    defenseFull: [
+      { role: "D1", x: 790, y: 280 },
+      { role: "D2", x: 790, y: 340 },
+      { role: "F1", x: 640, y: 300 },
+      { role: "F2", x: 520, y: 260 },
+      { role: "F3", x: 520, y: 380 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Rush through the neutral zone. You are ${role}. Where should you go to be a passing option?`,
+    guidanceByRole: {
+      C:  { x: 590, y: 310, r: 85 },
+      LW: { x: 700, y: 430, r: 95 },
+      RW: { x: 700, y: 190, r: 95 },
+      LD: { x: 490, y: 370, r: 95 },
+      RD: { x: 490, y: 250, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 40, max: 160 }, stayAbovePuck: { margin: 55, allowDeeper: true } },
+      LW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      RW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      LD: { spacingFromPuck: { min: 80, max: 260 } },
+      RD: { spacingFromPuck: { min: 80, max: 260 } },
+    }
+  },
+  {
+    id: "ozone_right_wall_cycle",
+    phase: "O-zone",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 900, y: 410 },
+    offenseFull: [
+      { role: "C",  x: 790, y: 320 },
+      { role: "LW", x: 800, y: 190 },
+      { role: "RW", x: 910, y: 400 },
+      { role: "LD", x: 710, y: 180 },
+      { role: "RD", x: 740, y: 260 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 880, y: 395 },
+      { role: "F2", x: 820, y: 360 },
+      { role: "F3", x: 760, y: 440 },
+      { role: "D1", x: 820, y: 260 },
+      { role: "D2", x: 770, y: 290 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — O-zone, puck on the right wall. You are ${role}. Where should you go to support the puck?`,
+    guidanceByRole: {
+      C:  { x: 790, y: 320, r: 95 },
+      LW: { x: 800, y: 200, r: 95 },
+      RW: { x: 900, y: 395, r: 70 },
+      LD: { x: 710, y: 210, r: 95 },
+      RD: { x: 745, y: 270, r: 85 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "less" } },
+      LW: { spacingFromPuck: { min: 120, max: 320 } },
+      RW: { spacingFromPuck: { min: 30, max: 160 }, beOutlet: { preferX: "less" }, stayAbovePuck: { margin: 60, allowDeeper: true } },
+      LD: { spacingFromPuck: { min: 220, max: 540 } },
+      RD: { spacingFromPuck: { min: 180, max: 420 } },
+    }
+  },
+  {
+    id: "dzone_halfwall_defend",
+    phase: "Defend",
+    pressures: ["High", "Med", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "left",
+    isDefense: true,
+    puck: { x: 290, y: 180 },
+    offenseFull: [
+      { role: "C",  x: 370, y: 310 },
+      { role: "LW", x: 320, y: 230 },
+      { role: "RW", x: 450, y: 270 },
+      { role: "LD", x: 240, y: 320 },
+      { role: "RD", x: 290, y: 390 },
+    ],
+    defenseFull: [
+      { role: "O1", x: 290, y: 180 },
+      { role: "O2", x: 360, y: 240 },
+      { role: "O3", x: 250, y: 410 },
+      { role: "O4", x: 420, y: 160 },
+      { role: "O5", x: 440, y: 330 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Defending, puck on the half-wall. You are ${role}. Protect the middle — where should you be?`,
+    guidanceByRole: {
+      C:  { x: 370, y: 310, r: 95 },
+      LW: { x: 320, y: 230, r: 75 },
+      RW: { x: 450, y: 270, r: 95 },
+      LD: { x: 240, y: 320, r: 90 },
+      RD: { x: 290, y: 390, r: 90 },
+    },
+    rulesByRole: {
+      C:  { protectSlot: { slotSide: "left", radius: 170 }, spacingFromPuck: { min: 80, max: 260 } },
+      LW: { protectSlot: { slotSide: "left", radius: 210 }, spacingFromPuck: { min: 40, max: 190 } },
+      RW: { protectSlot: { slotSide: "left", radius: 210 }, spacingFromPuck: { min: 120, max: 320 } },
+      LD: { protectSlot: { slotSide: "left", radius: 150 }, spacingFromPuck: { min: 60, max: 230 } },
+      RD: { protectSlot: { slotSide: "left", radius: 190 }, spacingFromPuck: { min: 100, max: 300 } },
+    }
+  },
+  {
+    id: "breakout_d2d_reverse",
+    phase: "Breakout",
+    pressures: ["Med", "High", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 240, y: 520 },
+    offenseFull: [
+      { role: "LD", x: 210, y: 520 },
+      { role: "RD", x: 280, y: 340 },
+      { role: "C",  x: 340, y: 400 },
+      { role: "LW", x: 290, y: 560 },
+      { role: "RW", x: 460, y: 200 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 250, y: 500 },
+      { role: "F2", x: 320, y: 450 },
+      { role: "F3", x: 430, y: 340 },
+      { role: "D1", x: 420, y: 470 },
+      { role: "D2", x: 500, y: 260 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout: D-to-D reverse look. You are ${role}. Be an outlet and protect inside ice.`,
+    guidanceByRole: {
+      C:  { x: 350, y: 410, r: 95 },
+      LW: { x: 290, y: 560, r: 75 },
+      RW: { x: 470, y: 210, r: 95 },
+      LD: { x: 240, y: 490, r: 85 },
+      RD: { x: 300, y: 340, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 80, max: 240 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 40, max: 180 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 150, max: 380 } },
+      LD: { spacingFromPuck: { min: 30, max: 190 } },
+      RD: { spacingFromPuck: { min: 90, max: 270 }, beOutlet: { preferX: "greater" } },
+    }
+  },
+  {
+    id: "breakout_center_swing_low",
+    phase: "Breakout",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 190, y: 310 },
+    offenseFull: [
+      { role: "LD", x: 210, y: 360 },
+      { role: "RD", x: 260, y: 270 },
+      { role: "C",  x: 300, y: 320 },
+      { role: "LW", x: 260, y: 430 },
+      { role: "RW", x: 420, y: 210 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 220, y: 310 },
+      { role: "F2", x: 300, y: 290 },
+      { role: "F3", x: 380, y: 320 },
+      { role: "D1", x: 420, y: 420 },
+      { role: "D2", x: 500, y: 220 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout: Center swings low. You are ${role}. Give an angled outlet — don't crowd the puck.`,
+    guidanceByRole: {
+      C:  { x: 310, y: 320, r: 90 },
+      LW: { x: 270, y: 430, r: 80 },
+      RW: { x: 430, y: 220, r: 90 },
+      LD: { x: 240, y: 350, r: 85 },
+      RD: { x: 290, y: 270, r: 85 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 70, max: 210 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 90, max: 260 } },
+      RW: { spacingFromPuck: { min: 140, max: 360 } },
+      LD: { spacingFromPuck: { min: 40, max: 180 } },
+      RD: { spacingFromPuck: { min: 60, max: 220 } },
+    }
+  },
+  {
+    id: "rush_wide_drive_trailer",
+    phase: "Rush",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 610, y: 420 },
+    offenseFull: [
+      { role: "LW", x: 660, y: 450 },
+      { role: "C",  x: 640, y: 320 },
+      { role: "RW", x: 660, y: 200 },
+      { role: "LD", x: 520, y: 360 },
+      { role: "RD", x: 520, y: 260 },
+    ],
+    defenseFull: [
+      { role: "D1", x: 760, y: 300 },
+      { role: "D2", x: 760, y: 360 },
+      { role: "F1", x: 650, y: 380 },
+      { role: "F2", x: 560, y: 280 },
+      { role: "F3", x: 580, y: 430 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Rush: wide drive with a trailer option. You are ${role}. Keep spacing and be available.`,
+    guidanceByRole: {
+      LW: { x: 680, y: 460, r: 90 },
+      C:  { x: 650, y: 330, r: 90 },
+      RW: { x: 680, y: 190, r: 90 },
+      LD: { x: 530, y: 370, r: 95 },
+      RD: { x: 530, y: 250, r: 95 },
+    },
+    rulesByRole: {
+      LW: { spacingFromPuck: { min: 40, max: 170 }, stayAbovePuck: { margin: 80, allowDeeper: true } },
+      C:  { spacingFromPuck: { min: 100, max: 260 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 160, max: 420 } },
+      LD: { spacingFromPuck: { min: 140, max: 360 } },
+      RD: { spacingFromPuck: { min: 140, max: 360 } },
+    }
+  },
+  {
+    id: "breakout_wheel_behind_net",
+    phase: "Breakout",
+    pressures: ["Med", "High", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 70, y: 350 },
+    offenseFull: [
+      { role: "LD", x: 105, y: 380 },
+      { role: "RD", x: 170, y: 250 },
+      { role: "C",  x: 300, y: 350 },
+      { role: "LW", x: 270, y: 500 },
+      { role: "RW", x: 450, y: 180 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 180, y: 420 },
+      { role: "F2", x: 280, y: 330 },
+      { role: "F3", x: 420, y: 250 },
+      { role: "D1", x: 430, y: 430 },
+      { role: "D2", x: 480, y: 180 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout: D wheels behind the net. You are ${role}. Give a moving outlet up ice!`,
+    guidanceByRole: {
+      C:  { x: 300, y: 350, r: 90 },
+      LW: { x: 270, y: 500, r: 80 },
+      RW: { x: 450, y: 190, r: 95 },
+      LD: { x: 115, y: 385, r: 75 },
+      RD: { x: 180, y: 255, r: 85 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 90, max: 300 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 120, max: 330 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 200, max: 500 } },
+      LD: { spacingFromPuck: { min: 25, max: 160 } },
+      RD: { spacingFromPuck: { min: 80, max: 250 }, beOutlet: { preferX: "greater" } },
+    }
+  },
+  {
+    id: "nzone_regroup_d2d",
+    phase: "Rush",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 470, y: 250 },
+    offenseFull: [
+      { role: "RD", x: 480, y: 255 },
+      { role: "LD", x: 470, y: 380 },
+      { role: "C",  x: 560, y: 315 },
+      { role: "LW", x: 700, y: 440 },
+      { role: "RW", x: 700, y: 185 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 600, y: 310 },
+      { role: "F2", x: 680, y: 240 },
+      { role: "F3", x: 680, y: 390 },
+      { role: "D1", x: 820, y: 260 },
+      { role: "D2", x: 820, y: 360 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Neutral-zone regroup. You are ${role}. Reset with speed — give the D a target!`,
+    guidanceByRole: {
+      C:  { x: 560, y: 315, r: 85 },
+      LW: { x: 700, y: 440, r: 90 },
+      RW: { x: 700, y: 185, r: 90 },
+      LD: { x: 470, y: 380, r: 85 },
+      RD: { x: 480, y: 255, r: 75 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 60, max: 220 } },
+      LW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      RW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      LD: { spacingFromPuck: { min: 60, max: 200 } },
+      RD: { spacingFromPuck: { min: 20, max: 140 } },
+    }
+  },
+  {
+    id: "ozone_faceoff_right_dot",
+    phase: "O-zone",
+    pressures: ["Low", "Med"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 878, y: 450 },
+    offenseFull: [
+      { role: "C",  x: 862, y: 455 },
+      { role: "LW", x: 830, y: 400 },
+      { role: "RW", x: 845, y: 505 },
+      { role: "LD", x: 760, y: 250 },
+      { role: "RD", x: 760, y: 420 },
+    ],
+    defenseFull: [
+      { role: "O1", x: 892, y: 455 },
+      { role: "O2", x: 905, y: 405 },
+      { role: "O3", x: 905, y: 505 },
+      { role: "D1", x: 930, y: 380 },
+      { role: "D2", x: 950, y: 510 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — O-zone faceoff, right dot. You are ${role}. Line up ready for the win back!`,
+    guidanceByRole: {
+      C:  { x: 862, y: 455, r: 65 },
+      LW: { x: 830, y: 400, r: 75 },
+      RW: { x: 845, y: 505, r: 75 },
+      LD: { x: 760, y: 250, r: 95 },
+      RD: { x: 760, y: 420, r: 90 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 10, max: 90 } },
+      LW: { spacingFromPuck: { min: 40, max: 180 } },
+      RW: { spacingFromPuck: { min: 30, max: 160 } },
+      LD: { spacingFromPuck: { min: 180, max: 420 } },
+      RD: { spacingFromPuck: { min: 120, max: 340 } },
+    }
+  },
+  {
+    id: "dzone_net_front_battle",
+    phase: "Defend",
+    pressures: ["High", "Med"],
+    allowedFormats: ["5v5"],
+    attackDir: "left",
+    isDefense: true,
+    puck: { x: 120, y: 480 },
+    offenseFull: [
+      { role: "C",  x: 260, y: 400 },
+      { role: "LW", x: 390, y: 220 },
+      { role: "RW", x: 390, y: 440 },
+      { role: "LD", x: 150, y: 340 },
+      { role: "RD", x: 190, y: 460 },
+    ],
+    defenseFull: [
+      { role: "O1", x: 120, y: 480 },
+      { role: "O2", x: 200, y: 540 },
+      { role: "O3", x: 250, y: 330 },
+      { role: "O4", x: 420, y: 420 },
+      { role: "O5", x: 420, y: 200 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Defending: puck in your corner, battle at the net-front. You are ${role}. Box out and protect the house!`,
+    guidanceByRole: {
+      C:  { x: 260, y: 400, r: 90 },
+      LW: { x: 390, y: 220, r: 90 },
+      RW: { x: 390, y: 440, r: 90 },
+      LD: { x: 150, y: 340, r: 75 },
+      RD: { x: 190, y: 460, r: 80 },
+    },
+    rulesByRole: {
+      C:  { protectSlot: { slotSide: "left", radius: 190 }, spacingFromPuck: { min: 90, max: 280 } },
+      LW: { protectSlot: { slotSide: "left", radius: 260 }, spacingFromPuck: { min: 200, max: 450 } },
+      RW: { protectSlot: { slotSide: "left", radius: 240 }, spacingFromPuck: { min: 150, max: 400 } },
+      LD: { protectSlot: { slotSide: "left", radius: 120 }, spacingFromPuck: { min: 60, max: 220 } },
+      RD: { protectSlot: { slotSide: "left", radius: 170 }, spacingFromPuck: { min: 40, max: 180 } },
+    }
+  },
+  {
+    id: "ozone_low_to_high_point",
+    phase: "O-zone",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 930, y: 520 },
+    offenseFull: [
+      { role: "RW", x: 930, y: 500 },
+      { role: "C",  x: 820, y: 360 },
+      { role: "LW", x: 820, y: 190 },
+      { role: "LD", x: 760, y: 200 },
+      { role: "RD", x: 760, y: 420 },
+    ],
+    defenseFull: [
+      { role: "D1", x: 900, y: 410 },
+      { role: "D2", x: 880, y: 300 },
+      { role: "F1", x: 820, y: 440 },
+      { role: "F2", x: 820, y: 260 },
+      { role: "F3", x: 780, y: 320 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — O-zone: low-to-high cycle. You are ${role}. Create shot support and protect against the turnover.`,
+    guidanceByRole: {
+      C:  { x: 820, y: 350, r: 95 },
+      LW: { x: 820, y: 200, r: 95 },
+      RW: { x: 920, y: 490, r: 75 },
+      LD: { x: 760, y: 220, r: 95 },
+      RD: { x: 760, y: 410, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "less" } },
+      LW: { spacingFromPuck: { min: 200, max: 520 } },
+      RW: { spacingFromPuck: { min: 30, max: 180 }, beOutlet: { preferX: "less" } },
+      LD: { spacingFromPuck: { min: 220, max: 540 } },
+      RD: { spacingFromPuck: { min: 220, max: 540 } },
+    }
+  }
+];
+
+/* --- Special teams structures --- */
+HIQ.ppPositions = function (structure) {
+  if (structure === "one3one") {
+    return [
+      { role: "LD", x: 740, y: 310 },
+      { role: "LW", x: 860, y: 200 },
+      { role: "RW", x: 860, y: 420 },
+      { role: "C",  x: 880, y: 310 },
+      { role: "RD", x: 980, y: 310 },
+    ];
+  }
+  return [
+    { role: "LD", x: 720, y: 200 },
+    { role: "RD", x: 720, y: 420 },
+    { role: "LW", x: 860, y: 200 },
+    { role: "RW", x: 860, y: 420 },
+    { role: "C",  x: 860, y: 310 },
+  ];
+};
+
+HIQ.pkPositions = function (structure) {
+  if (structure === "diamond") {
+    return [
+      { role: "C",  x: 840, y: 310 },
+      { role: "LW", x: 900, y: 240 },
+      { role: "RW", x: 900, y: 380 },
+      { role: "LD", x: 960, y: 310 },
+      { role: "RD", x: 920, y: 310 },
+    ];
+  }
+  return [
+    { role: "C",  x: 900, y: 260 },
+    { role: "LW", x: 900, y: 360 },
+    { role: "LD", x: 960, y: 260 },
+    { role: "RD", x: 960, y: 360 },
+    { role: "RW", x: 930, y: 310 },
+  ];
+};
+
+HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
+  const pick = HIQ.util.pick;
+  const puckSpots = [
+    { x: 860, y: 200, label: "half wall" },
+    { x: 740, y: 310, label: "point" },
+    { x: 860, y: 420, label: "half wall" },
+    { x: 980, y: 310, label: "net-front" },
+    { x: 910, y: 520, label: "goal line" }
+  ];
+  const puckSpot = pick(puckSpots);
+
+  if (fmt === "5v4") {
+    const off = HIQ.ppPositions(ppStruct);
+    const def = (pkStruct === "diamond")
+      ? [
+          { role: "PK1", x: 900, y: 250 },
+          { role: "PK2", x: 900, y: 370 },
+          { role: "PK3", x: 960, y: 310 },
+          { role: "PK4", x: 840, y: 310 },
+          { role: "G",   x: 1040, y: 310 }
+        ]
+      : [
+          { role: "PK1", x: 900, y: 260 },
+          { role: "PK2", x: 900, y: 360 },
+          { role: "PK3", x: 960, y: 260 },
+          { role: "PK4", x: 960, y: 360 },
+          { role: "G",   x: 1040, y: 310 }
+        ];
+
+    return {
+      id: `PP_${ppStruct}_${pkStruct}_${puckSpot.label}`,
+      phase: "Special",
+      pressures: ["Low", "Med", "High"],
+      allowedFormats: ["5v4"],
+      attackDir: "right",
+      puck: { x: puckSpot.x, y: puckSpot.y },
+      offenseFull: off,
+      defenseFull: def,
+      prompt: (role, fmt2) => `${fmt2} — Power Play (${ppStruct === "one3one" ? "1-3-1" : "Umbrella"}). Puck at the ${puckSpot.label}. You are ${role}. Keep the structure!`,
+      guidanceByRole: {
+        C:  { x: 860, y: 310, r: 100 },
+        LW: { x: 860, y: 200, r: 95 },
+        RW: { x: 860, y: 420, r: 95 },
+        LD: { x: 720, y: 200, r: 120 },
+        RD: { x: 720, y: 420, r: 120 },
+      },
+      rulesByRole: {
+        LW: { spacingFromPuck: { min: 40, max: 220 }, beOutlet: { preferX: "less" }, stayAbovePuck: { margin: 80, allowDeeper: true } },
+        C:  { spacingFromPuck: { min: 70, max: 260 }, beOutlet: { preferX: "less" } },
+        RW: { spacingFromPuck: { min: 120, max: 420 } },
+        LD: { spacingFromPuck: { min: 220, max: 560 } },
+        RD: { spacingFromPuck: { min: 220, max: 560 } },
+      }
+    };
+  }
+
+  if (fmt === "4v5") {
+    const off = HIQ.pkPositions(pkStruct);
+    const oppPP = HIQ.ppPositions(ppStruct);
+    const def = oppPP.map(p => ({ role: `PP-${p.role}`, x: p.x, y: p.y }))
+      .concat([{ role: "G", x: 1040, y: 310 }]);
+
+    return {
+      id: `PK_${pkStruct}_${ppStruct}_${puckSpot.label}`,
+      phase: "Special",
+      pressures: ["Low", "Med", "High"],
+      allowedFormats: ["4v5"],
+      attackDir: "right",
+      isDefense: true,
+      puck: { x: puckSpot.x, y: puckSpot.y },
+      offenseFull: off,
+      defenseFull: def,
+      prompt: (role, fmt2) => `${fmt2} — Penalty Kill (${pkStruct}). Puck at the ${puckSpot.label}. You are ${role}. Protect middle ice — stay in your lane!`,
+      guidanceByRole: {
+        C:  { x: 900, y: 260, r: 120 },
+        LW: { x: 900, y: 360, r: 120 },
+        RW: { x: 960, y: 260, r: 120 },
+        LD: { x: 960, y: 360, r: 120 },
+        RD: { x: 930, y: 310, r: 140 },
+      },
+      rulesByRole: {
+        C:  { protectSlot: { slotSide: "right", radius: 210 }, spacingFromPuck: { min: 120, max: 360 } },
+        LW: { protectSlot: { slotSide: "right", radius: 210 }, spacingFromPuck: { min: 120, max: 360 } },
+        RW: { protectSlot: { slotSide: "right", radius: 200 }, spacingFromPuck: { min: 140, max: 420 } },
+        LD: { protectSlot: { slotSide: "right", radius: 200 }, spacingFromPuck: { min: 140, max: 420 } },
+        RD: { protectSlot: { slotSide: "right", radius: 190 }, spacingFromPuck: { min: 120, max: 380 } },
+      }
+    };
+  }
+
+  return null;
+};
+
+/* Hockey IQ Trainer — synthesized sound effects (no audio files needed). */
+window.HIQ = window.HIQ || {};
+
+HIQ.audio = (() => {
+  let ctx = null;
+  let muted = false;
+
+  function ensure() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+  }
+
+  function tone(freq, dur, type = "sine", vol = 0.14, when = 0, slideTo = null) {
+    if (muted) return;
+    try { ensure(); } catch (e) { return; }
+    const t0 = ctx.currentTime + when;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.linearRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(t0);
+    o.stop(t0 + dur + 0.05);
+  }
+
+  // Filtered white-noise swell — used for crowd roar and ice spray
+  function noiseBurst(dur, vol, when = 0, cutoff = 1100) {
+    if (muted) return;
+    try { ensure(); } catch (e) { return; }
+    const t0 = ctx.currentTime + when;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.value = cutoff;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(filt).connect(g).connect(ctx.destination);
+    src.start(t0);
+  }
+
+  const sfx = {
+    pass()        { tone(660, 0.08, "triangle", 0.12); },
+    catch()       { tone(880, 0.07, "triangle", 0.10); },
+    shot()        { tone(300, 0.12, "square", 0.12, 0, 180); },
+    // Arena goal horn (minor-third blare) + crowd roar
+    goal() {
+      tone(233, 0.9, "sawtooth", 0.16);
+      tone(311, 0.9, "sawtooth", 0.12);
+      tone(466, 0.9, "sawtooth", 0.05);
+      noiseBurst(1.5, 0.10, 0.15, 1400);
+    },
+    goalAgainst() {
+      tone(330, 0.35, "sine", 0.14, 0, 180);
+      tone(180, 0.5, "sine", 0.11, 0.3, 120);
+      noiseBurst(0.9, 0.04, 0.1, 500); // low groan
+    },
+    whistle()     { tone(2200, 0.25, "square", 0.05); tone(2100, 0.22, "square", 0.04, 0.05); },
+    good()        { tone(523, 0.12, "triangle", 0.12); tone(659, 0.12, "triangle", 0.12, 0.12); tone(784, 0.2, "triangle", 0.12, 0.24); noiseBurst(0.6, 0.03, 0.2, 1600); },
+    clear()       { tone(523, 0.15, "triangle", 0.12); tone(784, 0.25, "triangle", 0.12, 0.15); },
+    save()        { tone(140, 0.09, "square", 0.14); noiseBurst(0.25, 0.05, 0, 900); },
+    faceoff()     { tone(180, 0.05, "square", 0.10); tone(180, 0.05, "square", 0.10, 0.12); },
+    levelup() {
+      [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, "triangle", 0.13, i * 0.11));
+      noiseBurst(0.7, 0.03, 0.35, 1800);
+    },
+    badge()       { tone(988, 0.12, "triangle", 0.12); tone(1319, 0.3, "triangle", 0.12, 0.13); }
+  };
+
+  return {
+    play(name) { const f = sfx[name]; if (f) f(); },
+    setMuted(m) { muted = m; },
+    isMuted() { return muted; }
+  };
+})();
+
+/* Hockey IQ Trainer — play simulation runner.
+   Runs a sequential list of steps; each step tweens pieces toward targets over its duration.
+   Step: { d: ms, movers: [{obj, to:{x,y}}], sound, msg, banner: {…}|null, fx: {…}, shake: n }
+   A step without a `banner` key keeps the previous banner on screen.
+   opts.onStep(step) fires once when each step begins (for effects like rings/shake). */
+window.HIQ = window.HIQ || {};
+
+HIQ.Sim = (() => {
+  let running = false;
+  let cancelled = false;
+  let raf = 0;
+
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+
+  function run(steps, opts) {
+    if (running) return false;
+    running = true;
+    cancelled = false;
+    let i = 0, t0 = null, starts = null, banner = null;
+
+    function frame(now) {
+      if (cancelled) { running = false; return; }
+      if (i >= steps.length) {
+        running = false;
+        if (opts.onDone) opts.onDone(banner);
+        return;
+      }
+      const s = steps[i];
+      if (starts === null) {
+        t0 = now;
+        if (s.sound && HIQ.audio) HIQ.audio.play(s.sound);
+        if ("banner" in s) banner = s.banner;
+        if (s.msg && opts.onMsg) opts.onMsg(s.msg);
+        if (opts.onStep) opts.onStep(s);
+        starts = (s.movers || []).map(m => ({ m, x0: m.obj.x, y0: m.obj.y }));
+      }
+      const p = Math.min(1, (now - t0) / (s.d || 1));
+      const e = ease(p);
+      for (const st of starts) {
+        st.m.obj.x = st.x0 + (st.m.to.x - st.x0) * e;
+        st.m.obj.y = st.y0 + (st.m.to.y - st.y0) * e;
+      }
+      if (opts.onFrame) opts.onFrame(banner);
+      if (p >= 1) { i++; starts = null; }
+      raf = requestAnimationFrame(frame);
+    }
+
+    raf = requestAnimationFrame(frame);
+    return true;
+  }
+
+  function cancel() {
+    cancelled = true;
+    running = false;
+    cancelAnimationFrame(raf);
+  }
+
+  return { run, cancel, isRunning: () => running };
+})();
+
 /* Hockey IQ Trainer — main application: scenario building, scoring, rendering, input, and outcomes. */
 (() => {
   // Never fail silently: surface any runtime error where the player can see it.
@@ -1694,3 +2931,5 @@
   buildScenario();
   requestAnimationFrame(tick);
 })();
+
+</script>
