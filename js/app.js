@@ -228,32 +228,34 @@
     return dist(p.x, p.y, own.x, own.y) < 130;
   }
 
-  // --- Scoring engine (positional principles)
-  function scorePlacement(role, pos, scen) {
-    const ageCfg = getAgeSettings();
-    const rules = (scen.rulesByRole && scen.rulesByRole[role]) ? scen.rulesByRole[role] : {};
-    const failures = [];
+  // --- Scoring engine
+  // Two layers: a smooth positional score (how close to the coaching spot) plus
+  // specific, coachable rule violations. Keeping them separate means the ideal
+  // spot always scores 100 and the score degrades predictably with distance.
 
-    const fail = (key, pts, msg) => { failures.push({ key, msg, pts }); };
+  // Teaching rules only — no positional component. Also used to self-check scenario data.
+  function ruleViolations(role, pos, scen, skip = {}) {
+    const rules = (scen.rulesByRole && scen.rulesByRole[role]) ? scen.rulesByRole[role] : {};
+    const out = [];
+    const fail = (key, pts, msg) => { if (!skip[key]) out.push({ key, msg, pts }); };
 
     if (rules.spacingFromPuck) {
       const d = dist(pos.x, pos.y, puck.x, puck.y);
       const { min, max } = rules.spacingFromPuck;
-      if (d < min) fail("spacing", 25, "Too close to the puck — give your teammate room.");
-      if (d > max) fail("spacing", 25, "Too far from the puck — you're not an option.");
+      if (d < min) fail("spacing", 22, "Too close to the puck — give your teammate room.");
+      if (d > max) fail("spacing", 22, "Too far from the puck — you're not an option.");
     }
 
     if (rules.beOutlet) {
       const { preferX } = rules.beOutlet;
-      if (preferX === "greater" && pos.x < puck.x - 15) fail("outlet", 25, "You're behind the play — get ahead so they can pass to you.");
-      if (preferX === "less" && pos.x > puck.x + 15) fail("outlet", 25, "You're behind the play — get where they can pass to you.");
+      if (preferX === "greater" && pos.x < puck.x - 15) fail("outlet", 22, "You're behind the play — get ahead so they can pass to you.");
+      if (preferX === "less" && pos.x > puck.x + 15) fail("outlet", 22, "You're behind the play — get where they can pass to you.");
     }
 
     if (rules.protectSlot) {
       const { slotSide, radius } = rules.protectSlot;
       const slot = (slotSide === "left") ? LM.leftSlot : LM.rightSlot;
-      const d = dist(pos.x, pos.y, slot.x, slot.y);
-      if (d > radius) fail("slot", 30, "You left the front of your net open — protect middle ice!");
+      if (dist(pos.x, pos.y, slot.x, slot.y) > radius) fail("slot", 26, "You left the front of your net open — protect middle ice!");
     }
 
     if (rules.stayAbovePuck) {
@@ -261,23 +263,62 @@
       const tooDeep = (scen.attackDir === "right")
         ? (pos.x > puck.x + margin && !rules.stayAbovePuck.allowDeeper)
         : (pos.x < puck.x - margin && !rules.stayAbovePuck.allowDeeper);
-      if (tooDeep) fail("above", 20, "Too deep! Stay above the puck so you're not caught.");
+      if (tooDeep) fail("above", 18, "Too deep! Stay above the puck so you're not caught.");
     }
 
-    if (scen.guidanceByRole && scen.guidanceByRole[role]) {
+    return out;
+  }
+
+  // A rule the ideal spot itself breaks is a data bug, not a player mistake.
+  // Disable it for that play so the canonical answer can never be punished.
+  function buildSkipRules(scen) {
+    const skip = {};
+    for (const role of Object.keys(scen.guidanceByRole || {})) {
       const g = scen.guidanceByRole[role];
+      const v = ruleViolations(role, { x: g.x, y: g.y }, scen, {});
+      if (v.length) {
+        skip[role] = {};
+        v.forEach(f => { skip[role][f.key] = true; });
+        console.warn(`[HIQ] ${scen.id}/${role}: ideal spot violates [${v.map(f => f.key).join(", ")}] — rule disabled for this play (fix the scenario data).`);
+      }
+    }
+    return skip;
+  }
+
+  function scorePlacement(role, pos, scen) {
+    const ageCfg = getAgeSettings();
+    const skip = (scen._skipRules && scen._skipRules[role]) || {};
+
+    // Positional accuracy: 100 at the coaching spot, decaying smoothly outward.
+    const g = scen.guidanceByRole && scen.guidanceByRole[role];
+    let base = 100;
+    let posMiss = null;
+    if (g) {
+      const r = Math.max(35, difficultyTighten(g.r, scen.diff) * ageCfg.guidanceScale);
       const d = dist(pos.x, pos.y, g.x, g.y);
-      const r = difficultyTighten(g.r, scen.diff) * ageCfg.guidanceScale;
-      if (d > r * 1.35) fail("guidance", 20, "You drifted out of your support area.");
+      base = clamp(Math.round(100 - 30 * Math.pow(d / r, 1.3)), 0, 100);
+      if (base < 88) {
+        posMiss = {
+          key: "position",
+          pts: 100 - base,
+          msg: d > r * 2
+            ? "That's the wrong area of the ice for your position."
+            : "Close — but not quite in your support spot."
+        };
+      }
     }
 
-    failures.sort((a, b) => b.pts - a.pts);
-    const enforced = failures.slice(0, ageCfg.maxRulesToEnforce);
-    let score = 100;
-    for (const f of enforced) score -= f.pts;
-    score = clamp(score, 0, 100);
+    const violations = ruleViolations(role, pos, scen, skip);
+    violations.sort((a, b) => b.pts - a.pts);
+    const enforced = violations.slice(0, ageCfg.maxRulesToEnforce);
 
-    return { score, failures: enforced, allFailures: failures };
+    let score = base;
+    for (const f of enforced) score -= f.pts;
+    score = clamp(Math.round(score), 0, 100);
+
+    // Coaching cues: specific rule mistakes first, positional drift as backup.
+    const cues = enforced.concat(posMiss ? [posMiss] : []);
+    return { score, failures: cues, allFailures: violations };
   }
 
   // --- Scenario selection / building
@@ -365,11 +406,22 @@
     const applied = applyFormat(tpl.offenseFull, tpl.defenseFull, fmt);
     defense = applied.def.map(p => ({ ...p, r: 16 }));
 
+    // The player must be assigned a position that is actually on the ice in this
+    // format (e.g. a 4-man penalty kill has no 5th spot to stand in).
+    const onIce = applied.off.map(p => p.role);
+    let playRole = role;
+    if (!onIce.includes(playRole) || !scenario.guidanceByRole[playRole]) {
+      playRole = onIce.find(r2 => scenario.guidanceByRole[r2]) || onIce[0];
+      scenario.roleNote = `On this unit you're covering the ${playRole} spot.`;
+    }
+    scenario.role = playRole;
+    scenario.prompt = tpl.prompt ? tpl.prompt(playRole, fmt) : `${fmt} — ${tpl.phase}. You are ${playRole}.`;
+    scenario._skipRules = buildSkipRules(scenario);
+
     if (mode === "single") {
       // Your role always takes one of the team's spots (never adds an extra skater).
-      let others = applied.off.filter(p => p.role !== role);
-      if (others.length >= applied.off.length) others = others.slice(0, applied.off.length - 1);
-      controlled = [{ role, x: 550, y: 310, r: 19, dragging: false }];
+      const others = applied.off.filter(p => p.role !== playRole);
+      controlled = [{ role: playRole, x: 550, y: 310, r: 19, dragging: false }];
       offense = others.map(p => ({ ...p, r: 16 }));
     } else {
       controlled = applied.off.map(p => ({ ...p, r: 19, dragging: false }));
@@ -377,7 +429,7 @@
     }
 
     const ageCfg = getAgeSettings();
-    const g = scenario.guidanceByRole?.[role] || { x: 550, y: 310, r: 90 };
+    const g = scenario.guidanceByRole?.[playRole] || { x: 550, y: 310, r: 90 };
     guidance = { x: g.x, y: g.y, r: difficultyTighten(g.r, diff) * ageCfg.guidanceScale };
 
     // Choice mode: generate A/B/C options
@@ -396,7 +448,8 @@
     lockBtn.style.display = choice.active ? "none" : "";
 
     const showHints = (diffSel.value === "easy" || ageSel.value === "6-8");
-    const hints = showHints ? coachHints(role, scenario) : [];
+    const hints = showHints ? coachHints(scenario.role, scenario) : [];
+    if (scenario.roleNote) hints.unshift(scenario.roleNote);
     hintEl.textContent = hints.join("   ");
     hintEl.style.display = hints.length ? "" : "none";
 
@@ -414,6 +467,9 @@
   }
 
   // --- A/B/C choice generation
+  // Decoys are deliberate near-misses: each one is a real positioning mistake,
+  // placed a difficulty-scaled distance from the coaching spot. Obvious decoys
+  // teach nothing, so tighter difficulties pull them closer to the right answer.
   function generateChoices() {
     const role = scenario.role;
     const g = scenario.guidanceByRole?.[role] || { x: 550, y: 310, r: 90 };
@@ -424,46 +480,68 @@
     const ownS = ownSideOf(scenario);
     const atkNet = netFor(atk);
     const ownNet = netFor(ownS);
+    const ageCfg = getAgeSettings();
+    const r = difficultyTighten(g.r, scenario.diff) * ageCfg.guidanceScale;
+
+    // How far a wrong answer sits from the right one, by difficulty.
+    const spreadBand = { easy: [2.0, 2.8], med: [1.5, 2.1], hard: [1.1, 1.5] }[scenario.diff] || [1.5, 2.1];
+    const near = r * spreadBand[0];
+    const far = r * spreadBand[1];
+
+    const unit = (from, to) => {
+      const dx = to.x - from.x, dy = to.y - from.y;
+      const m = Math.hypot(dx, dy) || 1;
+      return { x: dx / m, y: dy / m };
+    };
+    const at = (dir, d, mistake) => ({
+      pos: {
+        x: clamp(correctPos.x + dir.x * d, 55, 1045),
+        y: clamp(correctPos.y + dir.y * d, 55, 565)
+      },
+      mistake
+    });
+
+    const toPuck = unit(correctPos, puck);
+    const toOwnNet = unit(correctPos, ownNet);
+    const toAtkNet = unit(correctPos, atkNet);
+    const toMiddle = unit(correctPos, { x: correctPos.x, y: 310 });
+    const toBoards = { x: 0, y: correctPos.y < 310 ? -1 : 1 };
 
     const candidates = [
-      // Chasing / crowding the puck
-      { x: puck.x + (puck.x < 550 ? 40 : -40), y: puck.y + (puck.y < 310 ? 30 : -30) },
-      // Way too deep behind the net at the play's end of the ice
-      (() => {
-        const deepNet = scenario.isDefense ? ownNet : atkNet;
-        return { x: deepNet.x + (deepNet.x < 550 ? -28 : 28), y: 470 };
-      })(),
-      // Wrong side of the ice (mirror of the correct spot)
-      { x: g.x, y: 620 - g.y },
-      // Hiding near own net corner
-      { x: ownNet.x + (ownS === "right" ? -70 : 70), y: 150 },
-      // Floating in the middle, away from the play
-      { x: 550, y: 310 + (g.y > 310 ? -170 : 170) },
-    ].map(p => ({ x: clamp(p.x, 60, 1040), y: clamp(p.y, 60, 560) }));
+      at(toPuck, near, "You chased the puck instead of holding your support spot."),
+      at(toOwnNet, far, "You hung back too far — you weren't an option for your teammate."),
+      at(toAtkNet, near, scenario.isDefense
+        ? "You got caught up ice while your team was defending."
+        : "You drifted too deep and skated yourself out of the play."),
+      at(toMiddle, far, "You floated into the middle and left your lane uncovered."),
+      at(toBoards, near, "You hugged the boards — no passing angle from there."),
+    ];
 
-    let decoys = candidates
-      .map(p => ({ pos: p, res: scorePlacement(role, p, scenario) }))
-      .filter(c => c.res.score <= correctRes.score - 10)
-      .filter(c => dist(c.pos.x, c.pos.y, correctPos.x, correctPos.y) > 90);
+    // Keep only genuinely worse options, well separated from each other.
+    const scored = candidates
+      .map(c => ({ ...c, res: scorePlacement(role, c.pos, scenario) }))
+      .filter(c => c.res.score <= correctRes.score - 12)
+      .filter(c => dist(c.pos.x, c.pos.y, correctPos.x, correctPos.y) > r * 0.9);
 
-    // Keep decoys apart from each other
     const spread = [];
-    for (const c of shuffle(decoys)) {
-      if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > 80)) spread.push(c);
+    for (const c of shuffle(scored)) {
+      if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
       if (spread.length === 2) break;
     }
-    // Fallbacks if the pool came up short
+    // Fallback: push straight out from the ideal spot in opposite directions.
+    let angle = Math.random() * Math.PI * 2;
     while (spread.length < 2) {
-      const p = spread.length === 0
-        ? { x: clamp(puck.x + 25, 60, 1040), y: clamp(puck.y - 25, 60, 560) }
-        : { x: clamp(ownNet.x + (ownS === "right" ? -40 : 40), 60, 1040), y: 520 };
-      spread.push({ pos: p, res: scorePlacement(role, p, scenario) });
+      const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+      const c = at(dir, far, "That's not your spot on this play.");
+      c.res = scorePlacement(role, c.pos, scenario);
+      if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
+      angle += Math.PI * 0.7;
     }
 
     const opts = shuffle([
       { pos: correctPos, res: correctRes, correct: true },
-      { pos: spread[0].pos, res: spread[0].res, correct: false },
-      { pos: spread[1].pos, res: spread[1].res, correct: false },
+      { pos: spread[0].pos, res: spread[0].res, correct: false, mistake: spread[0].mistake },
+      { pos: spread[1].pos, res: spread[1].res, correct: false, mistake: spread[1].mistake },
     ]);
     opts.forEach((o, i) => { o.label = "ABC"[i]; });
     return opts;
@@ -719,9 +797,12 @@
     const top = failures[0];
     const second = failures[1];
     const cues = [];
-    if (top) cues.push(top.msg);
-    if (ageCfg.showSecondCue && second) cues.push(second.msg);
-    const subMsg = top ? top.msg : "Not the best option this time.";
+    // A picked decoy knows exactly which mistake it represents — say that first.
+    if (!ok && chosen && chosen.mistake) cues.push(chosen.mistake);
+    if (top && cues.length === 0) cues.push(top.msg);
+    else if (top && ageCfg.showSecondCue) cues.push(top.msg);
+    if (ageCfg.showSecondCue && second && cues.length < 2) cues.push(second.msg);
+    const subMsg = cues[0] || (top ? top.msg : "Not the best option this time.");
 
     // Update stats immediately
     scoreEl.textContent = `${score}`;
@@ -1678,7 +1759,21 @@
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
     getStats: () => stats,
-    getProfile: () => profile
+    getProfile: () => profile,
+    // Auditing hooks: score an arbitrary spot, and force a specific template
+    scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
+    forceTemplate: (id, role) => {
+      const tpl = HIQ.TEMPLATES_EVEN.find(t => t.id === id);
+      if (!tpl) return null;
+      if (role) roleSel.value = role;
+      const saved = HIQ.TEMPLATES_EVEN.slice();
+      HIQ.TEMPLATES_EVEN.length = 0;
+      HIQ.TEMPLATES_EVEN.push(tpl);
+      buildScenario();
+      HIQ.TEMPLATES_EVEN.length = 0;
+      saved.forEach(t => HIQ.TEMPLATES_EVEN.push(t));
+      return scenario.id;
+    }
   };
 
   // Init

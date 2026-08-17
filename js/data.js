@@ -61,7 +61,7 @@ HIQ.TEMPLATES_EVEN = [
     rulesByRole: {
       C:  { spacingFromPuck: { min: 70, max: 220 }, beOutlet: { preferX: "greater" } },
       LW: { spacingFromPuck: { min: 40, max: 170 }, beOutlet: { preferX: "greater" } },
-      RW: { spacingFromPuck: { min: 120, max: 360 } },
+      RW: { spacingFromPuck: { min: 120, max: 430 } },
       LD: { spacingFromPuck: { min: 30, max: 180 } },
       RD: { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "greater" } },
     }
@@ -97,7 +97,7 @@ HIQ.TEMPLATES_EVEN = [
       RD: { x: 490, y: 250, r: 95 },
     },
     rulesByRole: {
-      C:  { spacingFromPuck: { min: 40, max: 160 }, stayAbovePuck: { margin: 55, allowDeeper: true } },
+      C:  { spacingFromPuck: { min: 20, max: 160 }, stayAbovePuck: { margin: 55, allowDeeper: true } },
       LW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
       RW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
       LD: { spacingFromPuck: { min: 80, max: 260 } },
@@ -137,7 +137,7 @@ HIQ.TEMPLATES_EVEN = [
     rulesByRole: {
       C:  { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "less" } },
       LW: { spacingFromPuck: { min: 120, max: 320 } },
-      RW: { spacingFromPuck: { min: 30, max: 160 }, beOutlet: { preferX: "less" }, stayAbovePuck: { margin: 60, allowDeeper: true } },
+      RW: { spacingFromPuck: { min: 5, max: 160 }, beOutlet: { preferX: "less" }, stayAbovePuck: { margin: 60, allowDeeper: true } },
       LD: { spacingFromPuck: { min: 220, max: 540 } },
       RD: { spacingFromPuck: { min: 180, max: 420 } },
     }
@@ -176,7 +176,7 @@ HIQ.TEMPLATES_EVEN = [
     rulesByRole: {
       C:  { protectSlot: { slotSide: "left", radius: 170 }, spacingFromPuck: { min: 80, max: 260 } },
       LW: { protectSlot: { slotSide: "left", radius: 210 }, spacingFromPuck: { min: 40, max: 190 } },
-      RW: { protectSlot: { slotSide: "left", radius: 210 }, spacingFromPuck: { min: 120, max: 320 } },
+      RW: { protectSlot: { slotSide: "left", radius: 270 }, spacingFromPuck: { min: 120, max: 320 } },
       LD: { protectSlot: { slotSide: "left", radius: 150 }, spacingFromPuck: { min: 60, max: 230 } },
       RD: { protectSlot: { slotSide: "left", radius: 190 }, spacingFromPuck: { min: 100, max: 300 } },
     }
@@ -214,7 +214,7 @@ HIQ.TEMPLATES_EVEN = [
     rulesByRole: {
       C:  { spacingFromPuck: { min: 80, max: 240 }, beOutlet: { preferX: "greater" } },
       LW: { spacingFromPuck: { min: 40, max: 180 }, beOutlet: { preferX: "greater" } },
-      RW: { spacingFromPuck: { min: 150, max: 380 } },
+      RW: { spacingFromPuck: { min: 150, max: 440 } },
       LD: { spacingFromPuck: { min: 30, max: 190 } },
       RD: { spacingFromPuck: { min: 90, max: 270 }, beOutlet: { preferX: "greater" } },
     }
@@ -289,10 +289,10 @@ HIQ.TEMPLATES_EVEN = [
     },
     rulesByRole: {
       LW: { spacingFromPuck: { min: 40, max: 170 }, stayAbovePuck: { margin: 80, allowDeeper: true } },
-      C:  { spacingFromPuck: { min: 100, max: 260 }, beOutlet: { preferX: "greater" } },
+      C:  { spacingFromPuck: { min: 70, max: 260 }, beOutlet: { preferX: "greater" } },
       RW: { spacingFromPuck: { min: 160, max: 420 } },
-      LD: { spacingFromPuck: { min: 140, max: 360 } },
-      RD: { spacingFromPuck: { min: 140, max: 360 } },
+      LD: { spacingFromPuck: { min: 70, max: 360 } },
+      RD: { spacingFromPuck: { min: 70, max: 360 } },
     }
   },
   {
@@ -368,7 +368,7 @@ HIQ.TEMPLATES_EVEN = [
       LW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
       RW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
       LD: { spacingFromPuck: { min: 60, max: 200 } },
-      RD: { spacingFromPuck: { min: 20, max: 140 } },
+      RD: { spacingFromPuck: { min: 0, max: 140 } },
     }
   },
   {
@@ -483,7 +483,7 @@ HIQ.TEMPLATES_EVEN = [
       LW: { spacingFromPuck: { min: 200, max: 520 } },
       RW: { spacingFromPuck: { min: 30, max: 180 }, beOutlet: { preferX: "less" } },
       LD: { spacingFromPuck: { min: 220, max: 540 } },
-      RD: { spacingFromPuck: { min: 220, max: 540 } },
+      RD: { spacingFromPuck: { min: 170, max: 540 } },
     }
   }
 ];
@@ -508,14 +508,14 @@ HIQ.ppPositions = function (structure) {
   ];
 };
 
+// A penalty kill is four skaters — no phantom fifth spot.
 HIQ.pkPositions = function (structure) {
   if (structure === "diamond") {
     return [
-      { role: "C",  x: 840, y: 310 },
-      { role: "LW", x: 900, y: 240 },
-      { role: "RW", x: 900, y: 380 },
-      { role: "LD", x: 960, y: 310 },
-      { role: "RD", x: 920, y: 310 },
+      { role: "C",  x: 840, y: 310 }, // top of the diamond, pressures the point
+      { role: "LW", x: 900, y: 240 }, // strong-side flank
+      { role: "RW", x: 900, y: 380 }, // weak-side flank
+      { role: "LD", x: 960, y: 310 }, // net-front
     ];
   }
   return [
@@ -523,8 +523,22 @@ HIQ.pkPositions = function (structure) {
     { role: "LW", x: 900, y: 360 },
     { role: "LD", x: 960, y: 260 },
     { role: "RD", x: 960, y: 360 },
-    { role: "RW", x: 930, y: 310 },
   ];
+};
+
+/* Build the coaching spots FROM the structure actually selected, shifted toward
+   the puck. Special teams units rotate as the puck moves — a static answer would
+   teach kids to stand still, which is exactly the habit we're trying to break. */
+HIQ.deriveGuidance = function (positions, puck, shift, radius) {
+  const out = {};
+  for (const p of positions) {
+    out[p.role] = {
+      x: Math.round(p.x + (puck.x - p.x) * shift),
+      y: Math.round(p.y + (puck.y - p.y) * shift),
+      r: radius
+    };
+  }
+  return out;
 };
 
 HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
@@ -565,20 +579,16 @@ HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
       puck: { x: puckSpot.x, y: puckSpot.y },
       offenseFull: off,
       defenseFull: def,
-      prompt: (role, fmt2) => `${fmt2} — Power Play (${ppStruct === "one3one" ? "1-3-1" : "Umbrella"}). Puck at the ${puckSpot.label}. You are ${role}. Keep the structure!`,
-      guidanceByRole: {
-        C:  { x: 860, y: 310, r: 100 },
-        LW: { x: 860, y: 200, r: 95 },
-        RW: { x: 860, y: 420, r: 95 },
-        LD: { x: 720, y: 200, r: 120 },
-        RD: { x: 720, y: 420, r: 120 },
-      },
+      prompt: (role, fmt2) => `${fmt2} — Power Play (${ppStruct === "one3one" ? "1-3-1" : "Umbrella"}). Puck at the ${puckSpot.label}. You are ${role}. Hold your spot and stay open!`,
+      // Shift gently toward the puck: on the PP you stay in your lane but present
+      // yourself as an option.
+      guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.14, 100),
       rulesByRole: {
-        LW: { spacingFromPuck: { min: 40, max: 220 }, beOutlet: { preferX: "less" }, stayAbovePuck: { margin: 80, allowDeeper: true } },
-        C:  { spacingFromPuck: { min: 70, max: 260 }, beOutlet: { preferX: "less" } },
-        RW: { spacingFromPuck: { min: 120, max: 420 } },
-        LD: { spacingFromPuck: { min: 220, max: 560 } },
-        RD: { spacingFromPuck: { min: 220, max: 560 } },
+        LW: { spacingFromPuck: { min: 30, max: 300 } },
+        C:  { spacingFromPuck: { min: 40, max: 300 } },
+        RW: { spacingFromPuck: { min: 30, max: 300 } },
+        LD: { spacingFromPuck: { min: 90, max: 560 } },
+        RD: { spacingFromPuck: { min: 60, max: 560 } },
       }
     };
   }
@@ -599,20 +609,15 @@ HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
       puck: { x: puckSpot.x, y: puckSpot.y },
       offenseFull: off,
       defenseFull: def,
-      prompt: (role, fmt2) => `${fmt2} — Penalty Kill (${pkStruct}). Puck at the ${puckSpot.label}. You are ${role}. Protect middle ice — stay in your lane!`,
-      guidanceByRole: {
-        C:  { x: 900, y: 260, r: 120 },
-        LW: { x: 900, y: 360, r: 120 },
-        RW: { x: 960, y: 260, r: 120 },
-        LD: { x: 960, y: 360, r: 120 },
-        RD: { x: 930, y: 310, r: 140 },
-      },
+      prompt: (role, fmt2) => `${fmt2} — Penalty Kill (${pkStruct}). Puck at the ${puckSpot.label}. You are ${role}. Rotate with the puck and protect the middle!`,
+      // The box/diamond rotates toward the puck as the power play moves it around.
+      guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.20, 105),
       rulesByRole: {
-        C:  { protectSlot: { slotSide: "right", radius: 210 }, spacingFromPuck: { min: 120, max: 360 } },
-        LW: { protectSlot: { slotSide: "right", radius: 210 }, spacingFromPuck: { min: 120, max: 360 } },
-        RW: { protectSlot: { slotSide: "right", radius: 200 }, spacingFromPuck: { min: 140, max: 420 } },
-        LD: { protectSlot: { slotSide: "right", radius: 200 }, spacingFromPuck: { min: 140, max: 420 } },
-        RD: { protectSlot: { slotSide: "right", radius: 190 }, spacingFromPuck: { min: 120, max: 380 } },
+        C:  { protectSlot: { slotSide: "right", radius: 230 } },
+        LW: { protectSlot: { slotSide: "right", radius: 230 } },
+        RW: { protectSlot: { slotSide: "right", radius: 230 } },
+        LD: { protectSlot: { slotSide: "right", radius: 230 } },
+        RD: { protectSlot: { slotSide: "right", radius: 230 } },
       }
     };
   }
