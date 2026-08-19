@@ -1,0 +1,16 @@
+{
+  "appId": "ca.hockeyiq.trainer",
+  "appName": "Hockey IQ Trainer",
+  "webDir": "www",
+  "backgroundColor": "#0f2a4aff",
+  "android": {
+    "backgroundColor": "#0f2a4aff"
+  },
+  "ios": {
+    "backgroundColor": "#0f2a4aff",
+    "contentInset": "always"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

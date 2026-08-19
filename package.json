@@ -1,0 +1,22 @@
+{
+  "name": "hockey-iq-trainer",
+  "version": "1.0.0",
+  "description": "Learn where to be on the ice. Read the play, pick your spot, and watch it unfold — hockey positioning training for young players.",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node tools/test.js",
+    "build:single": "node tools/build-single-file.js",
+    "build:icons": "node tools/make-icons.js",
+    "build:www": "node tools/build-www.js",
+    "cap:sync": "npm run build:www && npx cap sync",
+    "cap:ios": "npm run cap:sync && npx cap open ios",
+    "cap:android": "npm run cap:sync && npx cap open android"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.49.0"
+  },
+  "comments": {
+    "capacitor": "Native packaging deps are NOT installed by default — the web game has zero runtime dependencies. When you're ready for the app stores, run: npm i -D @capacitor/cli && npm i @capacitor/core @capacitor/ios @capacitor/android"
+  }
+}
