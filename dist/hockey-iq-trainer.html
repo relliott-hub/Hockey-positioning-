@@ -223,6 +223,40 @@ th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
 @keyframes toastIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
 @keyframes toastOut { to { transform: translateX(130%); opacity: 0; } }
 
+/* First-run tutorial */
+#tutorial {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8, 22, 40, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  animation: fadeIn 0.25s ease;
+}
+#tutorial[hidden] { display: none; }
+#tutCard {
+  background: #fff;
+  border-radius: 20px;
+  max-width: 420px; width: 100%;
+  padding: 26px 24px 20px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(8, 22, 40, 0.45);
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#tutArt { font-size: 54px; line-height: 1; margin-bottom: 6px; }
+#tutCard h2 { margin: 6px 0 10px; font-size: 21px; color: var(--navy); }
+#tutCard p { margin: 0; font-size: 15.5px; line-height: 1.5; color: #33506b; min-height: 68px; }
+#tutDots { display: flex; gap: 7px; justify-content: center; margin: 16px 0 14px; }
+#tutDots i {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: #cfdcea; display: block; transition: background 0.2s, width 0.2s;
+}
+#tutDots i.on { background: var(--accent); width: 22px; }
+#tutBtns { display: flex; gap: 10px; }
+#tutSkip { background: #eef4fb; color: #48678a; flex: 0 0 auto; }
+#tutNext { background: var(--good); flex: 1; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { transform: scale(0.9) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
 /* Game-first layout */
 #scorebar { margin-bottom: 4px; }
 canvas { margin-top: 6px; }
@@ -230,6 +264,7 @@ canvas { margin-top: 6px; }
 #actionRow button { min-width: 120px; }
 #settingsPanel { margin-top: 12px; }
 #settingsPanel summary { cursor: pointer; font-size: 15px; color: #0f2a4a; }
+#howToBtn { background: #48678a; font-size: 14px; padding: 9px 14px; }
 #profileRow label { min-width: 120px; }
 
 /* --- Mobile --- */
@@ -268,6 +303,10 @@ canvas { margin-top: 6px; }
   .toast { font-size: 13.5px; padding: 8px 12px; }
   #badgeGrid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   table { font-size: 11px; }
+  #tutCard { padding: 22px 18px 16px; }
+  #tutArt { font-size: 44px; }
+  #tutCard h2 { font-size: 18.5px; }
+  #tutCard p { font-size: 14.5px; min-height: 80px; }
 }
 
 @media (max-width: 760px) and (orientation: portrait) {
@@ -428,6 +467,10 @@ canvas { margin-top: 6px; }
         </select>
       </label>
     </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button id="howToBtn" type="button">❓ How to play</button>
+    </div>
   </details>
 
   <div class="legend">
@@ -465,6 +508,19 @@ canvas { margin-top: 6px; }
 </div>
 
 <div id="toasts"></div>
+
+<div id="tutorial" hidden>
+  <div id="tutCard" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
+    <div id="tutArt">🏒</div>
+    <h2 id="tutTitle">Welcome to Hockey IQ Trainer!</h2>
+    <p id="tutBody">Great players aren't just fast — they're always in the right place. Let's learn where to be.</p>
+    <div id="tutDots"></div>
+    <div id="tutBtns">
+      <button id="tutSkip" type="button">Skip</button>
+      <button id="tutNext" type="button">Next →</button>
+    </div>
+  </div>
+</div>
 
 
 <script>
@@ -1011,6 +1067,95 @@ HIQ.deriveGuidance = function (positions, puck, shift, radius) {
   return out;
 };
 
+/* Turn one template into an effectively unlimited supply of distinct reads.
+
+   A fixed template teaches a kid to memorise a picture: "breakout means stand
+   there." Real hockey IQ is reading what is actually in front of you, so every
+   play mirrors the ice, nudges the puck, and moves the support spots and the
+   opposition in response. The coaching answer changes every single time. */
+HIQ.varyScenario = function (tpl, opts) {
+  const clamp = HIQ.util.clamp;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+
+  const out = Object.assign({}, tpl);
+  out.puck = { ...tpl.puck };
+  out.offenseFull = tpl.offenseFull.map(p => ({ ...p }));
+  out.defenseFull = tpl.defenseFull.map(p => ({ ...p }));
+  out.guidanceByRole = {};
+  for (const [role, g] of Object.entries(tpl.guidanceByRole || {})) out.guidanceByRole[role] = { ...g };
+  out.rulesByRole = Object.assign({}, tpl.rulesByRole);
+
+  // 1. Run the same play off the other side of the ice. Mirroring across centre
+  //    ice leaves the slot where it is, so only the wings and D swap hands.
+  if (opts.mirror) {
+    const flip = p => ({ ...p, y: 620 - p.y });
+    out.puck = flip(out.puck);
+    out.offenseFull = out.offenseFull.map(p => ({ ...flip(p), role: SWAP[p.role] || p.role }));
+    out.defenseFull = out.defenseFull.map(flip);
+    const g = {}, r = {};
+    for (const [role, v] of Object.entries(out.guidanceByRole)) g[SWAP[role] || role] = { ...v, y: 620 - v.y };
+    for (const [role, v] of Object.entries(out.rulesByRole)) r[SWAP[role] || role] = v;
+    out.guidanceByRole = g;
+    out.rulesByRole = r;
+    out.mirrored = true;
+  }
+
+  // 2. Move the puck, and move every support spot in response. Players close to
+  //    the puck adjust most; the far-side D barely shifts at all.
+  const jitter = opts.jitter ?? 45;
+  const px = clamp(out.puck.x + rnd(-jitter, jitter), 70, 1030);
+  const py = clamp(out.puck.y + rnd(-jitter, jitter), 70, 550);
+  const dx = px - out.puck.x, dy = py - out.puck.y;
+  out.puck = { x: Math.round(px), y: Math.round(py) };
+
+  for (const g of Object.values(out.guidanceByRole)) {
+    const d = Math.hypot(g.x - px, g.y - py);
+    const respond = d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2;
+    g.x = Math.round(clamp(g.x + dx * respond, 60, 1040));
+    g.y = Math.round(clamp(g.y + dy * respond, 60, 560));
+  }
+
+  // Teammates stand where the coaching spots now are, so the picture stays honest.
+  out.offenseFull = out.offenseFull.map(p => {
+    const g = out.guidanceByRole[p.role];
+    return g ? { ...p, x: g.x, y: g.y } : p;
+  });
+
+  // The rule bands were written for the template's fixed picture. Now that the
+  // puck moves, give them the same slack so a correct read never falls outside
+  // its own rule.
+  const slack = Math.ceil(jitter * 0.9);
+  const widened = {};
+  for (const [role, r] of Object.entries(out.rulesByRole)) {
+    const copy = { ...r };
+    if (r.spacingFromPuck) {
+      copy.spacingFromPuck = {
+        min: Math.max(0, r.spacingFromPuck.min - slack),
+        max: r.spacingFromPuck.max + slack
+      };
+    }
+    if (r.protectSlot) copy.protectSlot = { ...r.protectSlot, radius: r.protectSlot.radius + slack };
+    widened[role] = copy;
+  }
+  out.rulesByRole = widened;
+
+  // 3. Pressure stops being a label and starts being real: under high pressure
+  //    the opposition collapses on the puck, under low pressure they sag off.
+  const press = { Low: -0.12, Med: 0, High: 0.14 }[opts.pressure] || 0;
+  out.defenseFull = out.defenseFull.map(p => {
+    if (p.role === "G") return p;
+    const bx = p.x + dx * 0.5, by = p.y + dy * 0.5;
+    return {
+      ...p,
+      x: Math.round(clamp(bx + (px - bx) * press + rnd(-13, 13), 55, 1045)),
+      y: Math.round(clamp(by + (py - by) * press + rnd(-13, 13), 55, 565))
+    };
+  });
+
+  return out;
+};
+
 HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
   const pick = HIQ.util.pick;
   const puckSpots = [
@@ -1053,12 +1198,15 @@ HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
       // Shift gently toward the puck: on the PP you stay in your lane but present
       // yourself as an option.
       guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.14, 100),
+      // On a power play any of these five can be the one holding the puck, so a
+      // minimum spacing would punish the puck carrier for standing on the puck.
+      // Holding the shape is what matters, and the positional score covers that.
       rulesByRole: {
-        LW: { spacingFromPuck: { min: 30, max: 300 } },
-        C:  { spacingFromPuck: { min: 40, max: 300 } },
-        RW: { spacingFromPuck: { min: 30, max: 300 } },
-        LD: { spacingFromPuck: { min: 90, max: 560 } },
-        RD: { spacingFromPuck: { min: 60, max: 560 } },
+        LW: { spacingFromPuck: { min: 0, max: 500 } },
+        C:  { spacingFromPuck: { min: 0, max: 500 } },
+        RW: { spacingFromPuck: { min: 0, max: 500 } },
+        LD: { spacingFromPuck: { min: 0, max: 560 } },
+        RD: { spacingFromPuck: { min: 0, max: 560 } },
       }
     };
   }
@@ -1438,13 +1586,15 @@ HIQ.Sim = (() => {
 
   function getAgeSettings() {
     const age = ageSel.value;
+    // scenarioJitter: how far the puck (and the whole read) moves play to play.
+    // Younger players get steadier pictures; older ones get more variety.
     if (age === "6-8") {
-      return { guidanceScale: 1.35, passScore: { easy: 55, med: 60, hard: 65 }, maxRulesToEnforce: 2, showSecondCue: false };
+      return { guidanceScale: 1.35, passScore: { easy: 55, med: 60, hard: 65 }, maxRulesToEnforce: 2, showSecondCue: false, scenarioJitter: 30 };
     }
     if (age === "12-14") {
-      return { guidanceScale: 0.95, passScore: { easy: 65, med: 75, hard: 85 }, maxRulesToEnforce: 4, showSecondCue: true };
+      return { guidanceScale: 0.95, passScore: { easy: 65, med: 75, hard: 85 }, maxRulesToEnforce: 4, showSecondCue: true, scenarioJitter: 60 };
     }
-    return { guidanceScale: 1.10, passScore: { easy: 60, med: 70, hard: 80 }, maxRulesToEnforce: 3, showSecondCue: true };
+    return { guidanceScale: 1.10, passScore: { easy: 60, med: 70, hard: 80 }, maxRulesToEnforce: 3, showSecondCue: true, scenarioJitter: 45 };
   }
 
   function passThreshold() {
@@ -1488,7 +1638,9 @@ HIQ.Sim = (() => {
       if (d > max) fail("spacing", 22, "Too far from the puck — you're not an option.");
     }
 
-    if (rules.beOutlet) {
+    // "Be an outlet" only means something for a player waiting to receive. The
+    // one carrying the puck can't be an outlet for themselves.
+    if (rules.beOutlet && dist(pos.x, pos.y, puck.x, puck.y) > 60) {
       const { preferX } = rules.beOutlet;
       if (preferX === "greater" && pos.x < puck.x - 15) fail("outlet", 22, "You're behind the play — get ahead so they can pass to you.");
       if (preferX === "less" && pos.x > puck.x + 15) fail("outlet", 22, "You're behind the play — get where they can pass to you.");
@@ -1628,8 +1780,17 @@ HIQ.Sim = (() => {
     if (candidates.length === 0) candidates = getCandidateTemplates(fmt);
     if (candidates.length === 0) { statusEl.textContent = "No scenarios available for those filters."; return; }
 
-    const tpl = pick(candidates);
-    const pressure = (pressureFilter === "any") ? pick(tpl.pressures || ["Med"]) : pressureFilter;
+    const base = pick(candidates);
+    const pressure = (pressureFilter === "any") ? pick(base.pressures || ["Med"]) : pressureFilter;
+
+    // Every play is a fresh read: mirrored ice, a moved puck, and support spots
+    // and opposition that respond. Special teams already vary by puck location.
+    const isSpecialTpl = base.id && base.id.startsWith("PP_") || (base.id || "").startsWith("PK_");
+    const tpl = isSpecialTpl ? base : HIQ.varyScenario(base, {
+      mirror: Math.random() < 0.5,
+      pressure,
+      jitter: getAgeSettings().scenarioJitter
+    });
 
     scenario = {
       id: tpl.id,
@@ -2100,12 +2261,23 @@ HIQ.Sim = (() => {
             : "<b>NICE READ ✅</b> You kept the play alive. Next play coming…";
           pendingTimer = setTimeout(buildScenario, 1500);
         } else {
-          statusEl.innerHTML = `<b>NOT THIS TIME ❌</b> ${cues.join(" ")}<br/><span class="muted">Coach cue: protect middle ice, keep spacing, be an option. Try again!</span>`;
+          // Revealing the answer on the first miss teaches kids to tap the green
+          // circle instead of reading the play. Give them a cue and a second look
+          // first; only show the spot once they've genuinely had two goes.
+          // The youngest group still gets the answer right away.
+          const alwaysReveal = (ageSel.value === "6-8" || diffSel.value === "easy");
+          scenario._attempts = (scenario._attempts || 0) + 1;
+          const reveal = alwaysReveal || scenario._attempts >= 2;
+
+          statusEl.innerHTML = reveal
+            ? `<b>NOT QUITE ❌</b> ${cues.join(" ")}<br/><span class="muted">Here's the spot the coach wanted — remember that shape.</span>`
+            : `<b>NOT THIS TIME ❌</b> ${cues.join(" ")}<br/><span class="muted">Have another look — where should you be?</span>`;
+
           pendingTimer = setTimeout(() => {
             restoreSnapshot();
             setBanner(null);
             if (isChoiceMode() && choice.options.length) choice.active = true;
-            renderState.showGuidance = true;
+            renderState.showGuidance = reveal;
             renderState.guidanceOk = false;
           }, 1600);
         }
@@ -3002,6 +3174,7 @@ HIQ.Sim = (() => {
     simRunning: () => HIQ.Sim.isRunning(),
     getStats: () => stats,
     getProfile: () => profile,
+    guidanceShown: () => renderState.showGuidance,
     // Auditing hooks: score an arbitrary spot, and force a specific template
     scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
     forceTemplate: (id, role) => {
@@ -3017,6 +3190,75 @@ HIQ.Sim = (() => {
       return scenario.id;
     }
   };
+
+  // --- First-run tutorial
+  // New players (and anyone testing the game) should understand what to do
+  // without being told. Four short cards, then straight into a real play.
+  const TUTORIAL_STEPS = [
+    {
+      art: "🏒",
+      title: "Welcome to Hockey IQ Trainer!",
+      body: "Great players aren't just the fastest — they're always in the right place. This game teaches you where to be on the ice."
+    },
+    {
+      art: "🔵",
+      title: "Find yourself on the ice",
+      body: "Your team is blue and the opponents are red. You're the player with the gold ring around them — that's who you control."
+    },
+    {
+      art: "🅰️",
+      title: "Pick your spot",
+      body: "Every play shows three spots: A, B and C. Read where the puck is and tap the spot where you should skate to help your team."
+    },
+    {
+      art: "🏆",
+      title: "Watch what happens",
+      body: "The play runs so you can see if your read worked. Score goals, build streaks, earn XP and unlock trophies. Ready?"
+    }
+  ];
+
+  const tutorialEl = document.getElementById("tutorial");
+  const tutArt = document.getElementById("tutArt");
+  const tutTitle = document.getElementById("tutTitle");
+  const tutBody = document.getElementById("tutBody");
+  const tutDots = document.getElementById("tutDots");
+  const tutNext = document.getElementById("tutNext");
+  const tutSkip = document.getElementById("tutSkip");
+  let tutStep = 0;
+
+  function renderTutorial() {
+    const s = TUTORIAL_STEPS[tutStep];
+    tutArt.textContent = s.art;
+    tutTitle.textContent = s.title;
+    tutBody.textContent = s.body;
+    tutNext.textContent = tutStep === TUTORIAL_STEPS.length - 1 ? "Let's play! 🥅" : "Next →";
+    tutDots.innerHTML = TUTORIAL_STEPS.map((_, i) => `<i class="${i === tutStep ? "on" : ""}"></i>`).join("");
+  }
+
+  function closeTutorial() {
+    tutorialEl.hidden = true;
+    try { localStorage.setItem("hiq.seenTutorial", "1"); } catch (e) { /* private mode */ }
+  }
+
+  function openTutorial() {
+    tutStep = 0;
+    renderTutorial();
+    tutorialEl.hidden = false;
+  }
+
+  tutNext.addEventListener("click", () => {
+    if (tutStep === TUTORIAL_STEPS.length - 1) { closeTutorial(); return; }
+    tutStep++;
+    renderTutorial();
+  });
+  tutSkip.addEventListener("click", closeTutorial);
+
+  let seenTutorial = false;
+  try { seenTutorial = localStorage.getItem("hiq.seenTutorial") === "1"; } catch (e) { /* private mode */ }
+  if (!seenTutorial) openTutorial();
+
+  const howToBtn = document.getElementById("howToBtn");
+  if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
   ppStructWrap.style.display = "none";

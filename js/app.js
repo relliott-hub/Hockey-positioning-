@@ -196,13 +196,15 @@
 
   function getAgeSettings() {
     const age = ageSel.value;
+    // scenarioJitter: how far the puck (and the whole read) moves play to play.
+    // Younger players get steadier pictures; older ones get more variety.
     if (age === "6-8") {
-      return { guidanceScale: 1.35, passScore: { easy: 55, med: 60, hard: 65 }, maxRulesToEnforce: 2, showSecondCue: false };
+      return { guidanceScale: 1.35, passScore: { easy: 55, med: 60, hard: 65 }, maxRulesToEnforce: 2, showSecondCue: false, scenarioJitter: 30 };
     }
     if (age === "12-14") {
-      return { guidanceScale: 0.95, passScore: { easy: 65, med: 75, hard: 85 }, maxRulesToEnforce: 4, showSecondCue: true };
+      return { guidanceScale: 0.95, passScore: { easy: 65, med: 75, hard: 85 }, maxRulesToEnforce: 4, showSecondCue: true, scenarioJitter: 60 };
     }
-    return { guidanceScale: 1.10, passScore: { easy: 60, med: 70, hard: 80 }, maxRulesToEnforce: 3, showSecondCue: true };
+    return { guidanceScale: 1.10, passScore: { easy: 60, med: 70, hard: 80 }, maxRulesToEnforce: 3, showSecondCue: true, scenarioJitter: 45 };
   }
 
   function passThreshold() {
@@ -246,7 +248,9 @@
       if (d > max) fail("spacing", 22, "Too far from the puck — you're not an option.");
     }
 
-    if (rules.beOutlet) {
+    // "Be an outlet" only means something for a player waiting to receive. The
+    // one carrying the puck can't be an outlet for themselves.
+    if (rules.beOutlet && dist(pos.x, pos.y, puck.x, puck.y) > 60) {
       const { preferX } = rules.beOutlet;
       if (preferX === "greater" && pos.x < puck.x - 15) fail("outlet", 22, "You're behind the play — get ahead so they can pass to you.");
       if (preferX === "less" && pos.x > puck.x + 15) fail("outlet", 22, "You're behind the play — get where they can pass to you.");
@@ -386,8 +390,17 @@
     if (candidates.length === 0) candidates = getCandidateTemplates(fmt);
     if (candidates.length === 0) { statusEl.textContent = "No scenarios available for those filters."; return; }
 
-    const tpl = pick(candidates);
-    const pressure = (pressureFilter === "any") ? pick(tpl.pressures || ["Med"]) : pressureFilter;
+    const base = pick(candidates);
+    const pressure = (pressureFilter === "any") ? pick(base.pressures || ["Med"]) : pressureFilter;
+
+    // Every play is a fresh read: mirrored ice, a moved puck, and support spots
+    // and opposition that respond. Special teams already vary by puck location.
+    const isSpecialTpl = base.id && base.id.startsWith("PP_") || (base.id || "").startsWith("PK_");
+    const tpl = isSpecialTpl ? base : HIQ.varyScenario(base, {
+      mirror: Math.random() < 0.5,
+      pressure,
+      jitter: getAgeSettings().scenarioJitter
+    });
 
     scenario = {
       id: tpl.id,
@@ -858,12 +871,23 @@
             : "<b>NICE READ ✅</b> You kept the play alive. Next play coming…";
           pendingTimer = setTimeout(buildScenario, 1500);
         } else {
-          statusEl.innerHTML = `<b>NOT THIS TIME ❌</b> ${cues.join(" ")}<br/><span class="muted">Coach cue: protect middle ice, keep spacing, be an option. Try again!</span>`;
+          // Revealing the answer on the first miss teaches kids to tap the green
+          // circle instead of reading the play. Give them a cue and a second look
+          // first; only show the spot once they've genuinely had two goes.
+          // The youngest group still gets the answer right away.
+          const alwaysReveal = (ageSel.value === "6-8" || diffSel.value === "easy");
+          scenario._attempts = (scenario._attempts || 0) + 1;
+          const reveal = alwaysReveal || scenario._attempts >= 2;
+
+          statusEl.innerHTML = reveal
+            ? `<b>NOT QUITE ❌</b> ${cues.join(" ")}<br/><span class="muted">Here's the spot the coach wanted — remember that shape.</span>`
+            : `<b>NOT THIS TIME ❌</b> ${cues.join(" ")}<br/><span class="muted">Have another look — where should you be?</span>`;
+
           pendingTimer = setTimeout(() => {
             restoreSnapshot();
             setBanner(null);
             if (isChoiceMode() && choice.options.length) choice.active = true;
-            renderState.showGuidance = true;
+            renderState.showGuidance = reveal;
             renderState.guidanceOk = false;
           }, 1600);
         }
@@ -1760,6 +1784,7 @@
     simRunning: () => HIQ.Sim.isRunning(),
     getStats: () => stats,
     getProfile: () => profile,
+    guidanceShown: () => renderState.showGuidance,
     // Auditing hooks: score an arbitrary spot, and force a specific template
     scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
     forceTemplate: (id, role) => {
@@ -1775,6 +1800,75 @@
       return scenario.id;
     }
   };
+
+  // --- First-run tutorial
+  // New players (and anyone testing the game) should understand what to do
+  // without being told. Four short cards, then straight into a real play.
+  const TUTORIAL_STEPS = [
+    {
+      art: "🏒",
+      title: "Welcome to Hockey IQ Trainer!",
+      body: "Great players aren't just the fastest — they're always in the right place. This game teaches you where to be on the ice."
+    },
+    {
+      art: "🔵",
+      title: "Find yourself on the ice",
+      body: "Your team is blue and the opponents are red. You're the player with the gold ring around them — that's who you control."
+    },
+    {
+      art: "🅰️",
+      title: "Pick your spot",
+      body: "Every play shows three spots: A, B and C. Read where the puck is and tap the spot where you should skate to help your team."
+    },
+    {
+      art: "🏆",
+      title: "Watch what happens",
+      body: "The play runs so you can see if your read worked. Score goals, build streaks, earn XP and unlock trophies. Ready?"
+    }
+  ];
+
+  const tutorialEl = document.getElementById("tutorial");
+  const tutArt = document.getElementById("tutArt");
+  const tutTitle = document.getElementById("tutTitle");
+  const tutBody = document.getElementById("tutBody");
+  const tutDots = document.getElementById("tutDots");
+  const tutNext = document.getElementById("tutNext");
+  const tutSkip = document.getElementById("tutSkip");
+  let tutStep = 0;
+
+  function renderTutorial() {
+    const s = TUTORIAL_STEPS[tutStep];
+    tutArt.textContent = s.art;
+    tutTitle.textContent = s.title;
+    tutBody.textContent = s.body;
+    tutNext.textContent = tutStep === TUTORIAL_STEPS.length - 1 ? "Let's play! 🥅" : "Next →";
+    tutDots.innerHTML = TUTORIAL_STEPS.map((_, i) => `<i class="${i === tutStep ? "on" : ""}"></i>`).join("");
+  }
+
+  function closeTutorial() {
+    tutorialEl.hidden = true;
+    try { localStorage.setItem("hiq.seenTutorial", "1"); } catch (e) { /* private mode */ }
+  }
+
+  function openTutorial() {
+    tutStep = 0;
+    renderTutorial();
+    tutorialEl.hidden = false;
+  }
+
+  tutNext.addEventListener("click", () => {
+    if (tutStep === TUTORIAL_STEPS.length - 1) { closeTutorial(); return; }
+    tutStep++;
+    renderTutorial();
+  });
+  tutSkip.addEventListener("click", closeTutorial);
+
+  let seenTutorial = false;
+  try { seenTutorial = localStorage.getItem("hiq.seenTutorial") === "1"; } catch (e) { /* private mode */ }
+  if (!seenTutorial) openTutorial();
+
+  const howToBtn = document.getElementById("howToBtn");
+  if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
   ppStructWrap.style.display = "none";

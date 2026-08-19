@@ -541,6 +541,95 @@ HIQ.deriveGuidance = function (positions, puck, shift, radius) {
   return out;
 };
 
+/* Turn one template into an effectively unlimited supply of distinct reads.
+
+   A fixed template teaches a kid to memorise a picture: "breakout means stand
+   there." Real hockey IQ is reading what is actually in front of you, so every
+   play mirrors the ice, nudges the puck, and moves the support spots and the
+   opposition in response. The coaching answer changes every single time. */
+HIQ.varyScenario = function (tpl, opts) {
+  const clamp = HIQ.util.clamp;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+
+  const out = Object.assign({}, tpl);
+  out.puck = { ...tpl.puck };
+  out.offenseFull = tpl.offenseFull.map(p => ({ ...p }));
+  out.defenseFull = tpl.defenseFull.map(p => ({ ...p }));
+  out.guidanceByRole = {};
+  for (const [role, g] of Object.entries(tpl.guidanceByRole || {})) out.guidanceByRole[role] = { ...g };
+  out.rulesByRole = Object.assign({}, tpl.rulesByRole);
+
+  // 1. Run the same play off the other side of the ice. Mirroring across centre
+  //    ice leaves the slot where it is, so only the wings and D swap hands.
+  if (opts.mirror) {
+    const flip = p => ({ ...p, y: 620 - p.y });
+    out.puck = flip(out.puck);
+    out.offenseFull = out.offenseFull.map(p => ({ ...flip(p), role: SWAP[p.role] || p.role }));
+    out.defenseFull = out.defenseFull.map(flip);
+    const g = {}, r = {};
+    for (const [role, v] of Object.entries(out.guidanceByRole)) g[SWAP[role] || role] = { ...v, y: 620 - v.y };
+    for (const [role, v] of Object.entries(out.rulesByRole)) r[SWAP[role] || role] = v;
+    out.guidanceByRole = g;
+    out.rulesByRole = r;
+    out.mirrored = true;
+  }
+
+  // 2. Move the puck, and move every support spot in response. Players close to
+  //    the puck adjust most; the far-side D barely shifts at all.
+  const jitter = opts.jitter ?? 45;
+  const px = clamp(out.puck.x + rnd(-jitter, jitter), 70, 1030);
+  const py = clamp(out.puck.y + rnd(-jitter, jitter), 70, 550);
+  const dx = px - out.puck.x, dy = py - out.puck.y;
+  out.puck = { x: Math.round(px), y: Math.round(py) };
+
+  for (const g of Object.values(out.guidanceByRole)) {
+    const d = Math.hypot(g.x - px, g.y - py);
+    const respond = d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2;
+    g.x = Math.round(clamp(g.x + dx * respond, 60, 1040));
+    g.y = Math.round(clamp(g.y + dy * respond, 60, 560));
+  }
+
+  // Teammates stand where the coaching spots now are, so the picture stays honest.
+  out.offenseFull = out.offenseFull.map(p => {
+    const g = out.guidanceByRole[p.role];
+    return g ? { ...p, x: g.x, y: g.y } : p;
+  });
+
+  // The rule bands were written for the template's fixed picture. Now that the
+  // puck moves, give them the same slack so a correct read never falls outside
+  // its own rule.
+  const slack = Math.ceil(jitter * 0.9);
+  const widened = {};
+  for (const [role, r] of Object.entries(out.rulesByRole)) {
+    const copy = { ...r };
+    if (r.spacingFromPuck) {
+      copy.spacingFromPuck = {
+        min: Math.max(0, r.spacingFromPuck.min - slack),
+        max: r.spacingFromPuck.max + slack
+      };
+    }
+    if (r.protectSlot) copy.protectSlot = { ...r.protectSlot, radius: r.protectSlot.radius + slack };
+    widened[role] = copy;
+  }
+  out.rulesByRole = widened;
+
+  // 3. Pressure stops being a label and starts being real: under high pressure
+  //    the opposition collapses on the puck, under low pressure they sag off.
+  const press = { Low: -0.12, Med: 0, High: 0.14 }[opts.pressure] || 0;
+  out.defenseFull = out.defenseFull.map(p => {
+    if (p.role === "G") return p;
+    const bx = p.x + dx * 0.5, by = p.y + dy * 0.5;
+    return {
+      ...p,
+      x: Math.round(clamp(bx + (px - bx) * press + rnd(-13, 13), 55, 1045)),
+      y: Math.round(clamp(by + (py - by) * press + rnd(-13, 13), 55, 565))
+    };
+  });
+
+  return out;
+};
+
 HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
   const pick = HIQ.util.pick;
   const puckSpots = [
@@ -583,12 +672,15 @@ HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
       // Shift gently toward the puck: on the PP you stay in your lane but present
       // yourself as an option.
       guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.14, 100),
+      // On a power play any of these five can be the one holding the puck, so a
+      // minimum spacing would punish the puck carrier for standing on the puck.
+      // Holding the shape is what matters, and the positional score covers that.
       rulesByRole: {
-        LW: { spacingFromPuck: { min: 30, max: 300 } },
-        C:  { spacingFromPuck: { min: 40, max: 300 } },
-        RW: { spacingFromPuck: { min: 30, max: 300 } },
-        LD: { spacingFromPuck: { min: 90, max: 560 } },
-        RD: { spacingFromPuck: { min: 60, max: 560 } },
+        LW: { spacingFromPuck: { min: 0, max: 500 } },
+        C:  { spacingFromPuck: { min: 0, max: 500 } },
+        RW: { spacingFromPuck: { min: 0, max: 500 } },
+        LD: { spacingFromPuck: { min: 0, max: 560 } },
+        RD: { spacingFromPuck: { min: 0, max: 560 } },
       }
     };
   }

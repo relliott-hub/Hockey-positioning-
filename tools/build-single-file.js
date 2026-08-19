@@ -12,9 +12,11 @@ const js = ["data", "audio", "sim", "app"]
   .map(n => fs.readFileSync(path.join(root, "js", `${n}.js`), "utf8"))
   .join("\n");
 
-// Take everything inside <body>, drop the external script tags
+// Take everything inside <body>, drop the external script tags and any block
+// marked build:strip (things that only make sense for the hosted, multi-file site)
 let body = html.split(/<body>/)[1].split(/<\/body>/)[0];
 body = body.replace(/<script src="[^"]+"><\/script>\s*/g, "");
+body = body.replace(/<!--\s*build:strip-start[\s\S]*?build:strip-end\s*-->\s*/g, "");
 
 // charset MUST be first — without it, browsers guess an encoding and emoji shatter into mojibake
 const out = `<meta charset="utf-8" />

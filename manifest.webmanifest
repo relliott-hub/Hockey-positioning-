@@ -1,0 +1,19 @@
+{
+  "name": "Hockey IQ Trainer",
+  "short_name": "Hockey IQ",
+  "description": "Learn where to be on the ice. Read the play, pick your spot, and watch it unfold — hockey positioning training for young players.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f2a4a",
+  "theme_color": "#0f2a4a",
+  "lang": "en",
+  "categories": ["education", "sports", "games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

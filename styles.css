@@ -219,6 +219,40 @@ th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
 @keyframes toastIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
 @keyframes toastOut { to { transform: translateX(130%); opacity: 0; } }
 
+/* First-run tutorial */
+#tutorial {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8, 22, 40, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  animation: fadeIn 0.25s ease;
+}
+#tutorial[hidden] { display: none; }
+#tutCard {
+  background: #fff;
+  border-radius: 20px;
+  max-width: 420px; width: 100%;
+  padding: 26px 24px 20px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(8, 22, 40, 0.45);
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#tutArt { font-size: 54px; line-height: 1; margin-bottom: 6px; }
+#tutCard h2 { margin: 6px 0 10px; font-size: 21px; color: var(--navy); }
+#tutCard p { margin: 0; font-size: 15.5px; line-height: 1.5; color: #33506b; min-height: 68px; }
+#tutDots { display: flex; gap: 7px; justify-content: center; margin: 16px 0 14px; }
+#tutDots i {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: #cfdcea; display: block; transition: background 0.2s, width 0.2s;
+}
+#tutDots i.on { background: var(--accent); width: 22px; }
+#tutBtns { display: flex; gap: 10px; }
+#tutSkip { background: #eef4fb; color: #48678a; flex: 0 0 auto; }
+#tutNext { background: var(--good); flex: 1; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { transform: scale(0.9) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
 /* Game-first layout */
 #scorebar { margin-bottom: 4px; }
 canvas { margin-top: 6px; }
@@ -226,6 +260,7 @@ canvas { margin-top: 6px; }
 #actionRow button { min-width: 120px; }
 #settingsPanel { margin-top: 12px; }
 #settingsPanel summary { cursor: pointer; font-size: 15px; color: #0f2a4a; }
+#howToBtn { background: #48678a; font-size: 14px; padding: 9px 14px; }
 #profileRow label { min-width: 120px; }
 
 /* --- Mobile --- */
@@ -264,6 +299,10 @@ canvas { margin-top: 6px; }
   .toast { font-size: 13.5px; padding: 8px 12px; }
   #badgeGrid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   table { font-size: 11px; }
+  #tutCard { padding: 22px 18px 16px; }
+  #tutArt { font-size: 44px; }
+  #tutCard h2 { font-size: 18.5px; }
+  #tutCard p { font-size: 14.5px; min-height: 80px; }
 }
 
 @media (max-width: 760px) and (orientation: portrait) {

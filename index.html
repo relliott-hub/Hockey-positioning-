@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Hockey IQ Trainer</title>
+  <meta name="description" content="Learn where to be on the ice. Read the play, pick your spot, and watch it unfold — hockey positioning training for young players." />
+  <meta name="theme-color" content="#0f2a4a" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hockey IQ" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -159,6 +167,10 @@
         </select>
       </label>
     </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button id="howToBtn" type="button">❓ How to play</button>
+    </div>
   </details>
 
   <div class="legend">
@@ -197,9 +209,34 @@
 
 <div id="toasts"></div>
 
+<div id="tutorial" hidden>
+  <div id="tutCard" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
+    <div id="tutArt">🏒</div>
+    <h2 id="tutTitle">Welcome to Hockey IQ Trainer!</h2>
+    <p id="tutBody">Great players aren't just fast — they're always in the right place. Let's learn where to be.</p>
+    <div id="tutDots"></div>
+    <div id="tutBtns">
+      <button id="tutSkip" type="button">Skip</button>
+      <button id="tutNext" type="button">Next →</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/app.js"></script>
+<!-- build:strip-start (the single-file bundle has no sw.js alongside it) -->
+<script>
+  // Offline play: register the service worker only when the page is served over
+  // http(s). Opening index.html straight off disk (file://) has no SW support,
+  // and attempting it throws a console error for no benefit.
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => { /* offline support is optional */ });
+    });
+  }
+</script>
+<!-- build:strip-end -->
 </body>
 </html>
