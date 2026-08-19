@@ -34,10 +34,13 @@ const section = (t) => console.log(`\n${t}`);
   const dataWarnings = [];
   page.on("console", m => { if (m.type() === "warning" && m.text().includes("[HIQ]")) dataWarnings.push(m.text()); });
 
+  // Rink coords -> page coords. The game frames the action with a camera, so this
+  // has to go through the same transform the player's eye does.
   const tapCanvas = async (x, y) => {
     await page.evaluate(() => document.getElementById("rink").scrollIntoView({ block: "center" }));
     const box = await page.locator("#rink").boundingBox();
-    await page.mouse.click(box.x + x * (box.width / 1100), box.y + y * (box.height / 620));
+    const c = await page.evaluate(({ x, y }) => HIQ.debug.worldToScreen(x, y), { x, y });
+    await page.mouse.click(box.x + c.x * (box.width / 1100), box.y + c.y * (box.height / 620));
   };
   const settle = () => page.waitForFunction(() => !HIQ.debug.simRunning(), null, { timeout: 15000 });
 
@@ -227,6 +230,68 @@ const section = (t) => console.log(`\n${t}`);
     return { top, bottom };
   });
   check(sides.top > 25 && sides.bottom > 25, "plays run off both sides of the ice", `${sides.top} top / ${sides.bottom} bottom`);
+
+  // ------------------------------------------------------------ readability
+  // A play you can't read teaches nothing, so these are correctness checks too.
+  section("Readability");
+  const vis = await page.evaluate(() => {
+    let overlaps = 0, markerClash = 0, plays = 0, minGap = Infinity, minMarker = Infinity;
+    let carrierFound = 0, unlabelled = 0, youHadPuck = 0;
+    for (let i = 0; i < 150; i++) {
+      HIQ.debug.newPlay();
+      const p = HIQ.debug.getPieces();
+      // Only what is actually drawn: the player token is hidden while choosing.
+      const drawn = [...p.offense, ...p.defense].filter(q => q.role !== "G");
+      if (!HIQ.debug.choiceActive()) drawn.push(...p.controlled);
+      plays++;
+
+      for (let a = 0; a < drawn.length; a++) {
+        for (let b = a + 1; b < drawn.length; b++) {
+          const d = Math.hypot(drawn[a].x - drawn[b].x, drawn[a].y - drawn[b].y);
+          if (d < minGap) minGap = d;
+          if (d < 40) overlaps++;
+        }
+      }
+      for (const o of HIQ.debug.getChoices()) {
+        for (const q of drawn) {
+          const d = Math.hypot(o.pos.x - q.x, o.pos.y - q.y);
+          if (d < minMarker) minMarker = d;
+          if (d < 40) markerClash++;
+        }
+      }
+      // The puck situation must always be spelled out — either someone is shown
+      // holding it, or it's shown as loose. Never left ambiguous.
+      const st = HIQ.debug.puckState();
+      if (st.label === "HAS PUCK") carrierFound++;
+      else if (st.label !== "LOOSE PUCK") unlabelled++;
+
+      // You should never be asked where to go on a play where you have the puck.
+      const g = p.guidance;
+      if (Math.hypot(g.x - p.puck.x, g.y - p.puck.y) < 55) youHadPuck++;
+    }
+    return {
+      overlaps, markerClash, plays, unlabelled, youHadPuck,
+      minGap: Math.round(minGap), minMarker: Math.round(minMarker), carrierFound
+    };
+  });
+  check(vis.overlaps === 0, "no two players are ever drawn overlapping",
+    `closest pair ${vis.minGap}px across ${vis.plays} plays`);
+  check(vis.markerClash === 0, "A/B/C markers never sit on top of a player",
+    `closest marker-to-player ${vis.minMarker}px`);
+  check(vis.unlabelled === 0, "the puck situation is always spelled out (carried or loose)",
+    `${vis.carrierFound}/${vis.plays} carried, ${vis.plays - vis.carrierFound} loose`);
+  check(vis.carrierFound / vis.plays > 0.7, "most plays show a clear puck carrier",
+    `${Math.round(vis.carrierFound / vis.plays * 100)}% carried`);
+  check(vis.youHadPuck === 0, "you are never asked to reposition on a play you already have the puck on",
+    `${vis.youHadPuck} such plays`);
+
+  // Taps must land through the camera transform, not just at 1:1
+  const camOk = await page.evaluate(() => {
+    const c = HIQ.debug.getCamera();
+    const p = HIQ.debug.worldToScreen(c.x, c.y);
+    return c.scale >= 1 && Math.abs(p.x - 550) < 1 && Math.abs(p.y - 310) < 1;
+  });
+  check(camOk, "camera transform is self-consistent (taps map back correctly)");
 
   // ------------------------------------------------------------ persistence
   section("Progress and profile persistence");

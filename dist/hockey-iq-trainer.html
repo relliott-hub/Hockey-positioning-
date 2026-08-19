@@ -1109,9 +1109,18 @@ HIQ.varyScenario = function (tpl, opts) {
   const dx = px - out.puck.x, dy = py - out.puck.y;
   out.puck = { x: Math.round(px), y: Math.round(py) };
 
-  for (const g of Object.values(out.guidanceByRole)) {
+  // Whoever had the puck keeps it: they move with it exactly, or possession
+  // visibly drifts apart and you can no longer tell who is carrying.
+  let carrierRole = null, carrierDist = Infinity;
+  for (const [role, g] of Object.entries(out.guidanceByRole)) {
+    const d = Math.hypot(g.x - (px - dx), g.y - (py - dy));
+    if (d < carrierDist) { carrierDist = d; carrierRole = role; }
+  }
+  if (carrierDist > 60) carrierRole = null; // nobody had it to begin with
+
+  for (const [role, g] of Object.entries(out.guidanceByRole)) {
     const d = Math.hypot(g.x - px, g.y - py);
-    const respond = d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2;
+    const respond = role === carrierRole ? 1 : (d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2);
     g.x = Math.round(clamp(g.x + dx * respond, 60, 1040));
     g.y = Math.round(clamp(g.y + dy * respond, 60, 560));
   }
@@ -1780,17 +1789,33 @@ HIQ.Sim = (() => {
     if (candidates.length === 0) candidates = getCandidateTemplates(fmt);
     if (candidates.length === 0) { statusEl.textContent = "No scenarios available for those filters."; return; }
 
-    const base = pick(candidates);
-    const pressure = (pressureFilter === "any") ? pick(base.pressures || ["Med"]) : pressureFilter;
-
     // Every play is a fresh read: mirrored ice, a moved puck, and support spots
     // and opposition that respond. Special teams already vary by puck location.
-    const isSpecialTpl = base.id && base.id.startsWith("PP_") || (base.id || "").startsWith("PK_");
-    const tpl = isSpecialTpl ? base : HIQ.varyScenario(base, {
-      mirror: Math.random() < 0.5,
-      pressure,
-      jitter: getAgeSettings().scenarioJitter
-    });
+    //
+    // One situation is rejected outright: a play where the puck belongs to the
+    // very role the player is being asked to position. The question is "where
+    // should you go to help" — if you already have the puck that makes no sense,
+    // and since your token is hidden while choosing, nobody visible would be
+    // carrying it. Re-roll for a play where a teammate or opponent has it.
+    let tpl = null, pressure = null;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const base = pick(candidates);
+      const pr = (pressureFilter === "any") ? pick(base.pressures || ["Med"]) : pressureFilter;
+      const id = base.id || "";
+      const isSpecialTpl = id.startsWith("PP_") || id.startsWith("PK_");
+      const cand = isSpecialTpl ? base : HIQ.varyScenario(base, {
+        mirror: Math.random() < 0.5,
+        pressure: pr,
+        jitter: getAgeSettings().scenarioJitter
+      });
+
+      const g = cand.guidanceByRole && cand.guidanceByRole[role];
+      const youHaveThePuck = g && dist(g.x, g.y, cand.puck.x, cand.puck.y) < 62;
+      if (mode === "single" && youHaveThePuck && attempt < 7) continue;
+
+      tpl = cand; pressure = pr;
+      break;
+    }
 
     scenario = {
       id: tpl.id,
@@ -1819,7 +1844,6 @@ HIQ.Sim = (() => {
     }
     scenario.role = playRole;
     scenario.prompt = tpl.prompt ? tpl.prompt(playRole, fmt) : `${fmt} — ${tpl.phase}. You are ${playRole}.`;
-    scenario._skipRules = buildSkipRules(scenario);
 
     if (mode === "single") {
       // Your role always takes one of the team's spots (never adds an extra skater).
@@ -1835,12 +1859,28 @@ HIQ.Sim = (() => {
     const g = scenario.guidanceByRole?.[playRole] || { x: 550, y: 310, r: 90 };
     guidance = { x: g.x, y: g.y, r: difficultyTighten(g.r, diff) * ageCfg.guidanceScale };
 
-    // Choice mode: generate A/B/C options
+    // Positions settle FIRST: spread the skaters apart and clear the coaching
+    // spot, moving the puck with its carrier so possession survives. Everything
+    // derived from positions — the rule self-check, the choices — comes after,
+    // so nothing is computed against coordinates that later shift.
     choice = { active: false, options: [] };
+    spreadForClarity([guidance]);
+    scenario._skipRules = buildSkipRules(scenario);
+
     if (isChoiceMode()) {
       choice.options = generateChoices();
       choice.active = choice.options.length > 0;
     }
+
+    // Park the (hidden) player token equidistant from the three options, so when
+    // they answer it skates in from a neutral spot that's already on screen.
+    if (choice.active && controlled.length) {
+      const n = choice.options.length;
+      controlled[0].x = choice.options.reduce((s, o) => s + o.pos.x, 0) / n;
+      controlled[0].y = choice.options.reduce((s, o) => s + o.pos.y, 0) / n;
+    }
+
+    camera.ready = false; // snap to the new play rather than gliding across the ice
 
     // UI
     phaseEl.textContent = scenario.phase;
@@ -1867,6 +1907,136 @@ HIQ.Sim = (() => {
     renderState.intro = { text: `${scenario.phase.toUpperCase()}  •  ${fmt}`, at: performance.now() };
     HIQ.audio.play("faceoff");
     setCoach("think");
+  }
+
+  /* Ten players inside one zone will overlap if you place them where a coach
+     would draw them, and overlapping dots are unreadable — especially on a
+     phone. Nudge skaters apart to a minimum gap, and push them off the A/B/C
+     markers so the choices stay visible. A few feet of separation never changes
+     the read; being unable to tell two players apart certainly does. */
+  function spreadForClarity(keepClear) {
+    const MIN_GAP = 62;
+    const skaters = [...offense, ...defense].filter(p => p.role !== "G");
+    if (skaters.length < 2) return;
+
+    // Whoever has the puck stays put, so the puck never looks orphaned.
+    let carrier = null, best = Infinity;
+    for (const p of skaters) {
+      const d = dist(p.x, p.y, puck.x, puck.y);
+      if (d < best) { best = d; carrier = p; }
+    }
+    const pinned = (carrier && best < 80) ? carrier : null;
+
+    const nudge = (p, ux, uy, amount) => {
+      p.x = clamp(p.x + ux * amount, 58, 1042);
+      p.y = clamp(p.y + uy * amount, 58, 562);
+    };
+
+    for (let iter = 0; iter < 16; iter++) {
+      let moved = false;
+
+      for (let i = 0; i < skaters.length; i++) {
+        for (let j = i + 1; j < skaters.length; j++) {
+          const a = skaters[i], b = skaters[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          let d = Math.hypot(dx, dy);
+          if (d >= MIN_GAP) continue;
+          if (d < 0.5) { dx = Math.cos(i * 2.4); dy = Math.sin(i * 2.4); d = 1; }
+          const ux = dx / d, uy = dy / d;
+          const half = (MIN_GAP - d) / 2;
+          const aFree = a !== pinned, bFree = b !== pinned;
+          if (aFree) nudge(a, -ux, -uy, bFree ? half : half * 2);
+          if (bFree) nudge(b, ux, uy, aFree ? half : half * 2);
+          moved = true;
+        }
+      }
+
+      for (const spot of keepClear) {
+        if (!spot) continue;
+        for (const p of skaters) {
+          let dx = p.x - spot.x, dy = p.y - spot.y;
+          let d = Math.hypot(dx, dy);
+          if (d >= MIN_GAP) continue;
+          if (d < 0.5) { dx = 1; dy = 0; d = 1; }
+          const ux = dx / d, uy = dy / d;
+          const amount = MIN_GAP - d;
+          const before = { x: p.x, y: p.y };
+          nudge(p, ux, uy, amount);
+          // The carrier may move off the coaching spot, but the puck goes with
+          // them — possession has to survive a readability nudge.
+          if (p === pinned) {
+            puck.x = clamp(puck.x + (p.x - before.x), 58, 1042);
+            puck.y = clamp(puck.y + (p.y - before.y), 58, 562);
+          }
+          moved = true;
+        }
+      }
+
+      if (!moved) break;
+    }
+  }
+
+  /* Camera: a 200-foot rink drawn to fit a phone leaves the actual play tiny in
+     one corner. Frame the action instead, so the players fill the screen. */
+  const camera = { x: 550, y: 310, scale: 1, ready: false };
+
+  function cameraTarget() {
+    const pts = [];
+    const add = p => { if (p && isFinite(p.x) && isFinite(p.y)) pts.push(p); };
+    offense.forEach(add);
+    defense.forEach(p => { if (p.role !== "G") add(p); });
+    if (!choice.active) controlled.forEach(add); // hidden while choosing
+    add(puck);
+    if (choice.active) choice.options.forEach(o => add(o.pos));
+    if (!pts.length) return { x: 550, y: 310, scale: 1 };
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+
+    const pad = 95; // breathing room so nothing sits against the edge
+    const scale = clamp(
+      Math.min(canvas.width / ((maxX - minX) + pad * 2), canvas.height / ((maxY - minY) + pad * 2)),
+      1, 2.1
+    );
+    // Centre on the action, but never pan past the boards.
+    const halfW = canvas.width / (2 * scale), halfH = canvas.height / (2 * scale);
+    return {
+      x: clamp((minX + maxX) / 2, halfW, canvas.width - halfW),
+      y: clamp((minY + maxY) / 2, halfH, canvas.height - halfH),
+      scale
+    };
+  }
+
+  function updateCamera() {
+    const tgt = cameraTarget();
+    if (!camera.ready) {
+      camera.x = tgt.x; camera.y = tgt.y; camera.scale = tgt.scale;
+      camera.ready = true;
+      return;
+    }
+    // Gentle follow — enough to keep a rush in frame, slow enough not to swim.
+    const k = 0.07;
+    camera.x += (tgt.x - camera.x) * k;
+    camera.y += (tgt.y - camera.y) * k;
+    camera.scale += (tgt.scale - camera.scale) * k;
+  }
+
+  function applyCamera() {
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(camera.scale, camera.scale);
+    ctx.translate(-camera.x, -camera.y);
+  }
+
+  function screenToWorld(x, y) {
+    return {
+      x: (x - canvas.width / 2) / camera.scale + camera.x,
+      y: (y - canvas.height / 2) / camera.scale + camera.y
+    };
   }
 
   // --- A/B/C choice generation
@@ -1926,8 +2096,15 @@ HIQ.Sim = (() => {
       .filter(c => c.res.score <= correctRes.score - 12)
       .filter(c => dist(c.pos.x, c.pos.y, correctPos.x, correctPos.y) > r * 0.9);
 
+    // Prefer decoys that already sit in open ice — a marker drawn on top of a
+    // player is hard to see and harder to tap.
+    const occupied = [...offense, ...defense].filter(p => p.role !== "G");
+    const isClear = c => occupied.every(p => dist(c.pos.x, c.pos.y, p.x, p.y) >= 62);
+    const shuffled = shuffle(scored);
+    const ordered = [...shuffled.filter(isClear), ...shuffled.filter(c => !isClear(c))];
+
     const spread = [];
-    for (const c of shuffle(scored)) {
+    for (const c of ordered) {
       if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
       if (spread.length === 2) break;
     }
@@ -1939,6 +2116,29 @@ HIQ.Sim = (() => {
       c.res = scorePlacement(role, c.pos, scenario);
       if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
       angle += Math.PI * 0.7;
+    }
+
+    // A decoy sitting on top of a player is unreadable — and the "you chased the
+    // puck" decoy lands on the puck carrier by its very nature. Slide such a
+    // decoy clear of the player and re-score it where it actually ends up.
+    const skaters = [...offense, ...defense].filter(p => p.role !== "G");
+    for (const c of spread) {
+      for (let i = 0; i < 6; i++) {
+        let worst = null, worstD = Infinity;
+        for (const p of skaters) {
+          const d = dist(c.pos.x, c.pos.y, p.x, p.y);
+          if (d < 62 && d < worstD) { worst = p; worstD = d; }
+        }
+        if (!worst) break;
+        let dx = c.pos.x - worst.x, dy = c.pos.y - worst.y;
+        let d = Math.hypot(dx, dy);
+        if (d < 0.5) { dx = correctPos.x - worst.x; dy = correctPos.y - worst.y; d = Math.hypot(dx, dy) || 1; }
+        c.pos = {
+          x: clamp(c.pos.x + (dx / d) * (62 - worstD), 58, 1042),
+          y: clamp(c.pos.y + (dy / d) * (62 - worstD), 58, 562)
+        };
+      }
+      c.res = scorePlacement(role, c.pos, scenario);
     }
 
     const opts = shuffle([
@@ -2708,6 +2908,13 @@ HIQ.Sim = (() => {
     ctx.ellipse(2 * s, 4 * s, 15 * s, 11 * s, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // A pale ring of "ice" behind each player, so two skaters standing close
+    // together still read as two distinct figures rather than one blob.
+    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.beginPath();
+    ctx.arc(0, 0, R + 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.rotate(a);
     ctx.scale(s, s);
 
@@ -2812,6 +3019,69 @@ HIQ.Sim = (() => {
     ctx.restore();
 
     drawRoleChip(p, style, t);
+  }
+
+  /* Who has the puck is the first thing you need to know to read a play, and a
+     small black disc among ten players doesn't say it clearly enough. Ring the
+     carrier, and spell it out in words while the player is still deciding. */
+  // Single source of truth for possession, shared by the renderer and the tests.
+  function findPuckCarrier() {
+    const skaters = [...offense, ...defense, ...(choice.active ? [] : controlled)]
+      .filter(p => p.role !== "G");
+    let carrier = null, best = Infinity;
+    for (const p of skaters) {
+      const d = dist(p.x, p.y, puck.x, puck.y);
+      if (d < best) { best = d; carrier = p; }
+    }
+    return (carrier && best <= 60) ? { player: carrier, dist: best } : null;
+  }
+
+  function drawPuckCarrier(t) {
+    const found = findPuckCarrier();
+    const carrier = found && found.player;
+    if (!carrier) {
+      // Nobody has it. Say so rather than leaving the player to wonder.
+      if (choice.active) drawPuckTag("LOOSE PUCK", puck.x, puck.y - 20);
+      return;
+    }
+
+    const r = (carrier.r || 17) + 10 + Math.sin(t / 240) * 1.6;
+    ctx.save();
+    // Bright halo, distinct from the gold ring that marks "you"
+    ctx.shadowColor = "rgba(255,255,255,0.9)";
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3.4;
+    ctx.setLineDash([8, 6]);
+    ctx.lineDashOffset = -t / 50;
+    ctx.beginPath();
+    ctx.arc(carrier.x, carrier.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Label it plainly during the decision, where clarity matters most.
+    if (choice.active) drawPuckTag("HAS PUCK", carrier.x, carrier.y - r - 13);
+  }
+
+  function drawPuckTag(label, cx, cy) {
+    ctx.save();
+    ctx.font = "700 12px 'Segoe UI', system-ui, Arial";
+    const w = ctx.measureText(label).width + 14;
+    // Keep it inside the boards, and flip below if there's no room above.
+    const bx = clamp(cx - w / 2, 26, 1074 - w);
+    const by = cy - 9 < 26 ? cy + 26 : cy - 9;
+    ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, w, 18, 9);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, bx + w / 2, by + 9.5);
+    ctx.restore();
   }
 
   function drawPuck(t) {
@@ -2939,13 +3209,15 @@ HIQ.Sim = (() => {
     ctx.globalAlpha = clamp(a, 0, 1);
     ctx.font = "bold 26px system-ui";
     const w = ctx.measureText(i.text).width + 64;
-    roundRectPath(ctx, 550 - w / 2, 96, w, 46, 14);
+    // Hug the top edge: this is a transient title, and lower down it can sit
+    // over an A/B/C marker the player is trying to read.
+    roundRectPath(ctx, 550 - w / 2, 18, w, 44, 14);
     ctx.fillStyle = "rgba(15, 42, 74, 0.82)";
     ctx.fill();
     ctx.fillStyle = "#ffd76a";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(i.text, 550, 120);
+    ctx.fillText(i.text, 550, 40);
     ctx.restore();
   }
 
@@ -3004,6 +3276,7 @@ HIQ.Sim = (() => {
     }
     ctx.save();
     ctx.translate(shx, shy);
+    applyCamera();
 
     ctx.drawImage(rinkLayer, 0, 0);
     drawOverlays();
@@ -3026,16 +3299,25 @@ HIQ.Sim = (() => {
       else drawSkater(p, teamStyle(), t);
     });
 
-    // You
-    controlled.forEach(p => drawSkater(p, { ...teamStyle(), isYou: true }, t));
+    // You — hidden while choosing. Before an answer you aren't anywhere yet, and
+    // a stray token parked mid-ice reads as another player and clutters the read.
+    if (!choice.active) {
+      controlled.forEach(p => drawSkater(p, { ...teamStyle(), isYou: true }, t));
+    }
 
+    drawPuckCarrier(t);
     drawPuck(t);
     drawEffects(t);
     drawChoices(t);
     drawParticles();
+
+    ctx.restore();
+
+    // Screen-space overlays — these should not scale or pan with the camera.
+    ctx.save();
+    ctx.translate(shx, shy);
     drawIntro(t);
     drawBanner(t);
-
     ctx.restore();
   }
 
@@ -3046,6 +3328,7 @@ HIQ.Sim = (() => {
     updateGoalies(dt);
     updatePuckTrail();
     updateParticles(dt);
+    updateCamera();
     draw(t);
     requestAnimationFrame(tick);
   }
@@ -3056,10 +3339,11 @@ HIQ.Sim = (() => {
     const isTouch = evt.touches && evt.touches.length;
     const clientX = isTouch ? evt.touches[0].clientX : evt.clientX;
     const clientY = isTouch ? evt.touches[0].clientY : evt.clientY;
-    return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height)
-    };
+    // Canvas pixels, then back through the camera transform into rink coords.
+    return screenToWorld(
+      (clientX - rect.left) * (canvas.width / rect.width),
+      (clientY - rect.top) * (canvas.height / rect.height)
+    );
   }
 
   function findControlledAt(x, y) {
@@ -3175,6 +3459,19 @@ HIQ.Sim = (() => {
     getStats: () => stats,
     getProfile: () => profile,
     guidanceShown: () => renderState.showGuidance,
+    getCamera: () => ({ ...camera }),
+    // What the player is told about possession on this play.
+    puckState: () => {
+      const f = findPuckCarrier();
+      return f
+        ? { label: "HAS PUCK", role: f.player.role, dist: Math.round(f.dist) }
+        : { label: "LOOSE PUCK", role: null, dist: null };
+    },
+    // Rink coords -> canvas pixels, so tests can tap where a thing is drawn.
+    worldToScreen: (x, y) => ({
+      x: (x - camera.x) * camera.scale + canvas.width / 2,
+      y: (y - camera.y) * camera.scale + canvas.height / 2
+    }),
     // Auditing hooks: score an arbitrary spot, and force a specific template
     scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
     forceTemplate: (id, role) => {

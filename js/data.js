@@ -583,9 +583,18 @@ HIQ.varyScenario = function (tpl, opts) {
   const dx = px - out.puck.x, dy = py - out.puck.y;
   out.puck = { x: Math.round(px), y: Math.round(py) };
 
-  for (const g of Object.values(out.guidanceByRole)) {
+  // Whoever had the puck keeps it: they move with it exactly, or possession
+  // visibly drifts apart and you can no longer tell who is carrying.
+  let carrierRole = null, carrierDist = Infinity;
+  for (const [role, g] of Object.entries(out.guidanceByRole)) {
+    const d = Math.hypot(g.x - (px - dx), g.y - (py - dy));
+    if (d < carrierDist) { carrierDist = d; carrierRole = role; }
+  }
+  if (carrierDist > 60) carrierRole = null; // nobody had it to begin with
+
+  for (const [role, g] of Object.entries(out.guidanceByRole)) {
     const d = Math.hypot(g.x - px, g.y - py);
-    const respond = d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2;
+    const respond = role === carrierRole ? 1 : (d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2);
     g.x = Math.round(clamp(g.x + dx * respond, 60, 1040));
     g.y = Math.round(clamp(g.y + dy * respond, 60, 560));
   }
