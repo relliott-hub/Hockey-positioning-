@@ -1,57 +1,113 @@
 # 🏒 Hockey IQ Trainer
 
-A game that teaches kids of all ages **positional play** in hockey. Each play presents a real game scenario — a breakout, a rush, an offensive-zone cycle, defending, a power play, or a penalty kill — and the player picks the best spot on the ice. The game then **animates how the play turns out**: a crisp pass and a goal when the read is right, or a turnover (maybe even a goal against!) when it isn't.
+**[▶ Play it](https://relliott-hub.github.io/Hockey-positioning-/)** — works on any
+phone, tablet or computer. No login, no install, no connection needed after the
+first load.
 
-## How to play
+Young players get taught skating, shooting and stickhandling. What they rarely
+get taught is **where to be** — and that's what separates good players from
+great ones. This game puts a kid in a real situation, asks where they should
+skate, and then runs the play so they can see whether their read was right.
 
-1. Pick your **age group**, **position** (C, LW, RW, LD, RD), and **difficulty**.
-2. Read the play prompt (e.g., *"Breakout under pressure — where should you go?"*).
-3. **Tap A, B, or C** to choose where to go on the ice (or switch to *Free drag* for advanced players and drag your player anywhere).
-4. Watch the simulation:
-   - **Great choice** → pass, carry, shot… **GOAL!** 🚨
-   - **Good choice** → the play stays alive ⚡
-   - **Poor choice** → turnover ❌ — and a really poor one can end up in your own net 😖
-5. After a miss, the coach's area lights up green and you get to **try again**.
+---
 
-The scoreboard tracks goals for/against, your streak, and the **Coach Report** logs every attempt with the most common mistakes — handy for parents and coaches.
+## How it works
+
+1. A play is set up — a breakout under pressure, a rush through the neutral
+   zone, a defensive-zone battle, a power play.
+2. Three spots appear on the ice: **A**, **B** and **C**. The player reads where
+   the puck is and taps where they should go.
+3. The play runs. Passes, carries, shots, saves, goals — you see whether your
+   positioning made the play work.
+4. The coach explains what happened, and specifically what was wrong with a
+   miss: *"You chased the puck instead of holding your support spot."*
+
+Every play is different. The ice mirrors, the puck moves, and the teammates and
+opposition shift in response, so the right answer changes every single time —
+kids have to read the play rather than memorise a picture.
 
 ## Features
 
-### Make it yours
-- **Player profile** — kids enter their name, jersey number, and pick a team color; the whole team skates in their colors and their player wears a gold name tag (saved on the device)
-- **XP & levels** — every play earns XP; level up with a fanfare
-- **Trophy Case** — 12 unlockable badges (First Goal, Hat Trick, Breakout Boss, PK Wall, On Fire, Comeback Kid…) with pop-up unlock toasts, saved between sessions
-- **Coach character** — an animated coach with a speech bubble who sets up each play, watches nervously, and celebrates (or groans) with you
+- **Three age groups** (6–8, 9–11, 12–14) and three difficulty levels that change
+  scoring tolerance, how much variation you see, and how much coaching you get
+- **All three formats** — 5v5 even strength, 5v4 power play (umbrella or 1-3-1),
+  4v5 penalty kill (box or diamond)
+- **Every position** — C, LW, RW, LD, RD, each with its own correct read
+- **Two answer styles** — tap A/B/C, or free-drag your player anywhere (advanced)
+- **Make it yours** — name, jersey number, and team colour on your player
+- **Progression** — XP, levels, streaks, and 12 trophies to unlock
+- **Coach report** — tracks your session and shows your most common mistakes
+- **Plays offline** — install it to your home screen and it works at the rink
 
-### Gameplay
+---
 
-- **A/B/C choice mode** — kid-friendly: tap the best option and watch it play out
-- **Free-drag mode** — advanced: position yourself (or your whole team in Multi mode) anywhere
-- **Real player sprites** — top-down skaters with helmets, jerseys, and sticks that turn to face the puck and their skating direction; goalies with masks and leg pads
-- **Living presentation** — 60 fps animation loop, puck trails, pulsing choice buttons, pop-in banners, goal-light flashes, and confetti goal celebrations
-- **Animated play simulation** with sound effects (mutable) — passes, interceptions, counter-attacks, goal lights
-- **All game states**: breakouts, rushes, o-zone cycles, d-zone coverage, PP (umbrella / 1-3-1), PK (box / diamond)
-- **Age-aware coaching** — younger groups get bigger target areas, simpler feedback, and coach hints
-- **Principle-based scoring engine** — spacing, being an outlet, protecting the slot, staying above the puck
+## Running it locally
 
-## Running it
+It's plain HTML, CSS and JavaScript — no build step, no framework, no runtime
+dependencies.
 
-It's a static site — no build step. Open `index.html` in any browser, or enable **GitHub Pages** (Settings → Pages → deploy from branch) to play it at a public URL on phones and tablets.
-
-## Project structure
-
-```
-index.html    — page markup & controls
-styles.css    — styling
-js/data.js    — scenario library, PP/PK structures, rink landmarks
-js/audio.js   — synthesized sound effects (no audio files)
-js/sim.js     — play animation runner (tweens pieces through scripted steps)
-js/app.js     — game logic: scoring engine, choice generation, drawing, input
+```bash
+# Any static server works
+python3 -m http.server 8000
+# then open http://localhost:8000
 ```
 
-## Roadmap ideas
+Opening `index.html` directly also works, though offline caching only activates
+over http(s).
 
-- More scenario packs (faceoff assignments, regroups, line changes, 3v3 overtime)
-- Levels & badges (earn "Breakout Pro" after 5 correct breakout reads)
-- Opponent movement during the decision phase (reads under time pressure)
-- Save progress between sessions (localStorage profiles per kid)
+## Testing
+
+```bash
+npm install        # installs playwright-core (test-only dependency)
+npm test           # 29 end-to-end checks against a real browser
+```
+
+The suite drives the actual game and covers the tutorial, the full gameplay
+loop, drag mode, all three formats, persistence — and the **coaching
+correctness invariants**:
+
+- the ideal spot scores 100 in every age × difficulty combination
+- the right answer always outscores both decoys
+- every wrong answer names the mistake it represents
+- plays vary enough that they can't be memorised
+
+These exist because an audit found the game had been teaching wrong answers —
+including marking a *perfect* placement as a turnover on Advanced. The tests
+make sure that can't come back silently.
+
+## Project layout
+
+```
+index.html              markup and layout
+styles.css              all styling, mobile-first
+js/data.js              scenario templates, special teams, scenario variation
+js/sim.js               play simulation engine
+js/audio.js             synthesized sound effects
+js/app.js               scoring, rendering, input, progression
+sw.js                   service worker (offline play)
+manifest.webmanifest    installable app metadata
+privacy.html            privacy policy (required for app stores)
+tools/test.js           end-to-end test suite
+tools/build-single-file.js   bundles everything into one shareable HTML file
+tools/build-www.js      assembles www/ for native packaging
+tools/make-icons.js     regenerates the icon set from one SVG source
+docs/APP-STORE-GUIDE.md how to ship to the App Store and Google Play
+```
+
+## Deployment
+
+Pushing to `main` publishes to GitHub Pages automatically via
+`.github/workflows/pages.yml`. Nothing else to do.
+
+## Roadmap
+
+Ideas that would add the most, roughly in order of value:
+
+- **Live read mode** — let the play develop for a couple of seconds before you
+  choose, so you're reading movement rather than a still picture
+- **Two-stage decisions** — after "where do you go?", ask "now what?"
+  (pass, drive the net, hold the line)
+- **More scenarios** — forecheck (F1/F2/F3), 2-on-1s and odd-man rushes,
+  neutral-zone trap, 3v3 overtime, faceoff assignments
+- **Coach mode** — a parent or coach picks the situation to drill
+- **Daily challenge** — one fixed scenario a day, compare with teammates
