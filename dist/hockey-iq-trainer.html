@@ -1,0 +1,3277 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hockey IQ Trainer</title>
+<style>
+:root {
+  --navy: #0f2a4a;
+  --ice: #eef5fb;
+  --accent: #1e4fff;
+  --good: #16a34a;
+  --bad: #dc2626;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", system-ui, Arial, sans-serif;
+  margin: 0;
+  background: var(--ice);
+  color: #12263a;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Kill the mobile double-tap-zoom delay so buttons respond instantly */
+button, select, input, summary { touch-action: manipulation; }
+
+header {
+  background: linear-gradient(135deg, #0f2a4a, #14477e);
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+header h1 { font-size: 22px; margin: 0; }
+header .tag { font-size: 13px; opacity: 0.85; }
+
+#wrap { max-width: 1080px; margin: 0 auto; padding: 14px; }
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 8px rgba(15, 42, 74, 0.08);
+  margin-bottom: 12px;
+}
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.row + .row { margin-top: 10px; }
+
+label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #33506b;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+select {
+  font-size: 15px;
+  font-weight: 400;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #c5d4e4;
+  background: #fff;
+  color: #12263a;
+}
+
+button {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+}
+button:active { transform: scale(0.97); }
+#newBtn { background: var(--good); }
+#lockBtn { background: var(--accent); }
+#muteBtn { background: #e5eef7; color: #12263a; padding: 10px 12px; }
+
+.pill {
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #eef4fb;
+  border: 1px solid #d7e3f0;
+  border-radius: 999px;
+  font-size: 14px;
+  align-items: center;
+}
+.pill b { color: var(--navy); }
+.pill.scoreboard { background: #0f2a4a; color: #fff; border-color: #0f2a4a; }
+.pill.scoreboard b { color: #ffd76a; }
+
+#prompt { margin: 12px 0 4px; font-size: 17px; font-weight: 600; }
+#hint { font-size: 14px; font-weight: 600; color: #0b6b3a; margin: 0 0 8px; }
+
+canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  touch-action: none;
+  display: block;
+  box-shadow: 0 3px 12px rgba(15, 42, 74, 0.15);
+  background: #fff;
+}
+
+#status { margin-top: 10px; font-size: 16px; min-height: 24px; }
+
+.legend { font-size: 13px; color: #33506b; margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; margin-right: 12px; gap: 6px; }
+.dot { width: 12px; height: 12px; border-radius: 999px; display: inline-block; border: 1px solid #111; }
+
+details { margin-top: 12px; }
+summary { cursor: pointer; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
+.muted { color: #555; font-size: 13px; }
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  margin-right: 6px;
+  font-size: 12px;
+}
+.warn { color: #7a3b00; }
+
+/* Player profile */
+#profileRow { margin-top: 10px; border-top: 1px dashed #d7e3f0; padding-top: 10px; }
+#pName { font-size: 15px; padding: 8px 10px; border-radius: 10px; border: 1px solid #c5d4e4; width: 140px; }
+#pNum { font-size: 15px; padding: 8px 6px; border-radius: 10px; border: 1px solid #c5d4e4; width: 64px; }
+#xpwrap {
+  width: 150px; height: 12px; border-radius: 999px;
+  background: #dbe7f3; overflow: hidden; border: 1px solid #c5d4e4;
+  align-self: center;
+}
+#xpfill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+/* Coach box */
+#coachBox { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; }
+#coachAvatar {
+  position: relative;
+  width: 58px; height: 58px; flex: 0 0 58px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ffe9c7, #f5c98a);
+  border: 3px solid #0f2a4a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px;
+  box-shadow: 0 2px 6px rgba(15, 42, 74, 0.25);
+}
+#coachCap {
+  position: absolute; top: -14px; left: 4px;
+  font-size: 24px;
+  transform: rotate(-15deg);
+}
+#coachBox .bubble {
+  position: relative;
+  background: #fff;
+  border: 2px solid #c5d4e4;
+  border-radius: 14px;
+  padding: 8px 14px;
+  flex: 1;
+  min-height: 44px;
+  box-shadow: 0 2px 8px rgba(15, 42, 74, 0.08);
+}
+#coachBox .bubble::before {
+  content: "";
+  position: absolute; left: -10px; top: 20px;
+  border: 6px solid transparent;
+  border-right-color: #c5d4e4;
+}
+#coachName { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: #64809c; }
+#status { margin-top: 2px; font-size: 16px; min-height: 22px; }
+
+/* Trophy case */
+#badgeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.badge-card {
+  border: 1px solid #d7e3f0;
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(180deg, #fff, #f4f9ff);
+  text-align: center;
+}
+.badge-card .b-emoji { font-size: 30px; }
+.badge-card .b-name { font-weight: 800; font-size: 13px; margin-top: 4px; color: #0f2a4a; }
+.badge-card .b-desc { font-size: 11.5px; color: #64809c; margin-top: 2px; }
+.badge-card.locked { opacity: 0.45; filter: grayscale(1); }
+.badge-card.locked .b-emoji { filter: blur(1px); }
+
+/* Toasts */
+#toasts {
+  position: fixed;
+  top: 16px; right: 16px;
+  z-index: 50;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  background: #0f2a4a;
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(15, 42, 74, 0.35);
+  display: flex; align-items: center; gap: 10px;
+  animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), toastOut 0.4s ease 3.4s forwards;
+}
+.toast .t-emoji { font-size: 26px; }
+.toast .t-sub { font-weight: 500; font-size: 12.5px; color: #cbd5e1; }
+@keyframes toastIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
+@keyframes toastOut { to { transform: translateX(130%); opacity: 0; } }
+
+/* First-run tutorial */
+#tutorial {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8, 22, 40, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  animation: fadeIn 0.25s ease;
+}
+#tutorial[hidden] { display: none; }
+#tutCard {
+  background: #fff;
+  border-radius: 20px;
+  max-width: 420px; width: 100%;
+  padding: 26px 24px 20px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(8, 22, 40, 0.45);
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#tutArt { font-size: 54px; line-height: 1; margin-bottom: 6px; }
+#tutCard h2 { margin: 6px 0 10px; font-size: 21px; color: var(--navy); }
+#tutCard p { margin: 0; font-size: 15.5px; line-height: 1.5; color: #33506b; min-height: 68px; }
+#tutDots { display: flex; gap: 7px; justify-content: center; margin: 16px 0 14px; }
+#tutDots i {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: #cfdcea; display: block; transition: background 0.2s, width 0.2s;
+}
+#tutDots i.on { background: var(--accent); width: 22px; }
+#tutBtns { display: flex; gap: 10px; }
+#tutSkip { background: #eef4fb; color: #48678a; flex: 0 0 auto; }
+#tutNext { background: var(--good); flex: 1; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { transform: scale(0.9) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Game-first layout */
+#scorebar { margin-bottom: 4px; }
+canvas { margin-top: 6px; }
+#actionRow { margin-top: 10px; }
+#actionRow button { min-width: 120px; }
+#settingsPanel { margin-top: 12px; }
+#settingsPanel summary { cursor: pointer; font-size: 15px; color: #0f2a4a; }
+#howToBtn { background: #48678a; font-size: 14px; padding: 9px 14px; }
+#profileRow label { min-width: 120px; }
+
+/* --- Mobile --- */
+#rotateHint {
+  display: none;
+  background: #fff7e0;
+  border: 1px solid #f0d48a;
+  color: #7a5b12;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 760px) {
+  header { padding: 10px 14px; }
+  header h1 { font-size: 18px; }
+  header .tag { display: none; }
+  #wrap { padding: 8px; }
+  .card { padding: 10px; }
+  .row { gap: 8px; }
+  label { font-size: 11px; flex: 1 1 44%; min-width: 130px; }
+  label select, #pName { width: 100%; font-size: 14px; padding: 10px 8px; }
+  #pNum { width: 100%; }
+  #actionRow button { flex: 1 1 30%; min-width: 0; padding: 13px 8px; font-size: 15px; }
+  #muteBtn { flex: 0 0 52px; }
+  .pill { font-size: 12px; padding: 4px 9px; }
+  #prompt { font-size: 14.5px; }
+  #hint { font-size: 12.5px; }
+  #status { font-size: 14px; }
+  #coachAvatar { width: 46px; height: 46px; flex-basis: 46px; font-size: 24px; }
+  #xpwrap { width: 110px; }
+  .legend { font-size: 11.5px; }
+  #toasts { left: 12px; right: 12px; top: 10px; }
+  .toast { font-size: 13.5px; padding: 8px 12px; }
+  #badgeGrid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  table { font-size: 11px; }
+  #tutCard { padding: 22px 18px 16px; }
+  #tutArt { font-size: 44px; }
+  #tutCard h2 { font-size: 18.5px; }
+  #tutCard p { font-size: 14.5px; min-height: 80px; }
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  #rotateHint { display: block; }
+}
+
+</style>
+
+<header>
+  <h1>🏒 Hockey IQ Trainer</h1>
+  <span class="tag">Learn where to be on the ice — pick your spot, then watch the play!</span>
+</header>
+
+<div id="wrap">
+  <div class="row" id="scorebar">
+    <span class="pill scoreboard">🥅 You <b id="gf">0</b> — <b id="ga">0</b> Opponent</span>
+    <span class="pill">🔥 Streak: <b id="streak">0</b></span>
+    <span class="pill">⭐ Level <b id="level">1</b></span>
+    <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
+    <span class="pill">Phase: <b id="phase">—</b></span>
+    <span class="pill">Pressure: <b id="pressure">—</b></span>
+    <span class="pill">Structure: <b id="structure">—</b></span>
+    <span class="pill">Last score: <b id="score">—</b></span>
+  </div>
+
+  <p id="prompt">Loading play…</p>
+  <p id="hint" style="display:none;"></p>
+
+  <div id="rotateHint">📱 Tip: turn your phone sideways for a bigger rink!</div>
+
+  <canvas id="rink" width="1100" height="620"></canvas>
+
+  <div class="row" id="actionRow">
+    <button id="newBtn">New Play</button>
+    <button id="lockBtn">Lock In</button>
+    <button id="muteBtn" title="Sound on/off">🔊</button>
+  </div>
+
+  <div id="coachBox">
+    <div id="coachAvatar"><span id="coachFace">😀</span><span id="coachCap">🧢</span></div>
+    <div class="bubble">
+      <div id="coachName">COACH</div>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <details id="settingsPanel" class="card" open>
+    <summary><b>⚙️ Game settings &amp; my player</b></summary>
+
+    <div class="row" style="margin-top:10px;">
+      <label>Age group
+        <select id="age">
+          <option value="6-8">6–8 (Learn basics)</option>
+          <option value="9-11" selected>9–11 (Develop hockey IQ)</option>
+          <option value="12-14">12–14 (Advanced reads)</option>
+        </select>
+      </label>
+
+      <label>Game format
+        <select id="format">
+          <option value="5v5" selected>5v5 (Even Strength)</option>
+          <option value="5v4">5v4 (Power Play)</option>
+          <option value="4v5">4v5 (Penalty Kill)</option>
+        </select>
+      </label>
+
+      <label>Control mode
+        <select id="mode">
+          <option value="single" selected>Single Player</option>
+          <option value="multi">Multi (Control your whole team)</option>
+        </select>
+      </label>
+
+      <label id="roleWrap">You play
+        <select id="role">
+          <option value="C">Center (C)</option>
+          <option value="LW">Left Wing (LW)</option>
+          <option value="RW">Right Wing (RW)</option>
+          <option value="LD">Left D (LD)</option>
+          <option value="RD">Right D (RD)</option>
+        </select>
+      </label>
+
+      <label>Answer style
+        <select id="answerStyle">
+          <option value="choices" selected>Tap A / B / C</option>
+          <option value="drag">Free drag (advanced)</option>
+        </select>
+      </label>
+
+      <label>Difficulty
+        <select id="diff">
+          <option value="easy">Beginner</option>
+          <option value="med" selected>Intermediate</option>
+          <option value="hard">Advanced</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>Phase filter
+        <select id="phaseFilter">
+          <option value="any" selected>Any</option>
+          <option value="Breakout">Breakout</option>
+          <option value="Rush">Rush</option>
+          <option value="O-zone">O-zone</option>
+          <option value="Defend">Defend</option>
+          <option value="Special">Special Teams</option>
+        </select>
+      </label>
+
+      <label>Pressure
+        <select id="pressureFilter">
+          <option value="any" selected>Any</option>
+          <option value="Low">Low</option>
+          <option value="Med">Med</option>
+          <option value="High">High</option>
+        </select>
+      </label>
+
+      <label id="ppStructWrap">PP structure
+        <select id="ppStruct">
+          <option value="umbrella" selected>Umbrella</option>
+          <option value="one3one">1-3-1</option>
+        </select>
+      </label>
+
+      <label id="pkStructWrap">PK structure
+        <select id="pkStruct">
+          <option value="box" selected>Box</option>
+          <option value="diamond">Diamond</option>
+        </select>
+      </label>
+
+      <label>Coach overlays
+        <select id="overlay">
+          <option value="off" selected>Off</option>
+          <option value="lanes">Show lanes</option>
+          <option value="house">Show slot/house</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row" id="profileRow">
+      <label>Your name
+        <input id="pName" maxlength="12" placeholder="Your name" autocomplete="off" />
+      </label>
+      <label>Number
+        <input id="pNum" type="number" min="1" max="99" value="9" />
+      </label>
+      <label>Team color
+        <select id="pColor">
+          <option value="blue" selected>Ice Blue</option>
+          <option value="green">Lime Green</option>
+          <option value="purple">Power Purple</option>
+          <option value="teal">Aqua Teal</option>
+          <option value="gold">Golden</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button id="howToBtn" type="button">❓ How to play</button>
+    </div>
+  </details>
+
+  <div class="legend">
+    <span><i class="dot" id="dotTeam" style="background:#2456ff"></i> Your team (gold ring = you)</span>
+    <span><i class="dot" style="background:#cc2b2b"></i> Opponents</span>
+    <span><i class="dot" style="background:#0d9488"></i> Your goalie</span>
+    <span><i class="dot" style="background:#111"></i> Puck</span>
+    <span><i class="dot" style="background:#fffbeb; border-color:#f59e0b"></i> A/B/C choices</span>
+    <span><i class="dot" style="background:#00aa00; opacity:.3"></i> Coach's area (Beginner)</span>
+  </div>
+
+  <details>
+    <summary><b>🏆 Trophy Case</b> <span class="muted" id="trophySummary"></span></summary>
+    <div id="badgeGrid"></div>
+  </details>
+
+  <details>
+    <summary><b>Coach Report (this session)</b> <span class="muted">— performance + common misses</span></summary>
+    <div style="margin-top:8px;">
+      <div id="reportSummary" class="muted"></div>
+      <div style="margin-top:8px;" id="reportChips"></div>
+      <table style="margin-top:10px;">
+        <thead>
+          <tr>
+            <th>Time</th><th>Format</th><th>Phase</th><th>Mode</th><th>Role</th><th>Result</th><th>Top miss</th>
+          </tr>
+        </thead>
+        <tbody id="reportRows"></tbody>
+      </table>
+      <div class="muted warn" style="margin-top:8px;">
+        Tip: For younger kids, use Beginner difficulty + 6–8 age group with Tap A/B/C. They'll see coach hints and simpler scoring.
+      </div>
+    </div>
+  </details>
+</div>
+
+<div id="toasts"></div>
+
+<div id="tutorial" hidden>
+  <div id="tutCard" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
+    <div id="tutArt">🏒</div>
+    <h2 id="tutTitle">Welcome to Hockey IQ Trainer!</h2>
+    <p id="tutBody">Great players aren't just fast — they're always in the right place. Let's learn where to be.</p>
+    <div id="tutDots"></div>
+    <div id="tutBtns">
+      <button id="tutSkip" type="button">Skip</button>
+      <button id="tutNext" type="button">Next →</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* Hockey IQ Trainer — scenario data & shared utilities
+   All coordinates are in canvas space: 1100 x 620, rink 20..1080 x 20..600. */
+window.HIQ = window.HIQ || {};
+
+HIQ.util = {
+  pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
+  clamp(v, min, max) { return Math.max(min, Math.min(max, v)); },
+  dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); },
+  toward(a, b, t) { return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; },
+  shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+};
+
+HIQ.LANDMARKS = {
+  leftNet:   { x: 95,   y: 310 },
+  rightNet:  { x: 1005, y: 310 },
+  leftSlot:  { x: 220,  y: 310 },
+  rightSlot: { x: 880,  y: 310 },
+  center:    { x: 550,  y: 310 }
+};
+
+/* Even-strength scenario templates.
+   isDefense: true means the OPPONENTS have the puck and the player's job is coverage. */
+HIQ.TEMPLATES_EVEN = [
+  {
+    id: "breakout_left_corner_pressure",
+    phase: "Breakout",
+    pressures: ["High", "Med", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 210, y: 500 },
+    offenseFull: [
+      { role: "C",  x: 320, y: 390 },
+      { role: "LW", x: 270, y: 520 },
+      { role: "RW", x: 430, y: 200 },
+      { role: "LD", x: 190, y: 470 },
+      { role: "RD", x: 320, y: 280 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 240, y: 480 },
+      { role: "F2", x: 310, y: 430 },
+      { role: "F3", x: 410, y: 320 },
+      { role: "D1", x: 410, y: 420 },
+      { role: "D2", x: 470, y: 260 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout under pressure (puck in the corner). You are ${role}. Where should you go to help your team break out?`,
+    guidanceByRole: {
+      C:  { x: 320, y: 390, r: 90 },
+      LW: { x: 270, y: 520, r: 75 },
+      RW: { x: 430, y: 210, r: 95 },
+      LD: { x: 220, y: 450, r: 85 },
+      RD: { x: 320, y: 280, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 70, max: 220 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 40, max: 170 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 120, max: 430 } },
+      LD: { spacingFromPuck: { min: 30, max: 180 } },
+      RD: { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "greater" } },
+    }
+  },
+  {
+    id: "rush_middle_lane",
+    phase: "Rush",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 560, y: 310 },
+    offenseFull: [
+      { role: "C",  x: 590, y: 310 },
+      { role: "LW", x: 700, y: 430 },
+      { role: "RW", x: 700, y: 190 },
+      { role: "LD", x: 490, y: 370 },
+      { role: "RD", x: 490, y: 250 },
+    ],
+    defenseFull: [
+      { role: "D1", x: 790, y: 280 },
+      { role: "D2", x: 790, y: 340 },
+      { role: "F1", x: 640, y: 300 },
+      { role: "F2", x: 520, y: 260 },
+      { role: "F3", x: 520, y: 380 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Rush through the neutral zone. You are ${role}. Where should you go to be a passing option?`,
+    guidanceByRole: {
+      C:  { x: 590, y: 310, r: 85 },
+      LW: { x: 700, y: 430, r: 95 },
+      RW: { x: 700, y: 190, r: 95 },
+      LD: { x: 490, y: 370, r: 95 },
+      RD: { x: 490, y: 250, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 20, max: 160 }, stayAbovePuck: { margin: 55, allowDeeper: true } },
+      LW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      RW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      LD: { spacingFromPuck: { min: 80, max: 260 } },
+      RD: { spacingFromPuck: { min: 80, max: 260 } },
+    }
+  },
+  {
+    id: "ozone_right_wall_cycle",
+    phase: "O-zone",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 900, y: 410 },
+    offenseFull: [
+      { role: "C",  x: 790, y: 320 },
+      { role: "LW", x: 800, y: 190 },
+      { role: "RW", x: 910, y: 400 },
+      { role: "LD", x: 710, y: 180 },
+      { role: "RD", x: 740, y: 260 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 880, y: 395 },
+      { role: "F2", x: 820, y: 360 },
+      { role: "F3", x: 760, y: 440 },
+      { role: "D1", x: 820, y: 260 },
+      { role: "D2", x: 770, y: 290 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — O-zone, puck on the right wall. You are ${role}. Where should you go to support the puck?`,
+    guidanceByRole: {
+      C:  { x: 790, y: 320, r: 95 },
+      LW: { x: 800, y: 200, r: 95 },
+      RW: { x: 900, y: 395, r: 70 },
+      LD: { x: 710, y: 210, r: 95 },
+      RD: { x: 745, y: 270, r: 85 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "less" } },
+      LW: { spacingFromPuck: { min: 120, max: 320 } },
+      RW: { spacingFromPuck: { min: 5, max: 160 }, beOutlet: { preferX: "less" }, stayAbovePuck: { margin: 60, allowDeeper: true } },
+      LD: { spacingFromPuck: { min: 220, max: 540 } },
+      RD: { spacingFromPuck: { min: 180, max: 420 } },
+    }
+  },
+  {
+    id: "dzone_halfwall_defend",
+    phase: "Defend",
+    pressures: ["High", "Med", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "left",
+    isDefense: true,
+    puck: { x: 290, y: 180 },
+    offenseFull: [
+      { role: "C",  x: 370, y: 310 },
+      { role: "LW", x: 320, y: 230 },
+      { role: "RW", x: 450, y: 270 },
+      { role: "LD", x: 240, y: 320 },
+      { role: "RD", x: 290, y: 390 },
+    ],
+    defenseFull: [
+      { role: "O1", x: 290, y: 180 },
+      { role: "O2", x: 360, y: 240 },
+      { role: "O3", x: 250, y: 410 },
+      { role: "O4", x: 420, y: 160 },
+      { role: "O5", x: 440, y: 330 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Defending, puck on the half-wall. You are ${role}. Protect the middle — where should you be?`,
+    guidanceByRole: {
+      C:  { x: 370, y: 310, r: 95 },
+      LW: { x: 320, y: 230, r: 75 },
+      RW: { x: 450, y: 270, r: 95 },
+      LD: { x: 240, y: 320, r: 90 },
+      RD: { x: 290, y: 390, r: 90 },
+    },
+    rulesByRole: {
+      C:  { protectSlot: { slotSide: "left", radius: 170 }, spacingFromPuck: { min: 80, max: 260 } },
+      LW: { protectSlot: { slotSide: "left", radius: 210 }, spacingFromPuck: { min: 40, max: 190 } },
+      RW: { protectSlot: { slotSide: "left", radius: 270 }, spacingFromPuck: { min: 120, max: 320 } },
+      LD: { protectSlot: { slotSide: "left", radius: 150 }, spacingFromPuck: { min: 60, max: 230 } },
+      RD: { protectSlot: { slotSide: "left", radius: 190 }, spacingFromPuck: { min: 100, max: 300 } },
+    }
+  },
+  {
+    id: "breakout_d2d_reverse",
+    phase: "Breakout",
+    pressures: ["Med", "High", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 240, y: 520 },
+    offenseFull: [
+      { role: "LD", x: 210, y: 520 },
+      { role: "RD", x: 280, y: 340 },
+      { role: "C",  x: 340, y: 400 },
+      { role: "LW", x: 290, y: 560 },
+      { role: "RW", x: 460, y: 200 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 250, y: 500 },
+      { role: "F2", x: 320, y: 450 },
+      { role: "F3", x: 430, y: 340 },
+      { role: "D1", x: 420, y: 470 },
+      { role: "D2", x: 500, y: 260 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout: D-to-D reverse look. You are ${role}. Be an outlet and protect inside ice.`,
+    guidanceByRole: {
+      C:  { x: 350, y: 410, r: 95 },
+      LW: { x: 290, y: 560, r: 75 },
+      RW: { x: 470, y: 210, r: 95 },
+      LD: { x: 240, y: 490, r: 85 },
+      RD: { x: 300, y: 340, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 80, max: 240 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 40, max: 180 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 150, max: 440 } },
+      LD: { spacingFromPuck: { min: 30, max: 190 } },
+      RD: { spacingFromPuck: { min: 90, max: 270 }, beOutlet: { preferX: "greater" } },
+    }
+  },
+  {
+    id: "breakout_center_swing_low",
+    phase: "Breakout",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 190, y: 310 },
+    offenseFull: [
+      { role: "LD", x: 210, y: 360 },
+      { role: "RD", x: 260, y: 270 },
+      { role: "C",  x: 300, y: 320 },
+      { role: "LW", x: 260, y: 430 },
+      { role: "RW", x: 420, y: 210 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 220, y: 310 },
+      { role: "F2", x: 300, y: 290 },
+      { role: "F3", x: 380, y: 320 },
+      { role: "D1", x: 420, y: 420 },
+      { role: "D2", x: 500, y: 220 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout: Center swings low. You are ${role}. Give an angled outlet — don't crowd the puck.`,
+    guidanceByRole: {
+      C:  { x: 310, y: 320, r: 90 },
+      LW: { x: 270, y: 430, r: 80 },
+      RW: { x: 430, y: 220, r: 90 },
+      LD: { x: 240, y: 350, r: 85 },
+      RD: { x: 290, y: 270, r: 85 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 70, max: 210 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 90, max: 260 } },
+      RW: { spacingFromPuck: { min: 140, max: 360 } },
+      LD: { spacingFromPuck: { min: 40, max: 180 } },
+      RD: { spacingFromPuck: { min: 60, max: 220 } },
+    }
+  },
+  {
+    id: "rush_wide_drive_trailer",
+    phase: "Rush",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 610, y: 420 },
+    offenseFull: [
+      { role: "LW", x: 660, y: 450 },
+      { role: "C",  x: 640, y: 320 },
+      { role: "RW", x: 660, y: 200 },
+      { role: "LD", x: 520, y: 360 },
+      { role: "RD", x: 520, y: 260 },
+    ],
+    defenseFull: [
+      { role: "D1", x: 760, y: 300 },
+      { role: "D2", x: 760, y: 360 },
+      { role: "F1", x: 650, y: 380 },
+      { role: "F2", x: 560, y: 280 },
+      { role: "F3", x: 580, y: 430 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Rush: wide drive with a trailer option. You are ${role}. Keep spacing and be available.`,
+    guidanceByRole: {
+      LW: { x: 680, y: 460, r: 90 },
+      C:  { x: 650, y: 330, r: 90 },
+      RW: { x: 680, y: 190, r: 90 },
+      LD: { x: 530, y: 370, r: 95 },
+      RD: { x: 530, y: 250, r: 95 },
+    },
+    rulesByRole: {
+      LW: { spacingFromPuck: { min: 40, max: 170 }, stayAbovePuck: { margin: 80, allowDeeper: true } },
+      C:  { spacingFromPuck: { min: 70, max: 260 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 160, max: 420 } },
+      LD: { spacingFromPuck: { min: 70, max: 360 } },
+      RD: { spacingFromPuck: { min: 70, max: 360 } },
+    }
+  },
+  {
+    id: "breakout_wheel_behind_net",
+    phase: "Breakout",
+    pressures: ["Med", "High", "Low"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 70, y: 350 },
+    offenseFull: [
+      { role: "LD", x: 105, y: 380 },
+      { role: "RD", x: 170, y: 250 },
+      { role: "C",  x: 300, y: 350 },
+      { role: "LW", x: 270, y: 500 },
+      { role: "RW", x: 450, y: 180 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 180, y: 420 },
+      { role: "F2", x: 280, y: 330 },
+      { role: "F3", x: 420, y: 250 },
+      { role: "D1", x: 430, y: 430 },
+      { role: "D2", x: 480, y: 180 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Breakout: D wheels behind the net. You are ${role}. Give a moving outlet up ice!`,
+    guidanceByRole: {
+      C:  { x: 300, y: 350, r: 90 },
+      LW: { x: 270, y: 500, r: 80 },
+      RW: { x: 450, y: 190, r: 95 },
+      LD: { x: 115, y: 385, r: 75 },
+      RD: { x: 180, y: 255, r: 85 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 90, max: 300 }, beOutlet: { preferX: "greater" } },
+      LW: { spacingFromPuck: { min: 120, max: 330 }, beOutlet: { preferX: "greater" } },
+      RW: { spacingFromPuck: { min: 200, max: 500 } },
+      LD: { spacingFromPuck: { min: 25, max: 160 } },
+      RD: { spacingFromPuck: { min: 80, max: 250 }, beOutlet: { preferX: "greater" } },
+    }
+  },
+  {
+    id: "nzone_regroup_d2d",
+    phase: "Rush",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 470, y: 250 },
+    offenseFull: [
+      { role: "RD", x: 480, y: 255 },
+      { role: "LD", x: 470, y: 380 },
+      { role: "C",  x: 560, y: 315 },
+      { role: "LW", x: 700, y: 440 },
+      { role: "RW", x: 700, y: 185 },
+    ],
+    defenseFull: [
+      { role: "F1", x: 600, y: 310 },
+      { role: "F2", x: 680, y: 240 },
+      { role: "F3", x: 680, y: 390 },
+      { role: "D1", x: 820, y: 260 },
+      { role: "D2", x: 820, y: 360 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Neutral-zone regroup. You are ${role}. Reset with speed — give the D a target!`,
+    guidanceByRole: {
+      C:  { x: 560, y: 315, r: 85 },
+      LW: { x: 700, y: 440, r: 90 },
+      RW: { x: 700, y: 185, r: 90 },
+      LD: { x: 470, y: 380, r: 85 },
+      RD: { x: 480, y: 255, r: 75 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 60, max: 220 } },
+      LW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      RW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
+      LD: { spacingFromPuck: { min: 60, max: 200 } },
+      RD: { spacingFromPuck: { min: 0, max: 140 } },
+    }
+  },
+  {
+    id: "ozone_faceoff_right_dot",
+    phase: "O-zone",
+    pressures: ["Low", "Med"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 878, y: 450 },
+    offenseFull: [
+      { role: "C",  x: 862, y: 455 },
+      { role: "LW", x: 830, y: 400 },
+      { role: "RW", x: 845, y: 505 },
+      { role: "LD", x: 760, y: 250 },
+      { role: "RD", x: 760, y: 420 },
+    ],
+    defenseFull: [
+      { role: "O1", x: 892, y: 455 },
+      { role: "O2", x: 905, y: 405 },
+      { role: "O3", x: 905, y: 505 },
+      { role: "D1", x: 930, y: 380 },
+      { role: "D2", x: 950, y: 510 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — O-zone faceoff, right dot. You are ${role}. Line up ready for the win back!`,
+    guidanceByRole: {
+      C:  { x: 862, y: 455, r: 65 },
+      LW: { x: 830, y: 400, r: 75 },
+      RW: { x: 845, y: 505, r: 75 },
+      LD: { x: 760, y: 250, r: 95 },
+      RD: { x: 760, y: 420, r: 90 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 10, max: 90 } },
+      LW: { spacingFromPuck: { min: 40, max: 180 } },
+      RW: { spacingFromPuck: { min: 30, max: 160 } },
+      LD: { spacingFromPuck: { min: 180, max: 420 } },
+      RD: { spacingFromPuck: { min: 120, max: 340 } },
+    }
+  },
+  {
+    id: "dzone_net_front_battle",
+    phase: "Defend",
+    pressures: ["High", "Med"],
+    allowedFormats: ["5v5"],
+    attackDir: "left",
+    isDefense: true,
+    puck: { x: 120, y: 480 },
+    offenseFull: [
+      { role: "C",  x: 260, y: 400 },
+      { role: "LW", x: 390, y: 220 },
+      { role: "RW", x: 390, y: 440 },
+      { role: "LD", x: 150, y: 340 },
+      { role: "RD", x: 190, y: 460 },
+    ],
+    defenseFull: [
+      { role: "O1", x: 120, y: 480 },
+      { role: "O2", x: 200, y: 540 },
+      { role: "O3", x: 250, y: 330 },
+      { role: "O4", x: 420, y: 420 },
+      { role: "O5", x: 420, y: 200 },
+      { role: "G",  x: 70,  y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — Defending: puck in your corner, battle at the net-front. You are ${role}. Box out and protect the house!`,
+    guidanceByRole: {
+      C:  { x: 260, y: 400, r: 90 },
+      LW: { x: 390, y: 220, r: 90 },
+      RW: { x: 390, y: 440, r: 90 },
+      LD: { x: 150, y: 340, r: 75 },
+      RD: { x: 190, y: 460, r: 80 },
+    },
+    rulesByRole: {
+      C:  { protectSlot: { slotSide: "left", radius: 190 }, spacingFromPuck: { min: 90, max: 280 } },
+      LW: { protectSlot: { slotSide: "left", radius: 260 }, spacingFromPuck: { min: 200, max: 450 } },
+      RW: { protectSlot: { slotSide: "left", radius: 240 }, spacingFromPuck: { min: 150, max: 400 } },
+      LD: { protectSlot: { slotSide: "left", radius: 120 }, spacingFromPuck: { min: 60, max: 220 } },
+      RD: { protectSlot: { slotSide: "left", radius: 170 }, spacingFromPuck: { min: 40, max: 180 } },
+    }
+  },
+  {
+    id: "ozone_low_to_high_point",
+    phase: "O-zone",
+    pressures: ["Low", "Med", "High"],
+    allowedFormats: ["5v5"],
+    attackDir: "right",
+    puck: { x: 930, y: 520 },
+    offenseFull: [
+      { role: "RW", x: 930, y: 500 },
+      { role: "C",  x: 820, y: 360 },
+      { role: "LW", x: 820, y: 190 },
+      { role: "LD", x: 760, y: 200 },
+      { role: "RD", x: 760, y: 420 },
+    ],
+    defenseFull: [
+      { role: "D1", x: 900, y: 410 },
+      { role: "D2", x: 880, y: 300 },
+      { role: "F1", x: 820, y: 440 },
+      { role: "F2", x: 820, y: 260 },
+      { role: "F3", x: 780, y: 320 },
+      { role: "G",  x: 1040, y: 310 },
+    ],
+    prompt: (role, fmt) => `${fmt} — O-zone: low-to-high cycle. You are ${role}. Create shot support and protect against the turnover.`,
+    guidanceByRole: {
+      C:  { x: 820, y: 350, r: 95 },
+      LW: { x: 820, y: 200, r: 95 },
+      RW: { x: 920, y: 490, r: 75 },
+      LD: { x: 760, y: 220, r: 95 },
+      RD: { x: 760, y: 410, r: 95 },
+    },
+    rulesByRole: {
+      C:  { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "less" } },
+      LW: { spacingFromPuck: { min: 200, max: 520 } },
+      RW: { spacingFromPuck: { min: 30, max: 180 }, beOutlet: { preferX: "less" } },
+      LD: { spacingFromPuck: { min: 220, max: 540 } },
+      RD: { spacingFromPuck: { min: 170, max: 540 } },
+    }
+  }
+];
+
+/* --- Special teams structures --- */
+HIQ.ppPositions = function (structure) {
+  if (structure === "one3one") {
+    return [
+      { role: "LD", x: 740, y: 310 },
+      { role: "LW", x: 860, y: 200 },
+      { role: "RW", x: 860, y: 420 },
+      { role: "C",  x: 880, y: 310 },
+      { role: "RD", x: 980, y: 310 },
+    ];
+  }
+  return [
+    { role: "LD", x: 720, y: 200 },
+    { role: "RD", x: 720, y: 420 },
+    { role: "LW", x: 860, y: 200 },
+    { role: "RW", x: 860, y: 420 },
+    { role: "C",  x: 860, y: 310 },
+  ];
+};
+
+// A penalty kill is four skaters — no phantom fifth spot.
+HIQ.pkPositions = function (structure) {
+  if (structure === "diamond") {
+    return [
+      { role: "C",  x: 840, y: 310 }, // top of the diamond, pressures the point
+      { role: "LW", x: 900, y: 240 }, // strong-side flank
+      { role: "RW", x: 900, y: 380 }, // weak-side flank
+      { role: "LD", x: 960, y: 310 }, // net-front
+    ];
+  }
+  return [
+    { role: "C",  x: 900, y: 260 },
+    { role: "LW", x: 900, y: 360 },
+    { role: "LD", x: 960, y: 260 },
+    { role: "RD", x: 960, y: 360 },
+  ];
+};
+
+/* Build the coaching spots FROM the structure actually selected, shifted toward
+   the puck. Special teams units rotate as the puck moves — a static answer would
+   teach kids to stand still, which is exactly the habit we're trying to break. */
+HIQ.deriveGuidance = function (positions, puck, shift, radius) {
+  const out = {};
+  for (const p of positions) {
+    out[p.role] = {
+      x: Math.round(p.x + (puck.x - p.x) * shift),
+      y: Math.round(p.y + (puck.y - p.y) * shift),
+      r: radius
+    };
+  }
+  return out;
+};
+
+/* Turn one template into an effectively unlimited supply of distinct reads.
+
+   A fixed template teaches a kid to memorise a picture: "breakout means stand
+   there." Real hockey IQ is reading what is actually in front of you, so every
+   play mirrors the ice, nudges the puck, and moves the support spots and the
+   opposition in response. The coaching answer changes every single time. */
+HIQ.varyScenario = function (tpl, opts) {
+  const clamp = HIQ.util.clamp;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+
+  const out = Object.assign({}, tpl);
+  out.puck = { ...tpl.puck };
+  out.offenseFull = tpl.offenseFull.map(p => ({ ...p }));
+  out.defenseFull = tpl.defenseFull.map(p => ({ ...p }));
+  out.guidanceByRole = {};
+  for (const [role, g] of Object.entries(tpl.guidanceByRole || {})) out.guidanceByRole[role] = { ...g };
+  out.rulesByRole = Object.assign({}, tpl.rulesByRole);
+
+  // 1. Run the same play off the other side of the ice. Mirroring across centre
+  //    ice leaves the slot where it is, so only the wings and D swap hands.
+  if (opts.mirror) {
+    const flip = p => ({ ...p, y: 620 - p.y });
+    out.puck = flip(out.puck);
+    out.offenseFull = out.offenseFull.map(p => ({ ...flip(p), role: SWAP[p.role] || p.role }));
+    out.defenseFull = out.defenseFull.map(flip);
+    const g = {}, r = {};
+    for (const [role, v] of Object.entries(out.guidanceByRole)) g[SWAP[role] || role] = { ...v, y: 620 - v.y };
+    for (const [role, v] of Object.entries(out.rulesByRole)) r[SWAP[role] || role] = v;
+    out.guidanceByRole = g;
+    out.rulesByRole = r;
+    out.mirrored = true;
+  }
+
+  // 2. Move the puck, and move every support spot in response. Players close to
+  //    the puck adjust most; the far-side D barely shifts at all.
+  const jitter = opts.jitter ?? 45;
+  const px = clamp(out.puck.x + rnd(-jitter, jitter), 70, 1030);
+  const py = clamp(out.puck.y + rnd(-jitter, jitter), 70, 550);
+  const dx = px - out.puck.x, dy = py - out.puck.y;
+  out.puck = { x: Math.round(px), y: Math.round(py) };
+
+  for (const g of Object.values(out.guidanceByRole)) {
+    const d = Math.hypot(g.x - px, g.y - py);
+    const respond = d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2;
+    g.x = Math.round(clamp(g.x + dx * respond, 60, 1040));
+    g.y = Math.round(clamp(g.y + dy * respond, 60, 560));
+  }
+
+  // Teammates stand where the coaching spots now are, so the picture stays honest.
+  out.offenseFull = out.offenseFull.map(p => {
+    const g = out.guidanceByRole[p.role];
+    return g ? { ...p, x: g.x, y: g.y } : p;
+  });
+
+  // The rule bands were written for the template's fixed picture. Now that the
+  // puck moves, give them the same slack so a correct read never falls outside
+  // its own rule.
+  const slack = Math.ceil(jitter * 0.9);
+  const widened = {};
+  for (const [role, r] of Object.entries(out.rulesByRole)) {
+    const copy = { ...r };
+    if (r.spacingFromPuck) {
+      copy.spacingFromPuck = {
+        min: Math.max(0, r.spacingFromPuck.min - slack),
+        max: r.spacingFromPuck.max + slack
+      };
+    }
+    if (r.protectSlot) copy.protectSlot = { ...r.protectSlot, radius: r.protectSlot.radius + slack };
+    widened[role] = copy;
+  }
+  out.rulesByRole = widened;
+
+  // 3. Pressure stops being a label and starts being real: under high pressure
+  //    the opposition collapses on the puck, under low pressure they sag off.
+  const press = { Low: -0.12, Med: 0, High: 0.14 }[opts.pressure] || 0;
+  out.defenseFull = out.defenseFull.map(p => {
+    if (p.role === "G") return p;
+    const bx = p.x + dx * 0.5, by = p.y + dy * 0.5;
+    return {
+      ...p,
+      x: Math.round(clamp(bx + (px - bx) * press + rnd(-13, 13), 55, 1045)),
+      y: Math.round(clamp(by + (py - by) * press + rnd(-13, 13), 55, 565))
+    };
+  });
+
+  return out;
+};
+
+HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
+  const pick = HIQ.util.pick;
+  const puckSpots = [
+    { x: 860, y: 200, label: "half wall" },
+    { x: 740, y: 310, label: "point" },
+    { x: 860, y: 420, label: "half wall" },
+    { x: 980, y: 310, label: "net-front" },
+    { x: 910, y: 520, label: "goal line" }
+  ];
+  const puckSpot = pick(puckSpots);
+
+  if (fmt === "5v4") {
+    const off = HIQ.ppPositions(ppStruct);
+    const def = (pkStruct === "diamond")
+      ? [
+          { role: "PK1", x: 900, y: 250 },
+          { role: "PK2", x: 900, y: 370 },
+          { role: "PK3", x: 960, y: 310 },
+          { role: "PK4", x: 840, y: 310 },
+          { role: "G",   x: 1040, y: 310 }
+        ]
+      : [
+          { role: "PK1", x: 900, y: 260 },
+          { role: "PK2", x: 900, y: 360 },
+          { role: "PK3", x: 960, y: 260 },
+          { role: "PK4", x: 960, y: 360 },
+          { role: "G",   x: 1040, y: 310 }
+        ];
+
+    return {
+      id: `PP_${ppStruct}_${pkStruct}_${puckSpot.label}`,
+      phase: "Special",
+      pressures: ["Low", "Med", "High"],
+      allowedFormats: ["5v4"],
+      attackDir: "right",
+      puck: { x: puckSpot.x, y: puckSpot.y },
+      offenseFull: off,
+      defenseFull: def,
+      prompt: (role, fmt2) => `${fmt2} — Power Play (${ppStruct === "one3one" ? "1-3-1" : "Umbrella"}). Puck at the ${puckSpot.label}. You are ${role}. Hold your spot and stay open!`,
+      // Shift gently toward the puck: on the PP you stay in your lane but present
+      // yourself as an option.
+      guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.14, 100),
+      // On a power play any of these five can be the one holding the puck, so a
+      // minimum spacing would punish the puck carrier for standing on the puck.
+      // Holding the shape is what matters, and the positional score covers that.
+      rulesByRole: {
+        LW: { spacingFromPuck: { min: 0, max: 500 } },
+        C:  { spacingFromPuck: { min: 0, max: 500 } },
+        RW: { spacingFromPuck: { min: 0, max: 500 } },
+        LD: { spacingFromPuck: { min: 0, max: 560 } },
+        RD: { spacingFromPuck: { min: 0, max: 560 } },
+      }
+    };
+  }
+
+  if (fmt === "4v5") {
+    const off = HIQ.pkPositions(pkStruct);
+    const oppPP = HIQ.ppPositions(ppStruct);
+    const def = oppPP.map(p => ({ role: `PP-${p.role}`, x: p.x, y: p.y }))
+      .concat([{ role: "G", x: 1040, y: 310 }]);
+
+    return {
+      id: `PK_${pkStruct}_${ppStruct}_${puckSpot.label}`,
+      phase: "Special",
+      pressures: ["Low", "Med", "High"],
+      allowedFormats: ["4v5"],
+      attackDir: "right",
+      isDefense: true,
+      puck: { x: puckSpot.x, y: puckSpot.y },
+      offenseFull: off,
+      defenseFull: def,
+      prompt: (role, fmt2) => `${fmt2} — Penalty Kill (${pkStruct}). Puck at the ${puckSpot.label}. You are ${role}. Rotate with the puck and protect the middle!`,
+      // The box/diamond rotates toward the puck as the power play moves it around.
+      guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.20, 105),
+      rulesByRole: {
+        C:  { protectSlot: { slotSide: "right", radius: 230 } },
+        LW: { protectSlot: { slotSide: "right", radius: 230 } },
+        RW: { protectSlot: { slotSide: "right", radius: 230 } },
+        LD: { protectSlot: { slotSide: "right", radius: 230 } },
+        RD: { protectSlot: { slotSide: "right", radius: 230 } },
+      }
+    };
+  }
+
+  return null;
+};
+
+/* Hockey IQ Trainer — synthesized sound effects (no audio files needed). */
+window.HIQ = window.HIQ || {};
+
+HIQ.audio = (() => {
+  let ctx = null;
+  let muted = false;
+
+  function ensure() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+  }
+
+  function tone(freq, dur, type = "sine", vol = 0.14, when = 0, slideTo = null) {
+    if (muted) return;
+    try { ensure(); } catch (e) { return; }
+    const t0 = ctx.currentTime + when;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.linearRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(t0);
+    o.stop(t0 + dur + 0.05);
+  }
+
+  // Filtered white-noise swell — used for crowd roar and ice spray
+  function noiseBurst(dur, vol, when = 0, cutoff = 1100) {
+    if (muted) return;
+    try { ensure(); } catch (e) { return; }
+    const t0 = ctx.currentTime + when;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.value = cutoff;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(filt).connect(g).connect(ctx.destination);
+    src.start(t0);
+  }
+
+  const sfx = {
+    pass()        { tone(660, 0.08, "triangle", 0.12); },
+    catch()       { tone(880, 0.07, "triangle", 0.10); },
+    shot()        { tone(300, 0.12, "square", 0.12, 0, 180); },
+    // Arena goal horn (minor-third blare) + crowd roar
+    goal() {
+      tone(233, 0.9, "sawtooth", 0.16);
+      tone(311, 0.9, "sawtooth", 0.12);
+      tone(466, 0.9, "sawtooth", 0.05);
+      noiseBurst(1.5, 0.10, 0.15, 1400);
+    },
+    goalAgainst() {
+      tone(330, 0.35, "sine", 0.14, 0, 180);
+      tone(180, 0.5, "sine", 0.11, 0.3, 120);
+      noiseBurst(0.9, 0.04, 0.1, 500); // low groan
+    },
+    whistle()     { tone(2200, 0.25, "square", 0.05); tone(2100, 0.22, "square", 0.04, 0.05); },
+    good()        { tone(523, 0.12, "triangle", 0.12); tone(659, 0.12, "triangle", 0.12, 0.12); tone(784, 0.2, "triangle", 0.12, 0.24); noiseBurst(0.6, 0.03, 0.2, 1600); },
+    clear()       { tone(523, 0.15, "triangle", 0.12); tone(784, 0.25, "triangle", 0.12, 0.15); },
+    save()        { tone(140, 0.09, "square", 0.14); noiseBurst(0.25, 0.05, 0, 900); },
+    faceoff()     { tone(180, 0.05, "square", 0.10); tone(180, 0.05, "square", 0.10, 0.12); },
+    levelup() {
+      [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, "triangle", 0.13, i * 0.11));
+      noiseBurst(0.7, 0.03, 0.35, 1800);
+    },
+    badge()       { tone(988, 0.12, "triangle", 0.12); tone(1319, 0.3, "triangle", 0.12, 0.13); }
+  };
+
+  return {
+    play(name) { const f = sfx[name]; if (f) f(); },
+    setMuted(m) { muted = m; },
+    isMuted() { return muted; }
+  };
+})();
+
+/* Hockey IQ Trainer — play simulation runner.
+   Runs a sequential list of steps; each step tweens pieces toward targets over its duration.
+   Step: { d: ms, movers: [{obj, to:{x,y}}], sound, msg, banner: {…}|null, fx: {…}, shake: n }
+   A step without a `banner` key keeps the previous banner on screen.
+   opts.onStep(step) fires once when each step begins (for effects like rings/shake). */
+window.HIQ = window.HIQ || {};
+
+HIQ.Sim = (() => {
+  let running = false;
+  let cancelled = false;
+  let raf = 0;
+
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+
+  function run(steps, opts) {
+    if (running) return false;
+    running = true;
+    cancelled = false;
+    let i = 0, t0 = null, starts = null, banner = null;
+
+    function frame(now) {
+      if (cancelled) { running = false; return; }
+      if (i >= steps.length) {
+        running = false;
+        if (opts.onDone) opts.onDone(banner);
+        return;
+      }
+      const s = steps[i];
+      if (starts === null) {
+        t0 = now;
+        if (s.sound && HIQ.audio) HIQ.audio.play(s.sound);
+        if ("banner" in s) banner = s.banner;
+        if (s.msg && opts.onMsg) opts.onMsg(s.msg);
+        if (opts.onStep) opts.onStep(s);
+        starts = (s.movers || []).map(m => ({ m, x0: m.obj.x, y0: m.obj.y }));
+      }
+      const p = Math.min(1, (now - t0) / (s.d || 1));
+      const e = ease(p);
+      for (const st of starts) {
+        st.m.obj.x = st.x0 + (st.m.to.x - st.x0) * e;
+        st.m.obj.y = st.y0 + (st.m.to.y - st.y0) * e;
+      }
+      if (opts.onFrame) opts.onFrame(banner);
+      if (p >= 1) { i++; starts = null; }
+      raf = requestAnimationFrame(frame);
+    }
+
+    raf = requestAnimationFrame(frame);
+    return true;
+  }
+
+  function cancel() {
+    cancelled = true;
+    running = false;
+    cancelAnimationFrame(raf);
+  }
+
+  return { run, cancel, isRunning: () => running };
+})();
+
+/* Hockey IQ Trainer — main application: scenario building, scoring, rendering, input, and outcomes. */
+(() => {
+  // Never fail silently: surface any runtime error where the player can see it.
+  window.addEventListener("error", (e) => {
+    const el = document.getElementById("status");
+    if (el) el.innerHTML = `⚠️ Oops, something glitched (<code>${e.message || "unknown error"}</code>). Tap New Play to keep going.`;
+  });
+
+  const { pick, clamp, dist, toward, shuffle } = HIQ.util;
+  const LM = HIQ.LANDMARKS;
+
+  // --- DOM
+  const canvas = document.getElementById("rink");
+  const ctx = canvas.getContext("2d");
+
+  const ageSel = document.getElementById("age");
+  const formatSel = document.getElementById("format");
+  const modeSel = document.getElementById("mode");
+  const roleSel = document.getElementById("role");
+  const diffSel = document.getElementById("diff");
+  const answerSel = document.getElementById("answerStyle");
+
+  const phaseFilterSel = document.getElementById("phaseFilter");
+  const pressureFilterSel = document.getElementById("pressureFilter");
+  const ppStructSel = document.getElementById("ppStruct");
+  const pkStructSel = document.getElementById("pkStruct");
+  const ppStructWrap = document.getElementById("ppStructWrap");
+  const pkStructWrap = document.getElementById("pkStructWrap");
+  const overlaySel = document.getElementById("overlay");
+
+  const newBtn = document.getElementById("newBtn");
+  const lockBtn = document.getElementById("lockBtn");
+  const muteBtn = document.getElementById("muteBtn");
+
+  const streakEl = document.getElementById("streak");
+  const phaseEl = document.getElementById("phase");
+  const pressureEl = document.getElementById("pressure");
+  const structureEl = document.getElementById("structure");
+  const scoreEl = document.getElementById("score");
+  const gfEl = document.getElementById("gf");
+  const gaEl = document.getElementById("ga");
+  const promptEl = document.getElementById("prompt");
+  const hintEl = document.getElementById("hint");
+  const statusEl = document.getElementById("status");
+
+  const reportSummaryEl = document.getElementById("reportSummary");
+  const reportRowsEl = document.getElementById("reportRows");
+  const reportChipsEl = document.getElementById("reportChips");
+
+  const pNameEl = document.getElementById("pName");
+  const pNumEl = document.getElementById("pNum");
+  const pColorEl = document.getElementById("pColor");
+  const levelEl = document.getElementById("level");
+  const xpFillEl = document.getElementById("xpfill");
+  const coachFaceEl = document.getElementById("coachFace");
+  const badgeGridEl = document.getElementById("badgeGrid");
+  const trophySummaryEl = document.getElementById("trophySummary");
+  const toastsEl = document.getElementById("toasts");
+  const dotTeamEl = document.getElementById("dotTeam");
+
+  // --- State
+  let streak = 0;
+  let goalsFor = 0;
+  let goalsAgainst = 0;
+  let scenario = null;
+
+  let controlled = [];
+  let offense = [];
+  let defense = [];
+  const puck = { x: 550, y: 310, r: 9 };
+  let guidance = { x: 550, y: 310, r: 90 };
+
+  let choice = { active: false, options: [] };
+  let snapshot = null;
+  let pendingTimer = null;
+
+  const renderState = { banner: null, bannerAt: 0, showGuidance: false, guidanceOk: null, shakeAt: 0, shakeMag: 0, intro: null };
+  let particles = [];
+  let effects = [];
+  const puckTrail = [];
+  let lastTick = 0;
+
+  const report = [];
+
+  // --- Player profile, XP, and badges (persisted)
+  const XP_PER_LEVEL = 300;
+
+  function loadStore(key, fallback) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return (v && typeof v === "object") ? { ...fallback, ...v } : fallback;
+    } catch (e) { return fallback; }
+  }
+  function saveStore(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* private mode etc. */ }
+  }
+
+  const profile = loadStore("hiq_profile", { name: "", number: 9, color: "blue" });
+  const stats = loadStore("hiq_stats", {
+    xp: 0, goals: 0, corrects: 0, greats: 0, perfects: 0, bestStreak: 0,
+    byPhase: {}, pkCorrect: 0, ppCorrect: 0, badges: {}
+  });
+  let sessionGoals = 0;
+  let recentMisses = 0;
+
+  const PRESET_COLORS = {
+    blue:   { jersey: "#2456ff", trim: "#0a1c56", helmet: "#0a1c56" },
+    green:  { jersey: "#22c55e", trim: "#14532d", helmet: "#14532d" },
+    purple: { jersey: "#8b5cf6", trim: "#3b0764", helmet: "#3b0764" },
+    teal:   { jersey: "#06b6d4", trim: "#164e63", helmet: "#164e63" },
+    gold:   { jersey: "#eab308", trim: "#713f12", helmet: "#713f12" }
+  };
+  function teamStyle() { return PRESET_COLORS[profile.color] || PRESET_COLORS.blue; }
+
+  const BADGES = [
+    { id: "first_goal",    emoji: "🚨", name: "First Goal",      desc: "Score your first goal",            test: s => s.goals >= 1 },
+    { id: "hat_trick",     emoji: "🎩", name: "Hat Trick",       desc: "3 goals in one session",           test: () => sessionGoals >= 3 },
+    { id: "sniper",        emoji: "🎯", name: "Sniper",          desc: "Score 10 goals",                   test: s => s.goals >= 10 },
+    { id: "breakout_boss", emoji: "🧊", name: "Breakout Boss",   desc: "5 correct breakout reads",         test: s => (s.byPhase["Breakout"] || 0) >= 5 },
+    { id: "rush_master",   emoji: "💨", name: "Rush Master",     desc: "5 correct rush reads",             test: s => (s.byPhase["Rush"] || 0) >= 5 },
+    { id: "ozone_pro",     emoji: "🔁", name: "O-Zone Pro",      desc: "5 correct offensive-zone reads",   test: s => (s.byPhase["O-zone"] || 0) >= 5 },
+    { id: "lockdown",      emoji: "🛡️", name: "Lockdown D",      desc: "5 correct defensive reads",        test: s => (s.byPhase["Defend"] || 0) >= 5 },
+    { id: "pk_wall",       emoji: "🧱", name: "PK Wall",         desc: "5 correct penalty-kill reads",     test: s => s.pkCorrect >= 5 },
+    { id: "pp_qb",         emoji: "⚡", name: "PP Quarterback",  desc: "5 correct power-play reads",       test: s => s.ppCorrect >= 5 },
+    { id: "on_fire",       emoji: "🔥", name: "On Fire",         desc: "Get a streak of 5",                test: s => s.bestStreak >= 5 },
+    { id: "comeback",      emoji: "💪", name: "Comeback Kid",    desc: "Bounce back after 2 misses",       test: (s, ev) => !!ev.comeback },
+    { id: "perfect",       emoji: "💯", name: "Perfect 100",     desc: "Score a perfect 100",              test: s => s.perfects >= 1 },
+  ];
+
+  function toast(emoji, title, sub) {
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.innerHTML = `<span class="t-emoji">${emoji}</span><span>${title}<br/><span class="t-sub">${sub || ""}</span></span>`;
+    toastsEl.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  function levelFromXp(xp) { return Math.floor(xp / XP_PER_LEVEL) + 1; }
+
+  function renderProgress() {
+    levelEl.textContent = levelFromXp(stats.xp);
+    xpFillEl.style.width = `${Math.round(((stats.xp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100)}%`;
+  }
+
+  function awardXP(amount) {
+    const before = levelFromXp(stats.xp);
+    stats.xp += amount;
+    const after = levelFromXp(stats.xp);
+    renderProgress();
+    if (after > before) {
+      HIQ.audio.play("levelup");
+      toast("⭐", `LEVEL UP! Level ${after}`, "Keep making smart reads!");
+    }
+  }
+
+  function checkBadges(ev = {}) {
+    for (const b of BADGES) {
+      if (stats.badges[b.id]) continue;
+      if (b.test(stats, ev)) {
+        stats.badges[b.id] = Date.now();
+        HIQ.audio.play("badge");
+        toast(b.emoji, `Badge unlocked: ${b.name}`, b.desc);
+      }
+    }
+    renderTrophies();
+  }
+
+  function renderTrophies() {
+    const earned = Object.keys(stats.badges).length;
+    trophySummaryEl.textContent = `— ${earned}/${BADGES.length} earned`;
+    badgeGridEl.innerHTML = "";
+    for (const b of BADGES) {
+      const card = document.createElement("div");
+      card.className = "badge-card" + (stats.badges[b.id] ? "" : " locked");
+      card.innerHTML = `<div class="b-emoji">${b.emoji}</div><div class="b-name">${b.name}</div><div class="b-desc">${b.desc}</div>`;
+      badgeGridEl.appendChild(card);
+    }
+  }
+
+  const COACH_FACES = { neutral: "😀", watch: "👀", happy: "😄", goal: "🤩", sad: "😧", think: "🧐" };
+  function setCoach(mood) {
+    coachFaceEl.textContent = COACH_FACES[mood] || COACH_FACES.neutral;
+  }
+
+  // --- Helpers
+  const nowTime = () => {
+    const d = new Date();
+    return [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, "0")).join(":");
+  };
+
+  function difficultyTighten(radius, diff) {
+    if (diff === "easy") return radius * 1.25;
+    if (diff === "hard") return radius * 0.75;
+    return radius;
+  }
+
+  function getAgeSettings() {
+    const age = ageSel.value;
+    // scenarioJitter: how far the puck (and the whole read) moves play to play.
+    // Younger players get steadier pictures; older ones get more variety.
+    if (age === "6-8") {
+      return { guidanceScale: 1.35, passScore: { easy: 55, med: 60, hard: 65 }, maxRulesToEnforce: 2, showSecondCue: false, scenarioJitter: 30 };
+    }
+    if (age === "12-14") {
+      return { guidanceScale: 0.95, passScore: { easy: 65, med: 75, hard: 85 }, maxRulesToEnforce: 4, showSecondCue: true, scenarioJitter: 60 };
+    }
+    return { guidanceScale: 1.10, passScore: { easy: 60, med: 70, hard: 80 }, maxRulesToEnforce: 3, showSecondCue: true, scenarioJitter: 45 };
+  }
+
+  function passThreshold() {
+    return getAgeSettings().passScore[diffSel.value];
+  }
+
+  // Sides: for offensive scenarios attackDir is where we attack; for defensive
+  // scenarios attackDir is the zone we defend (where opponents attack).
+  function ownSideOf(scen) {
+    return scen.isDefense ? scen.attackDir : (scen.attackDir === "right" ? "left" : "right");
+  }
+  function attackSideOf(scen) {
+    return scen.isDefense ? (scen.attackDir === "right" ? "left" : "right") : scen.attackDir;
+  }
+  function netFor(side) { return side === "left" ? LM.leftNet : LM.rightNet; }
+  function slotFor(side) {
+    const n = netFor(side);
+    return { x: side === "right" ? n.x - 125 : n.x + 125, y: 310 };
+  }
+  function isFriendlyGoalie(p) {
+    if (p.role !== "G" || !scenario) return false;
+    const own = netFor(ownSideOf(scenario));
+    return dist(p.x, p.y, own.x, own.y) < 130;
+  }
+
+  // --- Scoring engine
+  // Two layers: a smooth positional score (how close to the coaching spot) plus
+  // specific, coachable rule violations. Keeping them separate means the ideal
+  // spot always scores 100 and the score degrades predictably with distance.
+
+  // Teaching rules only — no positional component. Also used to self-check scenario data.
+  function ruleViolations(role, pos, scen, skip = {}) {
+    const rules = (scen.rulesByRole && scen.rulesByRole[role]) ? scen.rulesByRole[role] : {};
+    const out = [];
+    const fail = (key, pts, msg) => { if (!skip[key]) out.push({ key, msg, pts }); };
+
+    if (rules.spacingFromPuck) {
+      const d = dist(pos.x, pos.y, puck.x, puck.y);
+      const { min, max } = rules.spacingFromPuck;
+      if (d < min) fail("spacing", 22, "Too close to the puck — give your teammate room.");
+      if (d > max) fail("spacing", 22, "Too far from the puck — you're not an option.");
+    }
+
+    // "Be an outlet" only means something for a player waiting to receive. The
+    // one carrying the puck can't be an outlet for themselves.
+    if (rules.beOutlet && dist(pos.x, pos.y, puck.x, puck.y) > 60) {
+      const { preferX } = rules.beOutlet;
+      if (preferX === "greater" && pos.x < puck.x - 15) fail("outlet", 22, "You're behind the play — get ahead so they can pass to you.");
+      if (preferX === "less" && pos.x > puck.x + 15) fail("outlet", 22, "You're behind the play — get where they can pass to you.");
+    }
+
+    if (rules.protectSlot) {
+      const { slotSide, radius } = rules.protectSlot;
+      const slot = (slotSide === "left") ? LM.leftSlot : LM.rightSlot;
+      if (dist(pos.x, pos.y, slot.x, slot.y) > radius) fail("slot", 26, "You left the front of your net open — protect middle ice!");
+    }
+
+    if (rules.stayAbovePuck) {
+      const margin = rules.stayAbovePuck.margin ?? 25;
+      const tooDeep = (scen.attackDir === "right")
+        ? (pos.x > puck.x + margin && !rules.stayAbovePuck.allowDeeper)
+        : (pos.x < puck.x - margin && !rules.stayAbovePuck.allowDeeper);
+      if (tooDeep) fail("above", 18, "Too deep! Stay above the puck so you're not caught.");
+    }
+
+    return out;
+  }
+
+  // A rule the ideal spot itself breaks is a data bug, not a player mistake.
+  // Disable it for that play so the canonical answer can never be punished.
+  function buildSkipRules(scen) {
+    const skip = {};
+    for (const role of Object.keys(scen.guidanceByRole || {})) {
+      const g = scen.guidanceByRole[role];
+      const v = ruleViolations(role, { x: g.x, y: g.y }, scen, {});
+      if (v.length) {
+        skip[role] = {};
+        v.forEach(f => { skip[role][f.key] = true; });
+        console.warn(`[HIQ] ${scen.id}/${role}: ideal spot violates [${v.map(f => f.key).join(", ")}] — rule disabled for this play (fix the scenario data).`);
+      }
+    }
+    return skip;
+  }
+
+  function scorePlacement(role, pos, scen) {
+    const ageCfg = getAgeSettings();
+    const skip = (scen._skipRules && scen._skipRules[role]) || {};
+
+    // Positional accuracy: 100 at the coaching spot, decaying smoothly outward.
+    const g = scen.guidanceByRole && scen.guidanceByRole[role];
+    let base = 100;
+    let posMiss = null;
+    if (g) {
+      const r = Math.max(35, difficultyTighten(g.r, scen.diff) * ageCfg.guidanceScale);
+      const d = dist(pos.x, pos.y, g.x, g.y);
+      base = clamp(Math.round(100 - 30 * Math.pow(d / r, 1.3)), 0, 100);
+      if (base < 88) {
+        posMiss = {
+          key: "position",
+          pts: 100 - base,
+          msg: d > r * 2
+            ? "That's the wrong area of the ice for your position."
+            : "Close — but not quite in your support spot."
+        };
+      }
+    }
+
+    const violations = ruleViolations(role, pos, scen, skip);
+    violations.sort((a, b) => b.pts - a.pts);
+    const enforced = violations.slice(0, ageCfg.maxRulesToEnforce);
+
+    let score = base;
+    for (const f of enforced) score -= f.pts;
+    score = clamp(Math.round(score), 0, 100);
+
+    // Coaching cues: specific rule mistakes first, positional drift as backup.
+    const cues = enforced.concat(posMiss ? [posMiss] : []);
+    return { score, failures: cues, allFailures: violations };
+  }
+
+  // --- Scenario selection / building
+  function getCandidateTemplates(fmt) {
+    if (fmt === "5v4" || fmt === "4v5") {
+      const st = HIQ.buildSpecialTeamsScenario(fmt, ppStructSel.value, pkStructSel.value);
+      return st ? [st] : [];
+    }
+    return HIQ.TEMPLATES_EVEN.filter(t => t.allowedFormats.includes("5v5"));
+  }
+
+  function applyFormat(offenseFull, defenseFull, fmt) {
+    const off = offenseFull.map(p => ({ ...p }));
+    const def = defenseFull.map(p => ({ ...p }));
+    const defSkaters = def.filter(p => p.role !== "G");
+    const defGoalies = def.filter(p => p.role === "G");
+
+    if (fmt === "5v4") return { off: off.slice(0, 5), def: defSkaters.slice(0, 4).concat(defGoalies) };
+    if (fmt === "4v5") return { off: off.slice(0, 4), def: defSkaters.slice(0, 5).concat(defGoalies) };
+    return { off: off.slice(0, 5), def: defSkaters.slice(0, 5).concat(defGoalies) };
+  }
+
+  function structureLabel(fmt) {
+    if (fmt === "5v4") return `PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"} vs PK ${pkStructSel.value}`;
+    if (fmt === "4v5") return `PK ${pkStructSel.value} vs PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"}`;
+    return "—";
+  }
+
+  function isChoiceMode() {
+    return answerSel.value === "choices" && modeSel.value === "single";
+  }
+
+  function coachHints(role, scen) {
+    const rules = (scen.rulesByRole && scen.rulesByRole[role]) || {};
+    const hints = [];
+    if (rules.protectSlot) hints.push("🛡️ Protect the front of your net — don't chase the puck!");
+    if (rules.beOutlet) hints.push("🏒 Get open where your teammate can pass to you.");
+    if (rules.spacingFromPuck) hints.push("↔️ Not too close to the puck, not too far.");
+    if (rules.stayAbovePuck) hints.push("⬆️ Don't get caught too deep — stay above the puck.");
+    return hints.slice(0, 2);
+  }
+
+  function buildScenario() {
+    if (HIQ.Sim.isRunning()) HIQ.Sim.cancel();
+    clearTimeout(pendingTimer);
+    setBanner(null);
+    renderState.showGuidance = false;
+    puckTrail.length = 0;
+    effects = [];
+
+    const fmt = formatSel.value;
+    const mode = modeSel.value;
+    const role = roleSel.value;
+    const diff = diffSel.value;
+
+    const isSpecial = (fmt === "5v4" || fmt === "4v5");
+    ppStructWrap.style.display = isSpecial ? "" : "none";
+    pkStructWrap.style.display = isSpecial ? "" : "none";
+
+    let candidates = getCandidateTemplates(fmt);
+    const phaseFilter = phaseFilterSel.value;
+    const pressureFilter = pressureFilterSel.value;
+
+    candidates = candidates.filter(t => phaseFilter === "any" || t.phase === phaseFilter);
+    if (candidates.length === 0) candidates = getCandidateTemplates(fmt);
+    if (candidates.length === 0) { statusEl.textContent = "No scenarios available for those filters."; return; }
+
+    const base = pick(candidates);
+    const pressure = (pressureFilter === "any") ? pick(base.pressures || ["Med"]) : pressureFilter;
+
+    // Every play is a fresh read: mirrored ice, a moved puck, and support spots
+    // and opposition that respond. Special teams already vary by puck location.
+    const isSpecialTpl = base.id && base.id.startsWith("PP_") || (base.id || "").startsWith("PK_");
+    const tpl = isSpecialTpl ? base : HIQ.varyScenario(base, {
+      mirror: Math.random() < 0.5,
+      pressure,
+      jitter: getAgeSettings().scenarioJitter
+    });
+
+    scenario = {
+      id: tpl.id,
+      phase: tpl.phase,
+      pressure, fmt, mode, role, diff,
+      attackDir: tpl.attackDir || "right",
+      isDefense: !!tpl.isDefense,
+      rulesByRole: tpl.rulesByRole || {},
+      guidanceByRole: tpl.guidanceByRole || {},
+      prompt: tpl.prompt ? tpl.prompt(role, fmt) : `${fmt} — ${tpl.phase}. You are ${role}.`
+    };
+
+    puck.x = tpl.puck.x;
+    puck.y = tpl.puck.y;
+
+    const applied = applyFormat(tpl.offenseFull, tpl.defenseFull, fmt);
+    defense = applied.def.map(p => ({ ...p, r: 16 }));
+
+    // The player must be assigned a position that is actually on the ice in this
+    // format (e.g. a 4-man penalty kill has no 5th spot to stand in).
+    const onIce = applied.off.map(p => p.role);
+    let playRole = role;
+    if (!onIce.includes(playRole) || !scenario.guidanceByRole[playRole]) {
+      playRole = onIce.find(r2 => scenario.guidanceByRole[r2]) || onIce[0];
+      scenario.roleNote = `On this unit you're covering the ${playRole} spot.`;
+    }
+    scenario.role = playRole;
+    scenario.prompt = tpl.prompt ? tpl.prompt(playRole, fmt) : `${fmt} — ${tpl.phase}. You are ${playRole}.`;
+    scenario._skipRules = buildSkipRules(scenario);
+
+    if (mode === "single") {
+      // Your role always takes one of the team's spots (never adds an extra skater).
+      const others = applied.off.filter(p => p.role !== playRole);
+      controlled = [{ role: playRole, x: 550, y: 310, r: 19, dragging: false }];
+      offense = others.map(p => ({ ...p, r: 16 }));
+    } else {
+      controlled = applied.off.map(p => ({ ...p, r: 19, dragging: false }));
+      offense = [];
+    }
+
+    const ageCfg = getAgeSettings();
+    const g = scenario.guidanceByRole?.[playRole] || { x: 550, y: 310, r: 90 };
+    guidance = { x: g.x, y: g.y, r: difficultyTighten(g.r, diff) * ageCfg.guidanceScale };
+
+    // Choice mode: generate A/B/C options
+    choice = { active: false, options: [] };
+    if (isChoiceMode()) {
+      choice.options = generateChoices();
+      choice.active = choice.options.length > 0;
+    }
+
+    // UI
+    phaseEl.textContent = scenario.phase;
+    pressureEl.textContent = scenario.pressure;
+    structureEl.textContent = structureLabel(fmt);
+    promptEl.textContent = scenario.prompt;
+    scoreEl.textContent = "—";
+    lockBtn.style.display = choice.active ? "none" : "";
+
+    const showHints = (diffSel.value === "easy" || ageSel.value === "6-8");
+    const hints = showHints ? coachHints(scenario.role, scenario) : [];
+    if (scenario.roleNote) hints.unshift(scenario.roleNote);
+    hintEl.textContent = hints.join("   ");
+    hintEl.style.display = hints.length ? "" : "none";
+
+    if (choice.active) {
+      statusEl.innerHTML = "Tap <b>A</b>, <b>B</b>, or <b>C</b> — where should you go? Then watch the play!";
+    } else if (mode === "single") {
+      statusEl.textContent = "Drag your blue player to the best spot, then tap Lock In to watch the play.";
+    } else {
+      statusEl.textContent = "Drag your whole team (blue) into a better shape, then tap Lock In.";
+    }
+
+    renderState.intro = { text: `${scenario.phase.toUpperCase()}  •  ${fmt}`, at: performance.now() };
+    HIQ.audio.play("faceoff");
+    setCoach("think");
+  }
+
+  // --- A/B/C choice generation
+  // Decoys are deliberate near-misses: each one is a real positioning mistake,
+  // placed a difficulty-scaled distance from the coaching spot. Obvious decoys
+  // teach nothing, so tighter difficulties pull them closer to the right answer.
+  function generateChoices() {
+    const role = scenario.role;
+    const g = scenario.guidanceByRole?.[role] || { x: 550, y: 310, r: 90 };
+    const correctPos = { x: g.x, y: g.y };
+    const correctRes = scorePlacement(role, correctPos, scenario);
+
+    const atk = attackSideOf(scenario);
+    const ownS = ownSideOf(scenario);
+    const atkNet = netFor(atk);
+    const ownNet = netFor(ownS);
+    const ageCfg = getAgeSettings();
+    const r = difficultyTighten(g.r, scenario.diff) * ageCfg.guidanceScale;
+
+    // How far a wrong answer sits from the right one, by difficulty.
+    const spreadBand = { easy: [2.0, 2.8], med: [1.5, 2.1], hard: [1.1, 1.5] }[scenario.diff] || [1.5, 2.1];
+    const near = r * spreadBand[0];
+    const far = r * spreadBand[1];
+
+    const unit = (from, to) => {
+      const dx = to.x - from.x, dy = to.y - from.y;
+      const m = Math.hypot(dx, dy) || 1;
+      return { x: dx / m, y: dy / m };
+    };
+    const at = (dir, d, mistake) => ({
+      pos: {
+        x: clamp(correctPos.x + dir.x * d, 55, 1045),
+        y: clamp(correctPos.y + dir.y * d, 55, 565)
+      },
+      mistake
+    });
+
+    const toPuck = unit(correctPos, puck);
+    const toOwnNet = unit(correctPos, ownNet);
+    const toAtkNet = unit(correctPos, atkNet);
+    const toMiddle = unit(correctPos, { x: correctPos.x, y: 310 });
+    const toBoards = { x: 0, y: correctPos.y < 310 ? -1 : 1 };
+
+    const candidates = [
+      at(toPuck, near, "You chased the puck instead of holding your support spot."),
+      at(toOwnNet, far, "You hung back too far — you weren't an option for your teammate."),
+      at(toAtkNet, near, scenario.isDefense
+        ? "You got caught up ice while your team was defending."
+        : "You drifted too deep and skated yourself out of the play."),
+      at(toMiddle, far, "You floated into the middle and left your lane uncovered."),
+      at(toBoards, near, "You hugged the boards — no passing angle from there."),
+    ];
+
+    // Keep only genuinely worse options, well separated from each other.
+    const scored = candidates
+      .map(c => ({ ...c, res: scorePlacement(role, c.pos, scenario) }))
+      .filter(c => c.res.score <= correctRes.score - 12)
+      .filter(c => dist(c.pos.x, c.pos.y, correctPos.x, correctPos.y) > r * 0.9);
+
+    const spread = [];
+    for (const c of shuffle(scored)) {
+      if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
+      if (spread.length === 2) break;
+    }
+    // Fallback: push straight out from the ideal spot in opposite directions.
+    let angle = Math.random() * Math.PI * 2;
+    while (spread.length < 2) {
+      const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+      const c = at(dir, far, "That's not your spot on this play.");
+      c.res = scorePlacement(role, c.pos, scenario);
+      if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
+      angle += Math.PI * 0.7;
+    }
+
+    const opts = shuffle([
+      { pos: correctPos, res: correctRes, correct: true },
+      { pos: spread[0].pos, res: spread[0].res, correct: false, mistake: spread[0].mistake },
+      { pos: spread[1].pos, res: spread[1].res, correct: false, mistake: spread[1].mistake },
+    ]);
+    opts.forEach((o, i) => { o.label = "ABC"[i]; });
+    return opts;
+  }
+
+  // --- Snapshots (restore after a failed attempt so the player can retry)
+  function takeSnapshot() {
+    snapshot = {
+      controlled: controlled.map(p => ({ x: p.x, y: p.y })),
+      offense: offense.map(p => ({ x: p.x, y: p.y })),
+      defense: defense.map(p => ({ x: p.x, y: p.y })),
+      puck: { x: puck.x, y: puck.y }
+    };
+  }
+  function restoreSnapshot() {
+    if (!snapshot) return;
+    controlled.forEach((p, i) => { p.x = snapshot.controlled[i].x; p.y = snapshot.controlled[i].y; });
+    offense.forEach((p, i) => { p.x = snapshot.offense[i].x; p.y = snapshot.offense[i].y; });
+    defense.forEach((p, i) => { p.x = snapshot.defense[i].x; p.y = snapshot.defense[i].y; });
+    puck.x = snapshot.puck.x; puck.y = snapshot.puck.y;
+    puckTrail.length = 0;
+  }
+
+  // --- Simulation script building
+  function mv(obj, x, y) { return { obj, to: { x, y } }; }
+
+  function nearestTo(arr, x, y) {
+    let best = null, bd = Infinity;
+    for (const p of arr) {
+      const d = dist(p.x, p.y, x, y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
+  // Ambient team motion: everyone drifts part-way toward a point so the whole
+  // play feels alive, not just the puck carriers.
+  function driftAll(list, exclude, target, amt) {
+    return list
+      .filter(p => !exclude.includes(p))
+      .map(p => mv(p, p.x + (target.x - p.x) * amt, p.y + (target.y - p.y) * amt));
+  }
+
+  function buildSimScript(tier, receiver, subMsg) {
+    const scen = scenario;
+    const atk = attackSideOf(scen);
+    const ownS = ownSideOf(scen);
+    const atkNet = netFor(atk);
+    const ownNet = netFor(ownS);
+    const steps = [];
+
+    const friendly = (scen.mode === "single") ? [controlled[0], ...offense] : controlled.slice();
+    const friendlySk = friendly.filter(p => p.role !== "G");
+    const oppSk = defense.filter(p => p.role !== "G");
+
+    const atkSlot = slotFor(atk);
+
+    if (!scen.isDefense) {
+      // We have the puck.
+      if (tier === "great" || tier === "good") {
+        steps.push({ d: 450, msg: "Good spot! Watch the play…" });
+        steps.push({
+          d: 520, sound: "pass",
+          movers: [
+            mv(puck, receiver.x, receiver.y),
+            ...driftAll(friendlySk, [receiver], atkSlot, 0.10),
+            ...driftAll(oppSk, [], atkSlot, 0.08)
+          ],
+          fx: { type: "ring", x: receiver.x, y: receiver.y, color: "96, 165, 250" }
+        });
+        if (tier === "great") {
+          const carryTo = toward(receiver, atkSlot, 0.6);
+          steps.push({
+            d: 650, sound: "catch",
+            movers: [
+              mv(receiver, carryTo.x, carryTo.y), mv(puck, carryTo.x, carryTo.y),
+              ...driftAll(friendlySk, [receiver], atkSlot, 0.15),
+              ...driftAll(oppSk, [], atkSlot, 0.12)
+            ]
+          });
+          steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
+          steps.push({ d: 1400, sound: "goal", shake: 1, banner: { text: "GOAL! 🚨", sub: "Perfect positioning!", color: "#4ade80", light: atk, fx: "confetti" } });
+        } else {
+          let next = null, bd = Infinity;
+          for (const p of friendlySk) {
+            if (p === receiver) continue;
+            const d = dist(p.x, p.y, atkNet.x, atkNet.y);
+            if (d < bd) { bd = d; next = p; }
+          }
+          if (next) {
+            steps.push({ d: 240, sound: "catch" });
+            steps.push({
+              d: 520, sound: "pass",
+              movers: [
+                mv(puck, next.x, next.y),
+                ...driftAll(friendlySk, [receiver, next], atkSlot, 0.08),
+                ...driftAll(oppSk, [], atkSlot, 0.08)
+              ],
+              fx: { type: "ring", x: next.x, y: next.y, color: "96, 165, 250" }
+            });
+            steps.push({ d: 1300, sound: "good", banner: { text: "PLAY ALIVE! ⚡", sub: "Great option — the play continues!", color: "#7dd3fc" } });
+          } else {
+            steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
+            steps.push({ d: 1300, sound: "good", banner: { text: "SCORING CHANCE! ⚡", sub: "Great option!", color: "#7dd3fc" } });
+          }
+        }
+      } else {
+        steps.push({ d: 450, msg: "Hmm… watch what happens." });
+        const mid = toward(puck, receiver, 0.55);
+        const D = nearestTo(oppSk, mid.x, mid.y) || { x: mid.x, y: mid.y };
+        steps.push({
+          d: 560, sound: "pass",
+          movers: [
+            mv(puck, mid.x, mid.y), mv(D, mid.x, mid.y),
+            ...driftAll(oppSk, [D], mid, 0.10)
+          ]
+        });
+        if (tier === "miss") {
+          steps.push({ d: 1400, sound: "whistle", banner: { text: "TURNOVER ❌", sub: subMsg, color: "#fca5a5" } });
+        } else {
+          const counter = slotFor(ownS);
+          steps.push({ d: 300, banner: { text: "TURNOVER ❌", sub: "They're coming back the other way!", color: "#fca5a5" } });
+          steps.push({
+            d: 700,
+            movers: [
+              mv(D, counter.x, counter.y), mv(puck, counter.x, counter.y),
+              ...driftAll(oppSk, [D], counter, 0.18),
+              ...driftAll(friendlySk, [receiver], counter, 0.10)
+            ]
+          });
+          steps.push({ d: 260, sound: "shot", movers: [mv(puck, ownNet.x, ownNet.y)] });
+          steps.push({ d: 1500, sound: "goalAgainst", shake: 0.7, banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
+        }
+      }
+    } else {
+      // Opponents have the puck — our job is coverage.
+      const dangerSpot = slotFor(ownS);
+      if (tier === "great" || tier === "good") {
+        steps.push({ d: 450, msg: "They attack — watch your read…" });
+        const cut = toward(puck, dangerSpot, 0.5);
+        steps.push({
+          d: 560, sound: "pass",
+          movers: [
+            mv(puck, cut.x, cut.y), mv(receiver, cut.x, cut.y),
+            ...driftAll(oppSk, [], dangerSpot, 0.10),
+            ...driftAll(friendlySk, [receiver], dangerSpot, 0.08)
+          ]
+        });
+        steps.push({ d: 400, sound: "catch", banner: { text: "TAKEAWAY! 🛡️", sub: "You read the play!", color: "#4ade80" }, fx: { type: "ring", x: cut.x, y: cut.y, color: "74, 222, 128" } });
+        if (tier === "great") {
+          const counter = slotFor(atk);
+          steps.push({
+            d: 850, banner: null,
+            movers: [
+              mv(receiver, counter.x, counter.y), mv(puck, counter.x, counter.y),
+              ...driftAll(friendlySk, [receiver], counter, 0.15),
+              ...driftAll(oppSk, [], counter, 0.12)
+            ]
+          });
+          steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
+          steps.push({ d: 1500, sound: "goal", shake: 1, banner: { text: "COUNTER-ATTACK GOAL! 🚨", sub: "Defense turned into offense!", color: "#4ade80", light: atk, fx: "confetti" } });
+        } else {
+          const clearTo = { x: ownS === "right" ? 320 : 780, y: 80 };
+          steps.push({
+            d: 650, banner: null, sound: "clear",
+            movers: [mv(puck, clearTo.x, clearTo.y), ...driftAll(oppSk, [], clearTo, 0.06)]
+          });
+          steps.push({ d: 1200, banner: { text: "CLEARED! ✅", sub: "Great defensive position!", color: "#4ade80" } });
+        }
+      } else {
+        steps.push({ d: 450, msg: "Uh oh — you left space open…" });
+        const carrier = nearestTo(oppSk, puck.x, puck.y);
+        const others = oppSk.filter(p => p !== carrier);
+        const open = nearestTo(others.length ? others : oppSk, dangerSpot.x, dangerSpot.y) || carrier;
+        steps.push({
+          d: 520, sound: "pass",
+          movers: [mv(puck, open.x, open.y), ...driftAll(oppSk, [open], dangerSpot, 0.08)]
+        });
+        steps.push({
+          d: 450, sound: "pass",
+          movers: [
+            mv(puck, dangerSpot.x, dangerSpot.y), mv(open, dangerSpot.x, dangerSpot.y),
+            ...driftAll(friendlySk, [], dangerSpot, 0.12)
+          ]
+        });
+        if (tier === "miss") {
+          const savePt = toward(dangerSpot, ownNet, 0.75);
+          steps.push({ d: 240, sound: "shot", movers: [mv(puck, savePt.x, savePt.y)] });
+          steps.push({ d: 200, sound: "save", fx: { type: "ring", x: savePt.x, y: savePt.y, color: "252, 211, 77" } });
+          steps.push({ d: 1300, sound: "whistle", banner: { text: "BIG CHANCE AGAINST ⚠️", sub: (subMsg || "") + " Lucky save by your goalie!", color: "#fcd34d" } });
+        } else {
+          steps.push({ d: 240, sound: "shot", movers: [mv(puck, ownNet.x, ownNet.y)] });
+          steps.push({ d: 1500, sound: "goalAgainst", shake: 0.7, banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
+        }
+      }
+    }
+    return steps;
+  }
+
+  // --- Lock In / outcome
+  function tierFor(score, ok) {
+    const pass = passThreshold();
+    if (ok) return score >= Math.min(96, pass + 12) ? "great" : "good";
+    return score >= pass - 25 ? "miss" : "bad";
+  }
+
+  function lockIn(chosen = null) {
+    if (!scenario || HIQ.Sim.isRunning()) return;
+    clearTimeout(pendingTimer);
+    renderState.showGuidance = false;
+
+    const mode = scenario.mode;
+    const pass = passThreshold();
+    const ageCfg = getAgeSettings();
+
+    let ok, score, failures, receiver, reportRole;
+
+    if (mode === "single") {
+      const you = controlled[0];
+      const res = chosen ? chosen.res : scorePlacement(scenario.role, { x: you.x, y: you.y }, scenario);
+      score = res.score;
+      failures = res.failures;
+      ok = chosen ? chosen.correct : (score >= pass);
+      receiver = you;
+      reportRole = scenario.role;
+    } else {
+      const results = controlled.map(p => scorePlacement(p.role, { x: p.x, y: p.y }, scenario));
+      score = Math.round(results.reduce((a, r) => a + r.score, 0) / Math.max(1, results.length));
+      const missCounts = {};
+      let worst = null;
+      for (const r of results) {
+        for (const f of r.failures) {
+          missCounts[f.key] = (missCounts[f.key] || 0) + 1;
+          if (!worst || f.pts > worst.pts) worst = f;
+        }
+      }
+      const topKey = Object.entries(missCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+      const teamMsgs = {
+        slot: "Too much slot exposure — protect inside ice.",
+        spacing: "Spacing is off — don't crowd the puck or disappear.",
+        outlet: "Not enough passing options — get open.",
+        above: "Too many players too deep — stay above the puck.",
+        guidance: "Players drifting out of structure — hold your shape."
+      };
+      failures = topKey ? [{ key: topKey, msg: teamMsgs[topKey], pts: worst?.pts || 0 }] : [];
+      ok = score >= pass;
+      const anchor = scenario.isDefense ? toward(puck, slotFor(ownSideOf(scenario)), 0.5) : puck;
+      receiver = nearestTo(controlled, anchor.x, anchor.y) || controlled[0];
+      reportRole = "TEAM";
+    }
+
+    const tier = tierFor(score, ok);
+    const top = failures[0];
+    const second = failures[1];
+    const cues = [];
+    // A picked decoy knows exactly which mistake it represents — say that first.
+    if (!ok && chosen && chosen.mistake) cues.push(chosen.mistake);
+    if (top && cues.length === 0) cues.push(top.msg);
+    else if (top && ageCfg.showSecondCue) cues.push(top.msg);
+    if (ageCfg.showSecondCue && second && cues.length < 2) cues.push(second.msg);
+    const subMsg = cues[0] || (top ? top.msg : "Not the best option this time.");
+
+    // Update stats immediately
+    scoreEl.textContent = `${score}`;
+    if (ok) streak += 1; else streak = 0;
+    streakEl.textContent = streak;
+    if (tier === "great") { goalsFor += 1; gfEl.textContent = goalsFor; }
+    if (tier === "bad") { goalsAgainst += 1; gaEl.textContent = goalsAgainst; }
+
+    // Progression (persisted): XP, counters, badges
+    const wasComeback = ok && recentMisses >= 2;
+    if (ok) {
+      stats.corrects += 1;
+      stats.byPhase[scenario.phase] = (stats.byPhase[scenario.phase] || 0) + 1;
+      if (scenario.fmt === "4v5") stats.pkCorrect += 1;
+      if (scenario.fmt === "5v4") stats.ppCorrect += 1;
+      recentMisses = 0;
+    } else {
+      recentMisses += 1;
+    }
+    if (tier === "great") { stats.goals += 1; stats.greats += 1; sessionGoals += 1; }
+    if (score === 100) stats.perfects += 1;
+    stats.bestStreak = Math.max(stats.bestStreak, streak);
+    awardXP(tier === "great" ? 100 : tier === "good" ? 60 : 15);
+    checkBadges({ comeback: wasComeback });
+    saveStore("hiq_stats", stats);
+
+    addReportEntry({
+      time: nowTime(), fmt: scenario.fmt, phase: scenario.phase,
+      mode, role: reportRole, ok, score,
+      topMissKey: ok ? null : (top?.key || null),
+      topMissMsg: ok ? null : (top?.msg || null)
+    });
+
+    // Run the simulation (choice mode snapshots before the player moves to the option)
+    if (!chosen) takeSnapshot();
+    choice.active = false;
+    const steps = buildSimScript(tier, receiver, subMsg);
+
+    setCoach("watch");
+    HIQ.Sim.run(steps, {
+      onFrame: (banner) => { setBanner(banner); },
+      onMsg: (m) => { statusEl.textContent = m; },
+      onStep: (s) => {
+        if (s.shake) { renderState.shakeAt = performance.now(); renderState.shakeMag = s.shake; }
+        if (s.fx) effects.push({ ...s.fx, at: performance.now() });
+      },
+      onDone: (banner) => {
+        setBanner(banner);
+        setCoach(ok ? (tier === "great" ? "goal" : "happy") : "sad");
+        if (ok) {
+          statusEl.innerHTML = tier === "great"
+            ? "<b>NICE READ ✅</b> You finished the play with a goal! Next play coming…"
+            : "<b>NICE READ ✅</b> You kept the play alive. Next play coming…";
+          pendingTimer = setTimeout(buildScenario, 1500);
+        } else {
+          // Revealing the answer on the first miss teaches kids to tap the green
+          // circle instead of reading the play. Give them a cue and a second look
+          // first; only show the spot once they've genuinely had two goes.
+          // The youngest group still gets the answer right away.
+          const alwaysReveal = (ageSel.value === "6-8" || diffSel.value === "easy");
+          scenario._attempts = (scenario._attempts || 0) + 1;
+          const reveal = alwaysReveal || scenario._attempts >= 2;
+
+          statusEl.innerHTML = reveal
+            ? `<b>NOT QUITE ❌</b> ${cues.join(" ")}<br/><span class="muted">Here's the spot the coach wanted — remember that shape.</span>`
+            : `<b>NOT THIS TIME ❌</b> ${cues.join(" ")}<br/><span class="muted">Have another look — where should you be?</span>`;
+
+          pendingTimer = setTimeout(() => {
+            restoreSnapshot();
+            setBanner(null);
+            if (isChoiceMode() && choice.options.length) choice.active = true;
+            renderState.showGuidance = reveal;
+            renderState.guidanceOk = false;
+          }, 1600);
+        }
+      }
+    });
+  }
+
+  // --- Reporting
+  function addReportEntry(entry) {
+    report.push(entry);
+    if (report.length > 25) report.shift();
+    renderReport();
+  }
+
+  function renderReport() {
+    const total = report.length;
+    const correct = report.filter(r => r.ok).length;
+    const pct = total ? Math.round((correct / total) * 100) : 0;
+
+    const byPhase = {};
+    const missKeys = {};
+    for (const r of report) {
+      byPhase[r.phase] = byPhase[r.phase] || { t: 0, c: 0 };
+      byPhase[r.phase].t += 1;
+      if (r.ok) byPhase[r.phase].c += 1;
+      if (!r.ok && r.topMissKey) missKeys[r.topMissKey] = (missKeys[r.topMissKey] || 0) + 1;
+    }
+
+    reportSummaryEl.textContent = `Attempts: ${total} | Correct: ${correct} (${pct}%)`;
+
+    reportChipsEl.innerHTML = "";
+    Object.keys(byPhase).sort().forEach(ph => {
+      const v = byPhase[ph];
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = `${ph}: ${Math.round((v.c / v.t) * 100)}%`;
+      reportChipsEl.appendChild(chip);
+    });
+
+    const topMiss = Object.entries(missKeys).sort((a, b) => b[1] - a[1])[0];
+    if (topMiss) {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = `Most common miss: ${topMiss[0]} (${topMiss[1]})`;
+      reportChipsEl.appendChild(chip);
+    }
+
+    reportRowsEl.innerHTML = "";
+    for (let i = report.length - 1; i >= 0; i--) {
+      const r = report[i];
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.time}</td>
+        <td>${r.fmt}</td>
+        <td>${r.phase}</td>
+        <td>${r.mode}</td>
+        <td>${r.role}</td>
+        <td>${r.ok ? "✅" : "❌"} ${r.score}</td>
+        <td>${r.topMissMsg || (r.ok ? "Good principles" : "—")}</td>
+      `;
+      reportRowsEl.appendChild(tr);
+    }
+  }
+
+  // =========================================================================
+  // RENDERING — persistent animation loop, sprite players, particles
+  // =========================================================================
+
+  function setBanner(b) {
+    if (renderState.banner === b) return;
+    renderState.banner = b;
+    renderState.bannerAt = performance.now();
+    if (b && b.fx === "confetti") spawnConfetti();
+  }
+
+  function spawnConfetti() {
+    const colors = ["#fbbf24", "#34d399", "#60a5fa", "#f87171", "#f472b6", "#ffffff"];
+    for (let i = 0; i < 90; i++) {
+      particles.push({
+        kind: "confetti",
+        x: 550 + (Math.random() - 0.5) * 340,
+        y: 130 + (Math.random() - 0.5) * 70,
+        vx: (Math.random() - 0.5) * 280,
+        vy: -Math.random() * 240 - 40,
+        size: 4 + Math.random() * 5,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 10,
+        color: colors[i % colors.length],
+        life: 1.5 + Math.random() * 0.9
+      });
+    }
+  }
+
+  // Little puff of snow when a skater stops hard
+  function spawnSpray(x, y) {
+    for (let i = 0; i < 7; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 25 + Math.random() * 55;
+      particles.push({
+        kind: "spray",
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        size: 1.5 + Math.random() * 2.5,
+        rot: 0, vr: 0,
+        color: "#ffffff",
+        life: 0.35 + Math.random() * 0.25
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (const p of particles) {
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (p.kind === "confetti") p.vy += 320 * dt;
+      else { p.vx *= 0.92; p.vy *= 0.92; }
+      p.rot += p.vr * dt;
+    }
+    particles = particles.filter(p => p.life > 0 && p.y < 660);
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.save();
+      ctx.globalAlpha = clamp(p.kind === "spray" ? p.life * 2 : p.life, 0, 1);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      if (p.kind === "confetti") {
+        ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawEffects(t) {
+    effects = effects.filter(e => t - e.at < 600);
+    for (const e of effects) {
+      const k = (t - e.at) / 600;
+      ctx.strokeStyle = `rgba(${e.color || "255, 255, 255"}, ${1 - k})`;
+      ctx.lineWidth = 3.5 * (1 - k) + 1;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 10 + k * 36, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // Smoothly rotate players toward their movement direction (or the puck when idle)
+  function updateHeadings(dt) {
+    const all = [...controlled, ...offense, ...defense];
+    for (const p of all) {
+      const dx = p.x - (p._px ?? p.x);
+      const dy = p.y - (p._py ?? p.y);
+      let target;
+      if (Math.hypot(dx, dy) > 0.6) {
+        target = Math.atan2(dy, dx);
+        p._moving = true;
+      } else {
+        p._moving = false;
+        target = Math.atan2(puck.y - p.y, puck.x - p.x);
+      }
+      if (p.angle === undefined) p.angle = target;
+      let d = target - p.angle;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      p.angle += d * Math.min(1, dt * 8);
+
+      // Skate trail carving + snow spray on hard stops
+      if (!p._trail) p._trail = [];
+      if (p._moving) {
+        const lt = p._trail[p._trail.length - 1];
+        if (!lt || dist(lt.x, lt.y, p.x, p.y) > 4) p._trail.push({ x: p.x, y: p.y });
+        if (p._trail.length > 9) p._trail.shift();
+      } else if (p._trail.length) {
+        p._trail.shift();
+      }
+      if (p._wasMoving && !p._moving && Math.hypot(dx, dy) < 0.6) spawnSpray(p.x, p.y);
+      p._wasMoving = p._moving;
+
+      p._px = p.x;
+      p._py = p.y;
+    }
+  }
+
+  // Goalies always square up to the puck and hug their crease
+  function updateGoalies(dt) {
+    for (const p of [...defense, ...offense]) {
+      if (p.role !== "G") continue;
+      const net = dist(p.x, p.y, LM.leftNet.x, LM.leftNet.y) < dist(p.x, p.y, LM.rightNet.x, LM.rightNet.y)
+        ? LM.leftNet : LM.rightNet;
+      const ty = clamp(puck.y, net.y - 26, net.y + 26);
+      const tx = net.x + (net.x < 550 ? 8 : -8);
+      p.y += (ty - p.y) * Math.min(1, dt * 3);
+      p.x += (tx - p.x) * Math.min(1, dt * 1.5);
+    }
+  }
+
+  function drawTrails() {
+    for (const p of [...controlled, ...offense, ...defense]) {
+      const tr = p._trail;
+      if (!tr || tr.length < 2) continue;
+      for (let i = 1; i < tr.length; i++) {
+        const k = i / tr.length;
+        ctx.strokeStyle = `rgba(125, 170, 215, ${0.28 * k})`;
+        ctx.lineWidth = 3 * k + 1;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(tr[i - 1].x, tr[i - 1].y);
+        ctx.lineTo(tr[i].x, tr[i].y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function updatePuckTrail() {
+    const last = puckTrail[puckTrail.length - 1];
+    if (!last || dist(last.x, last.y, puck.x, puck.y) > 3) {
+      puckTrail.push({ x: puck.x, y: puck.y });
+      if (puckTrail.length > 10) puckTrail.shift();
+    } else if (puckTrail.length) {
+      puckTrail.shift(); // fade the trail out when the puck stops
+    }
+  }
+
+  // --- Static rink pre-rendered once to an offscreen layer
+  const rinkLayer = document.createElement("canvas");
+  rinkLayer.width = 1100;
+  rinkLayer.height = 620;
+
+  function roundRectPath(c, x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + rr, y);
+    c.arcTo(x + w, y, x + w, y + h, rr);
+    c.arcTo(x + w, y + h, x, y + h, rr);
+    c.arcTo(x, y + h, x, y, rr);
+    c.arcTo(x, y, x + w, y, rr);
+    c.closePath();
+  }
+
+  function buildRinkLayer() {
+    const c = rinkLayer.getContext("2d");
+    c.clearRect(0, 0, 1100, 620);
+
+    // Ice with subtle vertical sheen
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    const grad = c.createLinearGradient(0, 20, 0, 600);
+    grad.addColorStop(0, "#f8fcff");
+    grad.addColorStop(0.5, "#eef6fd");
+    grad.addColorStop(1, "#e3eff9");
+    c.fillStyle = grad;
+    c.fill();
+
+    c.save();
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    c.clip();
+
+    // Ice texture: faint skate-scuff speckles
+    for (let i = 0; i < 420; i++) {
+      c.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,0.5)" : "rgba(160,190,220,0.18)";
+      const sx = 20 + Math.random() * 1060;
+      const sy = 20 + Math.random() * 580;
+      c.fillRect(sx, sy, 1 + Math.random() * 2, 1);
+    }
+
+    // Goal lines
+    c.strokeStyle = "#d94141";
+    c.lineWidth = 3;
+    c.beginPath(); c.moveTo(95, 20); c.lineTo(95, 600); c.stroke();
+    c.beginPath(); c.moveTo(1005, 20); c.lineTo(1005, 600); c.stroke();
+
+    // Blue lines + center red line
+    c.fillStyle = "rgba(37, 99, 235, 0.75)";
+    c.fillRect(354, 20, 12, 580);
+    c.fillRect(734, 20, 12, 580);
+    c.fillStyle = "rgba(220, 60, 60, 0.75)";
+    c.fillRect(544, 20, 12, 580);
+
+    // Center circle with a faint home logo
+    c.strokeStyle = "rgba(37, 99, 235, 0.6)";
+    c.lineWidth = 3;
+    c.beginPath(); c.arc(550, 310, 65, 0, Math.PI * 2); c.stroke();
+    c.font = "bold 34px system-ui";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillStyle = "rgba(37, 99, 235, 0.12)";
+    c.fillText("HIQ", 550, 310);
+    c.fillStyle = "rgba(220, 60, 60, 0.8)";
+    c.beginPath(); c.arc(550, 310, 5, 0, Math.PI * 2); c.fill();
+
+    // Board advertising strips (arena feel)
+    c.font = "bold 13px system-ui";
+    c.fillStyle = "rgba(18, 38, 58, 0.22)";
+    for (const y of [34, 588]) {
+      for (const x of [300, 550, 800]) {
+        c.fillText(x === 550 ? "★ HOCKEY IQ TRAINER ★" : "GO  TEAM  GO!", x, y);
+      }
+    }
+
+    // Zone faceoff circles + dots
+    c.strokeStyle = "rgba(217, 65, 65, 0.55)";
+    c.fillStyle = "rgba(217, 65, 65, 0.8)";
+    for (const [fx, fy] of [[222, 170], [222, 450], [878, 170], [878, 450]]) {
+      c.beginPath(); c.arc(fx, fy, 55, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.arc(fx, fy, 6, 0, Math.PI * 2); c.fill();
+    }
+    // Neutral zone dots
+    for (const [fx, fy] of [[460, 170], [460, 450], [640, 170], [640, 450]]) {
+      c.beginPath(); c.arc(fx, fy, 6, 0, Math.PI * 2); c.fill();
+    }
+
+    // Creases
+    c.fillStyle = "rgba(147, 197, 253, 0.55)";
+    c.strokeStyle = "#d94141";
+    c.lineWidth = 2;
+    c.beginPath(); c.arc(95, 310, 45, -Math.PI / 2, Math.PI / 2); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.arc(1005, 310, 45, Math.PI / 2, -Math.PI / 2); c.closePath(); c.fill(); c.stroke();
+
+    // Nets
+    for (const side of ["left", "right"]) {
+      const n = netFor(side);
+      const w = 30, h = 58;
+      const x0 = side === "left" ? n.x - w : n.x;
+      c.fillStyle = "rgba(255,255,255,0.9)";
+      c.fillRect(x0, n.y - h / 2, w, h);
+      c.strokeStyle = "#b93030";
+      c.lineWidth = 3;
+      c.strokeRect(x0, n.y - h / 2, w, h);
+      c.strokeStyle = "rgba(120,120,120,0.5)";
+      c.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        c.beginPath(); c.moveTo(x0 + (w / 4) * i, n.y - h / 2); c.lineTo(x0 + (w / 4) * i, n.y + h / 2); c.stroke();
+        c.beginPath(); c.moveTo(x0, n.y - h / 2 + (h / 4) * i); c.lineTo(x0 + w, n.y - h / 2 + (h / 4) * i); c.stroke();
+      }
+    }
+
+    c.restore();
+
+    // Boards with inner glow
+    c.lineWidth = 9;
+    c.strokeStyle = "rgba(18, 38, 58, 0.12)";
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    c.stroke();
+    c.lineWidth = 5;
+    c.strokeStyle = "#12263a";
+    roundRectPath(c, 20, 20, 1060, 580, 110);
+    c.stroke();
+  }
+
+  function drawOverlays() {
+    const ov = overlaySel.value;
+    if (ov === "off") return;
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#444";
+    if (ov === "lanes") {
+      for (const x of [360, 550, 740]) {
+        ctx.beginPath(); ctx.moveTo(x, 40); ctx.lineTo(x, 580); ctx.stroke();
+      }
+    }
+    if (ov === "house") {
+      const drawHouse = (slotX) => {
+        ctx.beginPath();
+        ctx.moveTo(slotX - 30, 250);
+        ctx.lineTo(slotX + 40, 220);
+        ctx.lineTo(slotX + 80, 310);
+        ctx.lineTo(slotX + 40, 400);
+        ctx.lineTo(slotX - 30, 370);
+        ctx.closePath();
+        ctx.stroke();
+      };
+      drawHouse(LM.leftSlot.x);
+      drawHouse(LM.rightSlot.x);
+    }
+    ctx.restore();
+  }
+
+  const TEAM_STYLES = {
+    you:       { jersey: "#2456ff", trim: "#0a1c56", helmet: "#0a1c56" },
+    teammate:  { jersey: "#f08a24", trim: "#8a4d0f", helmet: "#6b3a0c" },
+    opponent:  { jersey: "#cc2b2b", trim: "#5e1111", helmet: "#3f0b0b" },
+    ourGoalie: { jersey: "#0d9488", trim: "#06463f", helmet: "#06463f" },
+    oppGoalie: { jersey: "#a11d1d", trim: "#4a0d0d", helmet: "#380808" }
+  };
+
+  function drawRoleChip(p, style, t) {
+    let label = p.role;
+    if (style.isYou) {
+      const nm = (profile.name || "").trim().toUpperCase();
+      label = `${p.role} · ${nm ? nm + " " : ""}#${profile.number || 9}`;
+    }
+    if (!label) return;
+    ctx.font = "bold 10px system-ui";
+    const tw = ctx.measureText(label).width;
+    const w = tw + 10, h = 14;
+    const y = p.y + (p.r || 16) + 8;
+    ctx.save();
+    roundRectPath(ctx, p.x - w / 2, y, w, h, 6);
+    ctx.fillStyle = style.isYou ? "#facc15" : "rgba(15, 23, 42, 0.75)";
+    ctx.fill();
+    ctx.fillStyle = style.isYou ? "#1f2937" : "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, p.x, y + h / 2 + 0.5);
+    ctx.restore();
+  }
+
+  function drawSkater(p, style, t) {
+    if (p._ph === undefined) p._ph = Math.random() * Math.PI * 2;
+    const R = p.r || 16;
+    const s = R / 16;
+    const a = p.angle || 0;
+    const stride = p._moving ? Math.sin(t / 70 + p._ph) * 2.2 : 0;
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+
+    // Shadow on the ice
+    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(2 * s, 4 * s, 15 * s, 11 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.rotate(a);
+    ctx.scale(s, s);
+
+    // Stick (shaft + blade), waggling slightly while skating
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#8a5a2b";
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(3, 9);
+    ctx.lineTo(21, 13 + stride);
+    ctx.stroke();
+    ctx.strokeStyle = "#3d2b1f";
+    ctx.lineWidth = 3.8;
+    ctx.beginPath();
+    ctx.moveTo(21, 13 + stride);
+    ctx.lineTo(27, 10.5 + stride);
+    ctx.stroke();
+
+    // Body: shoulder pads (wide across the direction of travel)
+    ctx.fillStyle = style.jersey;
+    ctx.strokeStyle = style.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 11, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Jersey shoulder stripe
+    ctx.strokeStyle = "rgba(255,255,255,0.65)";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-3.5, -13);
+    ctx.lineTo(-3.5, 13);
+    ctx.stroke();
+
+    // Gloves at the shoulder tips
+    ctx.fillStyle = style.trim;
+    ctx.beginPath(); ctx.arc(3, -13.5, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, 13.5, 3.6, 0, Math.PI * 2); ctx.fill();
+
+    // Helmet with a shine
+    ctx.fillStyle = style.helmet;
+    ctx.beginPath(); ctx.arc(1.5, 0, 6.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.arc(3.4, -1.8, 2.2, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+
+    drawRoleChip(p, style, t);
+  }
+
+  function drawGoalie(p, style, t) {
+    const R = (p.r || 16) + 2;
+    const s = R / 16;
+    const a = p.angle || 0;
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(2 * s, 4 * s, 16 * s, 13 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.rotate(a);
+    ctx.scale(s, s);
+
+    // Leg pads out front
+    ctx.fillStyle = "#efe3cd";
+    ctx.strokeStyle = "#b7a27b";
+    ctx.lineWidth = 1.5;
+    roundRectPath(ctx, 5, -15, 8, 12, 3); ctx.fill(); ctx.stroke();
+    roundRectPath(ctx, 5, 3, 8, 12, 3); ctx.fill(); ctx.stroke();
+
+    // Goalie stick held across
+    ctx.strokeStyle = "#3d2b1f";
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(12, -12);
+    ctx.lineTo(12, 12);
+    ctx.stroke();
+
+    // Body
+    ctx.fillStyle = style.jersey;
+    ctx.strokeStyle = style.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 15.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Mask
+    ctx.fillStyle = "#f5f5f5";
+    ctx.strokeStyle = style.trim;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(1.5, 0, 6.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(80,80,80,0.7)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-1, -4); ctx.lineTo(-1, 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2, -4.5); ctx.lineTo(2, 4.5); ctx.stroke();
+
+    ctx.restore();
+
+    drawRoleChip(p, style, t);
+  }
+
+  function drawPuck(t) {
+    // Motion trail
+    for (let i = 0; i < puckTrail.length; i++) {
+      const q = puckTrail[i];
+      const k = (i + 1) / puckTrail.length;
+      ctx.fillStyle = `rgba(30, 41, 59, ${0.05 + k * 0.16})`;
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, puck.r * (0.4 + k * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Disc
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    const g = ctx.createRadialGradient(puck.x - 2, puck.y - 2, 1, puck.x, puck.y, puck.r);
+    g.addColorStop(0, "#3a3a3a");
+    g.addColorStop(1, "#0b0b0b");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(puck.x, puck.y, puck.r - 2.5, -2.4, -0.9);
+    ctx.stroke();
+  }
+
+  function drawDirectionTag() {
+    if (!scenario) return;
+    const atk = attackSideOf(scenario);
+    const ownS = ownSideOf(scenario);
+    const text = scenario.isDefense
+      ? `🛡️ DEFEND the ${ownS.toUpperCase()} net`
+      : (atk === "right" ? "ATTACK ➡➡" : "⬅⬅ ATTACK");
+    ctx.font = "bold 17px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(15, 42, 74, 0.5)";
+    ctx.fillText(text, 550, 52);
+  }
+
+  function drawGuidance(t) {
+    if (!scenario || scenario.mode !== "single") return;
+    const reveal = (diffSel.value === "easy" && !choice.active) || renderState.showGuidance;
+    if (!reveal) return;
+    ctx.save();
+    ctx.globalAlpha = 0.14 + Math.sin(t / 500) * 0.03;
+    ctx.fillStyle = "#00aa00";
+    ctx.beginPath();
+    ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (renderState.showGuidance) {
+      ctx.save();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = renderState.guidanceOk ? "#0a0" : "#c22";
+      ctx.setLineDash([10, 8]);
+      ctx.lineDashOffset = -t / 30;
+      ctx.beginPath();
+      ctx.arc(guidance.x, guidance.y, guidance.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function drawChoices(t) {
+    if (!choice.active) return;
+    for (const o of choice.options) {
+      const pulse = Math.sin(t / 280 + o.label.charCodeAt(0)) * 2.5;
+      const r = 25 + pulse;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.3)";
+      ctx.shadowBlur = 7;
+      ctx.shadowOffsetY = 2;
+      ctx.fillStyle = "#fffbeb";
+      ctx.beginPath();
+      ctx.arc(o.pos.x, o.pos.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#f59e0b";
+      ctx.beginPath();
+      ctx.arc(o.pos.x, o.pos.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#b45309";
+      ctx.font = "bold 22px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(o.label, o.pos.x, o.pos.y);
+    }
+  }
+
+  function drawYouHalo(t) {
+    if (HIQ.Sim.isRunning() || choice.active) return;
+    for (const p of controlled) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.9)";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 5]);
+      ctx.lineDashOffset = -t / 40;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (p.r || 19) + 8 + Math.sin(t / 350) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function easeOutBack(k) {
+    const c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
+  }
+
+  function drawIntro(t) {
+    const i = renderState.intro;
+    if (!i || renderState.banner) return;
+    const age = t - i.at;
+    if (age > 1500) return;
+    const a = age < 200 ? age / 200 : (age > 1200 ? (1500 - age) / 300 : 1);
+    ctx.save();
+    ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.font = "bold 26px system-ui";
+    const w = ctx.measureText(i.text).width + 64;
+    roundRectPath(ctx, 550 - w / 2, 96, w, 46, 14);
+    ctx.fillStyle = "rgba(15, 42, 74, 0.82)";
+    ctx.fill();
+    ctx.fillStyle = "#ffd76a";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(i.text, 550, 120);
+    ctx.restore();
+  }
+
+  function drawBanner(t) {
+    const b = renderState.banner;
+    if (!b) return;
+
+    if (b.light) {
+      const n = netFor(b.light);
+      const pulse = 0.45 + Math.sin(t / 120) * 0.2;
+      const g = ctx.createRadialGradient(n.x, n.y, 10, n.x, n.y, 130);
+      g.addColorStop(0, `rgba(255, 40, 40, ${pulse})`);
+      g.addColorStop(1, "rgba(255, 40, 40, 0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 130, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const age = t - renderState.bannerAt;
+    const k = clamp(age / 240, 0, 1);
+    const scale = 0.75 + 0.25 * easeOutBack(k);
+
+    ctx.save();
+    ctx.globalAlpha = clamp(age / 160, 0, 1);
+    ctx.translate(550, 130);
+    ctx.scale(scale, scale);
+    ctx.font = "bold 44px system-ui";
+    const w = Math.max(360, ctx.measureText(b.text).width + 90);
+    const h = b.sub ? 108 : 78;
+    roundRectPath(ctx, -w / 2, -38, w, h, 22);
+    ctx.fillStyle = "rgba(10, 18, 32, 0.86)";
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = b.color || "#fff";
+    ctx.fillText(b.text, 0, 2);
+    if (b.sub) {
+      ctx.font = "600 19px system-ui";
+      ctx.fillStyle = "#e2e8f0";
+      ctx.fillText(b.sub, 0, 42);
+    }
+    ctx.restore();
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Screen shake on big moments
+    let shx = 0, shy = 0;
+    const shAge = t - renderState.shakeAt;
+    if (renderState.shakeAt && shAge < 450) {
+      const k = (1 - shAge / 450) * renderState.shakeMag;
+      shx = (Math.random() - 0.5) * 12 * k;
+      shy = (Math.random() - 0.5) * 8 * k;
+    }
+    ctx.save();
+    ctx.translate(shx, shy);
+
+    ctx.drawImage(rinkLayer, 0, 0);
+    drawOverlays();
+    drawDirectionTag();
+    drawGuidance(t);
+    drawTrails();
+
+    drawYouHalo(t);
+
+    // Opponents (their goalie in dark red; our goalie may live in this array on PK/defense)
+    defense.forEach(p => {
+      const friendlyG = isFriendlyGoalie(p);
+      if (p.role === "G") drawGoalie(p, friendlyG ? TEAM_STYLES.ourGoalie : TEAM_STYLES.oppGoalie, t);
+      else drawSkater(p, TEAM_STYLES.opponent, t);
+    });
+
+    // Teammates (your chosen team color)
+    offense.forEach(p => {
+      if (p.role === "G") drawGoalie(p, TEAM_STYLES.ourGoalie, t);
+      else drawSkater(p, teamStyle(), t);
+    });
+
+    // You
+    controlled.forEach(p => drawSkater(p, { ...teamStyle(), isYou: true }, t));
+
+    drawPuck(t);
+    drawEffects(t);
+    drawChoices(t);
+    drawParticles();
+    drawIntro(t);
+    drawBanner(t);
+
+    ctx.restore();
+  }
+
+  function tick(t) {
+    const dt = Math.min(0.05, lastTick ? (t - lastTick) / 1000 : 0.016);
+    lastTick = t;
+    updateHeadings(dt);
+    updateGoalies(dt);
+    updatePuckTrail();
+    updateParticles(dt);
+    draw(t);
+    requestAnimationFrame(tick);
+  }
+
+  // --- Input (drag + choice taps)
+  function getPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const isTouch = evt.touches && evt.touches.length;
+    const clientX = isTouch ? evt.touches[0].clientX : evt.clientX;
+    const clientY = isTouch ? evt.touches[0].clientY : evt.clientY;
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function findControlledAt(x, y) {
+    for (let i = controlled.length - 1; i >= 0; i--) {
+      const p = controlled[i];
+      if (dist(x, y, p.x, p.y) <= (p.r || 19) + 12) return p;
+    }
+    return null;
+  }
+
+  let activeDrag = null;
+
+  function chooseOption(opt) {
+    if (HIQ.Sim.isRunning()) return;
+    takeSnapshot();
+    choice.active = false;
+    const you = controlled[0];
+    HIQ.Sim.run([{ d: 340, movers: [{ obj: you, to: { x: opt.pos.x, y: opt.pos.y } }] }], {
+      onFrame: () => {},
+      onDone: () => lockIn(opt)
+    });
+  }
+
+  function pointerDown(evt) {
+    if (!scenario || HIQ.Sim.isRunning()) return;
+    const p = getPos(evt);
+
+    if (choice.active) {
+      for (const o of choice.options) {
+        if (dist(p.x, p.y, o.pos.x, o.pos.y) <= 34) {
+          evt.preventDefault();
+          chooseOption(o);
+          return;
+        }
+      }
+      return;
+    }
+
+    activeDrag = findControlledAt(p.x, p.y);
+    if (activeDrag) activeDrag.dragging = true;
+  }
+
+  function pointerMove(evt) {
+    if (!activeDrag || !activeDrag.dragging) return;
+    evt.preventDefault();
+    const p = getPos(evt);
+    activeDrag.x = clamp(p.x, 50, 1050);
+    activeDrag.y = clamp(p.y, 50, 570);
+  }
+
+  function pointerUp() {
+    if (activeDrag) activeDrag.dragging = false;
+    activeDrag = null;
+  }
+
+  canvas.addEventListener("mousedown", pointerDown);
+  window.addEventListener("mousemove", pointerMove);
+  window.addEventListener("mouseup", pointerUp);
+  canvas.addEventListener("touchstart", pointerDown, { passive: false });
+  window.addEventListener("touchmove", pointerMove, { passive: false });
+  window.addEventListener("touchend", pointerUp);
+
+  // --- Controls
+  newBtn.addEventListener("click", buildScenario);
+  lockBtn.addEventListener("click", () => lockIn());
+  muteBtn.addEventListener("click", () => {
+    HIQ.audio.setMuted(!HIQ.audio.isMuted());
+    muteBtn.textContent = HIQ.audio.isMuted() ? "🔇" : "🔊";
+  });
+
+  // Player profile controls (instant — no scenario rebuild needed)
+  function syncProfileUI() {
+    pNameEl.value = profile.name || "";
+    pNumEl.value = profile.number || 9;
+    pColorEl.value = profile.color || "blue";
+    dotTeamEl.style.background = teamStyle().jersey;
+  }
+  pNameEl.addEventListener("input", () => {
+    profile.name = pNameEl.value.slice(0, 12);
+    saveStore("hiq_profile", profile);
+  });
+  pNumEl.addEventListener("input", () => {
+    profile.number = clamp(parseInt(pNumEl.value, 10) || 9, 1, 99);
+    saveStore("hiq_profile", profile);
+  });
+  pColorEl.addEventListener("change", () => {
+    profile.color = pColorEl.value;
+    saveStore("hiq_profile", profile);
+    dotTeamEl.style.background = teamStyle().jersey;
+  });
+
+  function onSettingChange() {
+    const fmt = formatSel.value;
+    const isSpecial = (fmt === "5v4" || fmt === "4v5");
+    ppStructWrap.style.display = isSpecial ? "" : "none";
+    pkStructWrap.style.display = isSpecial ? "" : "none";
+    if (scenario) buildScenario();
+  }
+
+  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, pressureFilterSel, ppStructSel, pkStructSel, overlaySel]
+    .forEach(el => el.addEventListener("change", onSettingChange));
+
+  // Debug/testing hooks (not used by gameplay)
+  HIQ.debug = {
+    getScenario: () => scenario,
+    getPieces: () => ({ controlled, offense, defense, puck: { x: puck.x, y: puck.y }, guidance: { ...guidance } }),
+    getChoices: () => choice.options,
+    choiceActive: () => choice.active,
+    place: (x, y) => { if (controlled[0]) { controlled[0].x = x; controlled[0].y = y; } },
+    lock: () => lockIn(),
+    newPlay: () => buildScenario(),
+    simRunning: () => HIQ.Sim.isRunning(),
+    getStats: () => stats,
+    getProfile: () => profile,
+    guidanceShown: () => renderState.showGuidance,
+    // Auditing hooks: score an arbitrary spot, and force a specific template
+    scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
+    forceTemplate: (id, role) => {
+      const tpl = HIQ.TEMPLATES_EVEN.find(t => t.id === id);
+      if (!tpl) return null;
+      if (role) roleSel.value = role;
+      const saved = HIQ.TEMPLATES_EVEN.slice();
+      HIQ.TEMPLATES_EVEN.length = 0;
+      HIQ.TEMPLATES_EVEN.push(tpl);
+      buildScenario();
+      HIQ.TEMPLATES_EVEN.length = 0;
+      saved.forEach(t => HIQ.TEMPLATES_EVEN.push(t));
+      return scenario.id;
+    }
+  };
+
+  // --- First-run tutorial
+  // New players (and anyone testing the game) should understand what to do
+  // without being told. Four short cards, then straight into a real play.
+  const TUTORIAL_STEPS = [
+    {
+      art: "🏒",
+      title: "Welcome to Hockey IQ Trainer!",
+      body: "Great players aren't just the fastest — they're always in the right place. This game teaches you where to be on the ice."
+    },
+    {
+      art: "🔵",
+      title: "Find yourself on the ice",
+      body: "Your team is blue and the opponents are red. You're the player with the gold ring around them — that's who you control."
+    },
+    {
+      art: "🅰️",
+      title: "Pick your spot",
+      body: "Every play shows three spots: A, B and C. Read where the puck is and tap the spot where you should skate to help your team."
+    },
+    {
+      art: "🏆",
+      title: "Watch what happens",
+      body: "The play runs so you can see if your read worked. Score goals, build streaks, earn XP and unlock trophies. Ready?"
+    }
+  ];
+
+  const tutorialEl = document.getElementById("tutorial");
+  const tutArt = document.getElementById("tutArt");
+  const tutTitle = document.getElementById("tutTitle");
+  const tutBody = document.getElementById("tutBody");
+  const tutDots = document.getElementById("tutDots");
+  const tutNext = document.getElementById("tutNext");
+  const tutSkip = document.getElementById("tutSkip");
+  let tutStep = 0;
+
+  function renderTutorial() {
+    const s = TUTORIAL_STEPS[tutStep];
+    tutArt.textContent = s.art;
+    tutTitle.textContent = s.title;
+    tutBody.textContent = s.body;
+    tutNext.textContent = tutStep === TUTORIAL_STEPS.length - 1 ? "Let's play! 🥅" : "Next →";
+    tutDots.innerHTML = TUTORIAL_STEPS.map((_, i) => `<i class="${i === tutStep ? "on" : ""}"></i>`).join("");
+  }
+
+  function closeTutorial() {
+    tutorialEl.hidden = true;
+    try { localStorage.setItem("hiq.seenTutorial", "1"); } catch (e) { /* private mode */ }
+  }
+
+  function openTutorial() {
+    tutStep = 0;
+    renderTutorial();
+    tutorialEl.hidden = false;
+  }
+
+  tutNext.addEventListener("click", () => {
+    if (tutStep === TUTORIAL_STEPS.length - 1) { closeTutorial(); return; }
+    tutStep++;
+    renderTutorial();
+  });
+  tutSkip.addEventListener("click", closeTutorial);
+
+  let seenTutorial = false;
+  try { seenTutorial = localStorage.getItem("hiq.seenTutorial") === "1"; } catch (e) { /* private mode */ }
+  if (!seenTutorial) openTutorial();
+
+  const howToBtn = document.getElementById("howToBtn");
+  if (howToBtn) howToBtn.addEventListener("click", openTutorial);
+
+  // Init
+  ppStructWrap.style.display = "none";
+  pkStructWrap.style.display = "none";
+  // Phones: start with the settings panel collapsed so the rink is front and center
+  const settingsPanel = document.getElementById("settingsPanel");
+  if (settingsPanel && window.innerWidth <= 760) settingsPanel.open = false;
+  syncProfileUI();
+  renderProgress();
+  renderTrophies();
+  buildRinkLayer();
+  buildScenario();
+  requestAnimationFrame(tick);
+})();
+
+</script>
