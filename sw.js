@@ -4,7 +4,7 @@
    Strategy is stale-while-revalidate: serve from cache straight away, then
    refresh the cache in the background so the next launch has the newest build.
    Bump CACHE_VERSION whenever the shell changes. */
-const CACHE_VERSION = "hiq-v3";
+const CACHE_VERSION = "hiq-v4";
 
 // Relative so the app works from a project subpath (GitHub Pages) or a domain root.
 const SHELL = [
@@ -47,6 +47,34 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  /* The page itself and the code are fetched network-first when online.
+
+     Cache-first is why an updated build kept showing the previous version: the
+     old copy was served immediately and the new one only appeared on the visit
+     after. For a game people are actively testing, seeing yesterday's build is
+     worse than waiting a moment for today's. Falling back to cache the instant
+     the network fails keeps it fully playable offline. */
+  const isCode = /\.(html|js|css|webmanifest)$/.test(url.pathname) ||
+                 url.pathname.endsWith("/") ||
+                 url.pathname === self.registration.scope;
+
+  if (isCode) {
+    event.respondWith(
+      fetch(req)
+        .then(res => {
+          if (res && res.status === 200 && res.type === "basic") {
+            const copy = res.clone();
+            caches.open(CACHE_VERSION).then(c => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then(c => c || caches.match("./index.html")))
+    );
+    return;
+  }
+
+  // Images, icons and fonts don't change between builds — serve them instantly
+  // and refresh in the background.
   event.respondWith(
     caches.match(req).then(cached => {
       const fresh = fetch(req)
@@ -58,10 +86,7 @@ self.addEventListener("fetch", (event) => {
           return res;
         })
         .catch(() => null);
-
-      // Offline navigation with nothing cached for this exact URL still gets the app.
-      if (cached) return cached;
-      return fresh.then(res => res || caches.match("./index.html"));
+      return cached || fresh.then(res => res || caches.match("./index.html"));
     })
   );
 });
