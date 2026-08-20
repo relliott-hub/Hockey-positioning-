@@ -470,6 +470,91 @@ HIQ.PLAYS = [
       },
     },
   },
+
+  /* ------------------------------------------------------------------ */
+  {
+    id: "forecheck_1_2_2",
+    phase: "Forecheck",
+    name: "Forechecking their breakout",
+    situation:
+      "Their defenceman has the puck in the corner below his own goal line and " +
+      "is trying to break out. You're first in on the forecheck.",
+    claims: { puck: ["belowGoalLine", "inCorner"], ourDAtBlueLine: true },
+    attackDir: "right",
+    ourNet: "left",
+    /* NOT isDefense. That flag means "we are defending our own end", and it
+       flips which net counts as ours. On a forecheck the opposition has the
+       puck but we are in THEIR end attacking — marking it defensive pointed
+       the attacking net at our own goal. `forecheck` carries the possession
+       meaning on its own. */
+    forecheck: true,
+    puck: { x: 194, y: 72 },
+    carrier: "opp",
+    players: {
+      C:  { x: 178, y: 54 },
+      LW: { x: 170, y: 74 },
+      RW: { x: 156, y: 44 },
+      RD: { x: 128, y: 62 },
+      LD: { x: 128, y: 28 },
+    },
+    opponents: [
+      { x: 194, y: 72, label: "O1" },
+      { x: 193, y: 40, label: "O2" },
+      { x: 178, y: 78, label: "O3" },
+      { x: 176, y: 58, label: "O4" },
+      { x: 172, y: 22, label: "O5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 178, y: 54, why: "Angle him from the inside. Your first angle decides the whole forecheck \u2014 take the middle away so the only place he can go is the wall. You're not trying to steal it, you're trying to make him rush the pass." },
+        acceptable: [
+          { x: 158, y: 44, why: "Holding the middle and letting them come to you is a real forecheck and it gives up nothing the other way \u2014 but it hands their defenceman time to pick a clean first pass." },
+        ],
+        wrong: [
+          { x: 193, y: 71, why: "You skated straight at him. With no angle he simply steps around you, and every layer behind you is now beaten." },
+          { x: 196, y: 45, why: "You chased behind the net. He goes the other way and your whole forecheck is caught below the puck." },
+        ],
+      },
+      LW: {
+        best: { x: 170, y: 74, why: "Above the puck on the wall. When your centre forces the panicked pass up the boards, you're the one who steps into it." },
+        acceptable: [
+          { x: 190, y: 74, why: "Going in as the second man works when your centre already has him sealed on the wall \u2014 but if he doesn't, two of you are below the puck and their breakout is free." },
+        ],
+        wrong: [
+          { x: 196, y: 52, why: "You dropped below the goal line. Everything they do now happens above you and you can't get back to it." },
+          { x: 168, y: 48, why: "You left the wall for the middle. The boards are where the pass is going, and now nobody is there." },
+        ],
+      },
+      RW: {
+        best: { x: 156, y: 44, why: "High in the middle, above everyone. You're the safety valve \u2014 you stop the odd-man rush and you're first on anything that comes up the middle." },
+        acceptable: [
+          { x: 156, y: 22, why: "Taking the weak-side wall does shut down that outlet \u2014 but a breakout through the middle is the one that really hurts, and now nobody is covering it." },
+        ],
+        wrong: [
+          { x: 188, y: 68, why: "Three forwards below the puck. If it comes out, there is nobody home at all." },
+          { x: 130, y: 44, why: "You backed all the way to the blue line. That's your defenceman's job and the forecheck has lost its third layer." },
+        ],
+      },
+      RD: {
+        best: { x: 128, y: 62, why: "Hold the blue line on the puck side. You keep it in when it comes up the wall, and you're the shot if it comes back to you." },
+        acceptable: [
+          { x: 150, y: 74, why: "Pinching down the wall keeps the puck in and it's the right call when you know you'll get there \u2014 but miss it and their winger is gone the other way with you caught." },
+        ],
+        wrong: [
+          { x: 108, y: 60, why: "You backed off into the neutral zone. The puck comes out clean and the whole forecheck was wasted." },
+          { x: 186, y: 70, why: "You went all the way to the corner. If they win that battle it's a two-on-one going back." },
+        ],
+      },
+      LD: {
+        best: { x: 128, y: 28, why: "Hold the weak-side blue line. When they try to swing it across to break out, you're the one who kills it." },
+        acceptable: [],
+        wrong: [
+          { x: 140, y: 66, why: "Both defencemen on the puck side. If it comes out the other way there is nobody there." },
+          { x: 104, y: 28, why: "You retreated to centre. They walk out of their zone with speed and you've given up the line for nothing." },
+        ],
+      },
+    },
+  },
 ];
 
 /* Variation that cannot corrupt the hockey.

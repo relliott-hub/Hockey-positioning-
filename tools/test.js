@@ -386,11 +386,14 @@ const section = (t) => console.log(`\n${t}`);
           if (!script) continue;
           // Track the puck through the script; each move of it is a pass or carry.
           let puckAt = V.ftPt(HIQ.debug.getPieces().puck);
+          /* Only OUR possession is audited. When the puck is theirs, moving it
+             into our slot is exactly what they are supposed to do. Possession
+             is marked explicitly by the simulation rather than guessed from
+             banner wording. */
+          let poss = script.startPoss;
           for (const step of script) {
-            /* Once we lose it, the puck is theirs and carrying it into our slot
-               is exactly what they're supposed to do. Only our own possession
-               is being audited here. */
-            if (step.banner && /TURNOVER|GIVEN AWAY|AGAINST|CHANCE AGAINST/i.test(step.banner)) break;
+            if (step.poss) poss = step.poss;
+            if (poss !== "us") continue;
             if (!step.puckTo) continue;
             const to = V.ftPt(step.puckTo);
             if (Math.hypot(to.x - puckAt.x, to.y - puckAt.y) < 3) { puckAt = to; continue; }
