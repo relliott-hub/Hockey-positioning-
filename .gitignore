@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+node_modules
 
 # Generated web bundle for native packaging (rebuild with: npm run build:www)
 www/

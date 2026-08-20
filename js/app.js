@@ -2061,6 +2061,7 @@
     getProfile: () => profile,
     guidanceShown: () => renderState.showGuidance,
     getCamera: () => ({ ...camera }),
+    choose: (opt) => chooseOption(opt),
     // What the player is told about possession on this play.
     puckState: () => {
       const f = findPuckCarrier();
