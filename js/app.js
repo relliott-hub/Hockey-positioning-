@@ -604,6 +604,25 @@
       }
       if (!moved) break;
     }
+
+    /* Finally, recover any marker clearance the pass above gave up — but only
+       by moves that keep every player properly separated. Overlapping players
+       is the worse failure, so it is never traded away to tidy a marker. */
+    for (const spot of keepClear) {
+      if (!spot) continue;
+      for (const p of skaters) {
+        if (p === pinned) continue;
+        let dx = p.x - spot.x, dy = p.y - spot.y;
+        let d = Math.hypot(dx, dy);
+        if (d >= MARKER_GAP) continue;
+        if (d < 0.5) { dx = 1; dy = 0; d = 1; }
+        const before = { x: p.x, y: p.y };
+        nudge(p, dx / d, dy / d, MARKER_GAP - d);
+        const clashes = skaters.some(q => q !== p &&
+          Math.hypot(q.x - p.x, q.y - p.y) < MIN_GAP);
+        if (clashes) { p.x = before.x; p.y = before.y; }
+      }
+    }
   }
 
   /* Camera: a 200-foot rink drawn to fit a phone leaves the actual play tiny in
@@ -758,6 +777,51 @@
       .map(p => mv(p, p.x + (target.x - p.x) * amt, p.y + (target.y - p.y) * amt));
   }
 
+  /* Pass legality.
+
+     Every pass the simulation shows is a demonstration of hockey to a child, so
+     it has to be a pass a coach would accept. The hard rule is that our own
+     players never move the puck through the front of our own net — it is the
+     first thing taught and the last thing forgiven. When the spot a player
+     chose has no safe lane to it, the right thing to show is the defenceman
+     refusing the pass, not making it. */
+  function laneIsSafe(from, to) {
+    const V = HIQ.VIEW;
+    return !HIQ.zones.laneCrossesSlot(V.ftPt(from), V.ftPt(to), ownSideOf(scenario));
+  }
+
+  /* How the puck actually gets from here to there.
+
+     A real breakout is rarely one pass. Going from the corner directly to the
+     far-side winger would cross the front of your own net — so a team moves it
+     D-to-D behind the goal first, then up. Modelling only a single direct pass
+     made legitimate weak-side positioning look illegal, which is why this
+     returns a route rather than a yes/no. */
+  function passRoute(fromPt, target, friendlySk) {
+    if (laneIsSafe(fromPt, target)) return [target];
+    let relay = null, bestCost = Infinity;
+    for (const p of friendlySk) {
+      if (p === target || p.role === "G") continue;
+      if (!laneIsSafe(fromPt, p) || !laneIsSafe(p, target)) continue;
+      const cost = dist(fromPt.x, fromPt.y, p.x, p.y) + dist(p.x, p.y, target.x, target.y);
+      if (cost < bestCost) { bestCost = cost; relay = p; }
+    }
+    return relay ? [relay, target] : [];
+  }
+
+  // Up the boards on the puck's side, near our blue line — where a pressured
+  // defenceman actually puts it when nothing is open.
+  function rimTarget() {
+    const R = HIQ.RINK, V = HIQ.VIEW;
+    const own = ownSideOf(scenario);
+    const blue = own === "left" ? R.blueLineLeft : R.blueLineRight;
+    const puckFt = V.ftPt(puck);
+    return V.pt({
+      x: own === "left" ? blue - 10 : blue + 10,
+      y: puckFt.y > R.midY ? R.width - 6 : 6,
+    });
+  }
+
   function buildSimScript(tier, receiver, subMsg) {
     const scen = scenario;
     const atk = attackSideOf(scen);
@@ -774,8 +838,41 @@
 
     if (!scen.isDefense) {
       // We have the puck.
+      const route = passRoute(puck, receiver, friendlySk);
+
+      if (!route.length) {
+        /* Nowhere safe to move it, even through a teammate. The defenceman
+           looks the option off and rims it rather than passing through the
+           front of his own net — which is what a coach would want him to do. */
+        const rim = rimTarget();
+        steps.push({ d: 480, msg: "Your defenceman looks for you\u2026" });
+        steps.push({
+          d: 420,
+          banner: { text: "NOT THROUGH THE MIDDLE", sub: "Your D won't pass across the front of his own net.", color: "#fcd34d" }
+        });
+        steps.push({
+          d: 620, sound: "clear",
+          movers: [mv(puck, rim.x, rim.y), ...driftAll(oppSk, [], rim, 0.12)]
+        });
+        steps.push({
+          d: 1500, sound: "whistle",
+          banner: { text: "PUCK GIVEN AWAY \u274C", sub: subMsg || "There was no safe pass to where you went.", color: "#fca5a5" }
+        });
+        return steps;
+      }
+
       if (tier === "great" || tier === "good") {
         steps.push({ d: 450, msg: "Good spot! Watch the play…" });
+        if (route.length > 1) {
+          // The D-to-D that makes the far-side option reachable.
+          const relay = route[0];
+          steps.push({
+            d: 460, sound: "pass",
+            movers: [mv(puck, relay.x, relay.y), ...driftAll(oppSk, [], atkSlot, 0.06)],
+            fx: { type: "ring", x: relay.x, y: relay.y, color: "96, 165, 250" },
+            msg: "D-to-D first — never through the middle."
+          });
+        }
         steps.push({
           d: 520, sound: "pass",
           movers: [
@@ -798,9 +895,11 @@
           steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
           steps.push({ d: 1400, sound: "goal", shake: 1, banner: { text: "GOAL! 🚨", sub: "Perfect positioning!", color: "#4ade80", light: atk, fx: "confetti" } });
         } else {
+          // Closest to the attacking net, but only through a lane we'd accept.
           let next = null, bd = Infinity;
           for (const p of friendlySk) {
             if (p === receiver) continue;
+            if (!laneIsSafe(receiver, p)) continue;
             const d = dist(p.x, p.y, atkNet.x, atkNet.y);
             if (d < bd) { bd = d; next = p; }
           }
@@ -823,7 +922,10 @@
         }
       } else {
         steps.push({ d: 450, msg: "Hmm… watch what happens." });
-        const mid = toward(puck, receiver, 0.55);
+        // The attempted pass is picked off early — and never deeper than a lane
+        // we would be willing to show in the first place.
+        let mid = toward(puck, receiver, 0.55);
+        if (!laneIsSafe(puck, mid)) mid = toward(puck, receiver, 0.3);
         const D = nearestTo(oppSk, mid.x, mid.y) || { x: mid.x, y: mid.y };
         steps.push({
           d: 560, sound: "pass",
@@ -877,7 +979,17 @@
           steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
           steps.push({ d: 1500, sound: "goal", shake: 1, banner: { text: "COUNTER-ATTACK GOAL! 🚨", sub: "Defense turned into offense!", color: "#4ade80", light: atk, fx: "confetti" } });
         } else {
-          const clearTo = { x: ownS === "right" ? 320 : 780, y: 80 };
+          // Cleared up the wall and out of the zone, in real rink coordinates.
+          // (This was a leftover pixel pair from the old, differently sized canvas.)
+          const clearTo = (() => {
+            const R = HIQ.RINK, V = HIQ.VIEW;
+            const blue = ownS === "left" ? R.blueLineLeft : R.blueLineRight;
+            const puckFt = V.ftPt(puck);
+            return V.pt({
+              x: ownS === "left" ? blue + 12 : blue - 12,
+              y: puckFt.y > R.midY ? R.width - 8 : 8,
+            });
+          })();
           steps.push({
             d: 650, banner: null, sound: "clear",
             movers: [mv(puck, clearTo.x, clearTo.y), ...driftAll(oppSk, [], clearTo, 0.06)]
@@ -1424,18 +1536,20 @@
       }
     }
     if (ov === "house") {
-      const drawHouse = (slotX) => {
+      /* The house: the box from the goal posts out to the four faceoff dots.
+         Drawn from the real rink definition rather than the hand-tuned pixel
+         pentagon this used to be, which was sized for the old canvas and no
+         longer matched either net. */
+      const drawHouse = (side) => {
+        const pts = HIQ.RINK.homePlate(side).map(p => HIQ.VIEW.pt(p));
         ctx.beginPath();
-        ctx.moveTo(slotX - 30, 250);
-        ctx.lineTo(slotX + 40, 220);
-        ctx.lineTo(slotX + 80, 310);
-        ctx.lineTo(slotX + 40, 400);
-        ctx.lineTo(slotX - 30, 370);
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
         ctx.closePath();
         ctx.stroke();
       };
-      drawHouse(PXLM.leftSlot.x);
-      drawHouse(PXLM.rightSlot.x);
+      drawHouse("left");
+      drawHouse("right");
     }
     ctx.restore();
   }
@@ -1744,6 +1858,13 @@
       ctx.arc(o.pos.x, o.pos.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+      // A white collar outside the amber ring, so the marker separates cleanly
+      // from a player it happens to sit near.
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath();
+      ctx.arc(o.pos.x, o.pos.y, r + 2.5, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.lineWidth = 4;
       ctx.strokeStyle = "#f59e0b";
       ctx.beginPath();
@@ -2042,6 +2163,33 @@
     outcomeFor: (grade) => outcomeFor(grade),
     readRadiusFt: () => readRadiusFt(),
     choose: (opt) => chooseOption(opt),
+    // Build a sim script without running it, so every pass can be audited.
+    simScriptFor: (grade, optIndex) => {
+      const opts = choice.options;
+      const opt = opts[optIndex] || opts[0];
+      if (!opt) return null;
+      const you = controlled[0];
+      const saved = { x: you.x, y: you.y };
+      you.x = opt.pos.x; you.y = opt.pos.y;
+      const script = buildSimScript(grade === "best" ? "great" : grade === "acceptable" ? "good" : "bad", you, "audit");
+      you.x = saved.x; you.y = saved.y;
+      /* Distinguish a PASS (the puck travels alone) from a CARRY (a player
+         skates with it). A centre carrying the puck up the middle on a breakout
+         is normal hockey; passing it through there is not. */
+      return script.map(st => {
+        const movers = st.movers || [];
+        const puckMove = movers.find(m => m.obj === puck);
+        const playerDests = movers.filter(m => m.obj !== puck).map(m => m.to);
+        const carried = !!puckMove && playerDests.some(d =>
+          d && Math.hypot(d.x - puckMove.to.x, d.y - puckMove.to.y) < 6);
+        return {
+          puckTo: puckMove ? { ...puckMove.to } : null,
+          carried,
+          dests: movers.map(m => ({ to: m.to || null })),
+          banner: st.banner ? st.banner.text : null,
+        };
+      });
+    },
     // What the player is told about possession on this play.
     puckState: () => {
       const f = findPuckCarrier();

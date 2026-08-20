@@ -53,7 +53,7 @@ Your defenceman has retrieved the puck in the corner, below your own goal line, 
 | Player | Where |
 |---|---|
 | LD *(has the puck)* | behind your own net, tight to the near boards (8 ft from the end boards, 31 ft near of centre) |
-| RD | in your defensive zone, toward the far side (16 ft from the end boards, 9 ft far of centre) |
+| RD | behind your own net, toward the far side (7 ft from the end boards, 9 ft far of centre) |
 | C | in your defensive zone, toward the near side (26 ft from the end boards, 14 ft near of centre) |
 | LW | in your defensive zone, tight to the near boards (33 ft from the end boards, 33 ft near of centre) |
 | RW | in your defensive zone, toward the far side (58 ft from the end boards, 21 ft far of centre) |
@@ -114,9 +114,9 @@ Your defenceman has retrieved the puck in the corner, below your own goal line, 
 
 #### Playing RD
 
-**Best read** — in your defensive zone, toward the far side (16 ft from the end boards, 9 ft far of centre)
+**Best read** — behind your own net, toward the far side (7 ft from the end boards, 9 ft far of centre)
 
-> On the far side of the net for the D-to-D. If the strong side is jammed, this is the safe reset.
+> Behind the net on the far side for the D-to-D. The pass goes behind the goal, never across the front of it — that's what makes it safe.
 
 **Also acceptable** *(partial credit — works, but not first choice)*
 
