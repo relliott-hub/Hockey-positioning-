@@ -515,7 +515,13 @@
   }
 
   function spreadForClarity(keepClear) {
+    // Two different jobs with two different budgets.
+    // Players are anonymous dots to the eye, so they need real separation.
+    // Markers are drawn on top of players and only need enough room not to be
+    // hidden — and every foot a player is shoved is a foot of authored hockey
+    // distorted, so that budget is deliberately smaller.
     const MIN_GAP = 62;
+    const MARKER_GAP = 52;
     const skaters = [...offense, ...defense].filter(p => p.role !== "G");
     if (skaters.length < 2) return;
 
@@ -532,7 +538,7 @@
       p.y = clamp(p.y + uy * amount, 58, 562);
     };
 
-    for (let iter = 0; iter < 16; iter++) {
+    for (let iter = 0; iter < 40; iter++) {
       let moved = false;
 
       for (let i = 0; i < skaters.length; i++) {
@@ -556,10 +562,10 @@
         for (const p of skaters) {
           let dx = p.x - spot.x, dy = p.y - spot.y;
           let d = Math.hypot(dx, dy);
-          if (d >= MIN_GAP) continue;
+          if (d >= MARKER_GAP) continue;
           if (d < 0.5) { dx = 1; dy = 0; d = 1; }
           const ux = dx / d, uy = dy / d;
-          const amount = MIN_GAP - d;
+          const amount = MARKER_GAP - d;
           const before = { x: p.x, y: p.y };
           nudge(p, ux, uy, amount);
           // The carrier may move off the coaching spot, but the puck goes with
@@ -572,6 +578,30 @@
         }
       }
 
+      if (!moved) break;
+    }
+
+    /* Separating players and clearing markers pull against each other, so the
+       relaxation above can stop with a pair still touching. Two players merged
+       into one blob is the worse failure of the two — a marker is drawn on top
+       and stays legible either way — so finish with a player-only pass. */
+    for (let iter = 0; iter < 12; iter++) {
+      let moved = false;
+      for (let i = 0; i < skaters.length; i++) {
+        for (let j = i + 1; j < skaters.length; j++) {
+          const a = skaters[i], b = skaters[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          let d = Math.hypot(dx, dy);
+          if (d >= MIN_GAP) continue;
+          if (d < 0.5) { dx = Math.cos(i * 2.4); dy = Math.sin(i * 2.4); d = 1; }
+          const ux = dx / d, uy = dy / d;
+          const half = (MIN_GAP - d) / 2;
+          const aFree = a !== pinned, bFree = b !== pinned;
+          if (aFree) nudge(a, -ux, -uy, bFree ? half : half * 2);
+          if (bFree) nudge(b, ux, uy, aFree ? half : half * 2);
+          moved = true;
+        }
+      }
       if (!moved) break;
     }
   }

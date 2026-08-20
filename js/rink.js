@@ -107,6 +107,57 @@ HIQ.VIEW = (() => {
   };
 })();
 
+/* Named regions of the ice.
+
+   A scenario that says "the puck is below the goal line" while drawing it
+   thirteen feet above the goal line teaches a kid the wrong vocabulary for the
+   sport. These predicates let every scenario's words be checked against its
+   actual geometry, automatically. */
+HIQ.zones = (() => {
+  const R = HIQ.RINK;
+  const glOf = (side) => (side === "left" ? R.goalLineLeft : R.goalLineRight);
+  const blOf = (side) => (side === "left" ? R.blueLineLeft : R.blueLineRight);
+  // How deep into that end a point is: negative means behind the goal line.
+  const depth = (p, side) => (side === "left" ? p.x - glOf(side) : glOf(side) - p.x);
+  const fromBoards = (p) => Math.min(p.y, R.width - p.y);
+
+  return {
+    nearestEnd: (p) => (p.x < R.centreLine ? "left" : "right"),
+    depth,
+    fromBoards,
+
+    // Between the goal line and the end boards.
+    belowGoalLine: (p, side) => depth(p, side) < 0,
+
+    // Below the goal line and out toward a corner, not behind the net.
+    inCorner: (p, side) => depth(p, side) < 2 && fromBoards(p) <= 16,
+
+    // Directly behind the net.
+    behindNet: (p, side) => depth(p, side) < 0 && Math.abs(p.y - R.midY) < 11,
+
+    // On the boards between the goal line and the top of the circle — where a
+    // winger actually stands on a half-wall.
+    onHalfWall: (p, side) => {
+      const d = depth(p, side);
+      return fromBoards(p) <= 12 && d >= 0 && d <= R.endDotFromGoalLine + R.faceoffCircleR;
+    },
+
+    inNeutralZone: (p) => p.x > R.blueLineLeft && p.x < R.blueLineRight,
+
+    // A "point" is a defenceman standing on the blue line of the attacking zone.
+    atBlueLine: (p, side, tol = 7) => Math.abs(p.x - blOf(side)) <= tol,
+
+    // The dangerous ice right in front of a net.
+    inFrontOfNet: (p, side) => {
+      const d = depth(p, side);
+      return d >= 0 && d <= 14 && Math.abs(p.y - R.midY) <= 12;
+    },
+
+    onIce: (p, inset = 2) =>
+      p.x >= inset && p.x <= R.length - inset && p.y >= inset && p.y <= R.width - inset,
+  };
+})();
+
 /* Distances in feet — used everywhere positioning is judged, so that "give him
    ten feet of room" means ten feet regardless of direction. */
 HIQ.ft = {
