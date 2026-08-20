@@ -323,6 +323,42 @@ const section = (t) => console.log(`\n${t}`);
   check((outcomes.wrong.bad || 0) / 900 < 0.45,
     "a mistake usually costs possession rather than conceding", `${Math.round((outcomes.wrong.bad || 0) / 900 * 100)}% goals against`);
 
+  // ------------------------------------------------- can a kid tell them apart?
+  /* Ryan's report: "I don't see any real difference between two options most of
+     the time, yet the outcome changes." Two spots a child cannot distinguish
+     are not a choice. Every option shown must read as a different decision. */
+  section("Options are distinguishable");
+  const sep = await page.evaluate(() => {
+    let worst = Infinity, worstWho = "", under20 = 0, pairs = 0, plays = 0, empty = 0;
+    const buckets = { best: 0, acceptable: 0, wrong: 0 };
+    for (let i = 0; i < 200; i++) {
+      HIQ.debug.newPlay();
+      const s = HIQ.debug.getScenario();
+      const opts = HIQ.debug.getChoices();
+      if (!opts.length) { empty++; continue; }
+      plays++;
+      for (const o of opts) buckets[o.tier]++;
+      for (let a = 0; a < opts.length; a++) {
+        for (let b = a + 1; b < opts.length; b++) {
+          const ft = Math.hypot(opts[a].pos.x - opts[b].pos.x, opts[a].pos.y - opts[b].pos.y) / HIQ.VIEW.PX_PER_FT;
+          pairs++;
+          if (ft < 20) under20++;
+          if (ft < worst) { worst = ft; worstWho = `${s.id}/${s.role}`; }
+        }
+      }
+    }
+    return { worst: worst.toFixed(1), worstWho, under20, pairs, plays, empty, buckets };
+  });
+  check(sep.under20 === 0,
+    "no two options a player chooses between are closer than 20 ft",
+    `closest ${sep.worst} ft (${sep.worstWho}), ${sep.pairs} pairs checked`);
+  check(Number(sep.worst) * 5.5 > 100,
+    "options are visually far apart on screen",
+    `closest pair ${Math.round(Number(sep.worst) * 5.5)} px, markers are ~36 px wide`);
+  check(sep.empty === 0, "no play is skipped for want of distinguishable options", `${sep.empty} skipped`);
+  check(sep.buckets.acceptable > 0, "a genuine alternative is still offered regularly",
+    JSON.stringify(sep.buckets));
+
   // ---------------------------------------------------------------- variety
   section("Replay variety (anti-memorisation)");
   for (const role of ["C", "LD"]) {

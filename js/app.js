@@ -685,25 +685,41 @@
       res: gradePlacement(role, { x: spot.x, y: spot.y }, scenario),
     });
 
-    const opts = [mk(reads.best, "best")];
-    if (reads.acceptable.length) opts.push(mk(pick(reads.acceptable), "acceptable"));
-    if (reads.wrong.length) opts.push(mk(pick(reads.wrong), "wrong"));
+    const best = mk(reads.best, "best");
+    const others = reads.acceptable.map(a => mk(a, "acceptable"))
+      .concat(reads.wrong.map(w => mk(w, "wrong")));
+    if (others.length < 2) return [];
 
-    // Top up from whichever pool can still offer something distinct.
-    const far = (a, b) => dist(a.pos.x, a.pos.y, b.pos.x, b.pos.y) > readRadiusFt() * HIQ.VIEW.PX_PER_FT;
-    for (const [pool, tier] of [[reads.wrong, "wrong"], [reads.acceptable, "acceptable"]]) {
-      for (const spot of pool) {
-        if (opts.length >= 3) break;
-        const cand = mk(spot, tier);
-        if (opts.every(o => far(o, cand))) opts.push(cand);
+    /* Two options a kid cannot tell apart are not a choice — they're a coin
+       flip with consequences. Whatever the authored pool contains, the three
+       shown must be far enough apart to read as three different decisions, so
+       pick the combination with the widest minimum separation. */
+    const MIN_SEP_FT = 20;
+    const sepFt = (a, b) => feetBetween(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+
+    let picked = null, pickedSpread = -1;
+    for (let i = 0; i < others.length; i++) {
+      for (let j = i + 1; j < others.length; j++) {
+        const trio = [best, others[i], others[j]];
+        const spread = Math.min(sepFt(trio[0], trio[1]), sepFt(trio[0], trio[2]), sepFt(trio[1], trio[2]));
+        // Prefer a set that includes a genuine alternative, all else equal.
+        const hasAcceptable = trio.some(o => o.tier === "acceptable") ? 0.5 : 0;
+        if (spread + hasAcceptable > pickedSpread) { pickedSpread = spread + hasAcceptable; picked = trio; }
       }
     }
-    if (opts.length < 3) return [];
+    if (!picked) return [];
+    if (pickedSpread < MIN_SEP_FT) {
+      // Nothing in this pool reads as three distinct decisions. Better to skip
+      // the play than to ask a child to guess between two identical spots.
+      console.warn(`[HIQ] ${scenario.id}/${role}: options only ${pickedSpread.toFixed(1)} ft apart — skipping.`);
+      return [];
+    }
 
-    const shuffled = shuffle(opts.slice(0, 3));
+    const shuffled = shuffle(picked);
     shuffled.forEach((o, i) => { o.label = "ABC"[i]; });
     return shuffled;
   }
+
 
   function takeSnapshot() {
     snapshot = {

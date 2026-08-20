@@ -47,9 +47,9 @@ HIQ.PLAYS = [
     players: {
       LD: { x: 8, y: 73 },
       RD: { x: 16, y: 34 },
-      C:  { x: 26, y: 56 },
+      C: { x: 26, y: 56 },
       LW: { x: 33, y: 75 },
-      RW: { x: 58, y: 24 },
+      RW: { x: 58, y: 22 },
     },
     opponents: [
       { x: 14, y: 68, label: "F1" },
@@ -60,43 +60,43 @@ HIQ.PLAYS = [
     ],
     reads: {
       LW: {
-        best: { x: 33, y: 75, why: "On the wall at the hash marks. It's a short, safe pass up the boards and you're already facing up the ice." },
+        best: { x: 33, y: 75, why: "Get to the wall at the hash marks. Short, safe pass up the boards, and you're already turned up the ice." },
         acceptable: [
-          { x: 50, y: 77, why: "Still an outlet on the wall, and it works — but it's a longer pass under pressure, and if your D gets hemmed in you're too far away to help." },
+          { x: 62, y: 76, why: "Stretching high up the wall is a real route and it beats the forecheck when it works \u2014 but it's a long pass under pressure, and if your D gets pinned you're too far away to help." },
         ],
         wrong: [
-          { x: 14, y: 74, why: "You dropped into the corner with your own D. Now one forechecker covers both of you and there's nobody to pass to." },
-          { x: 24, y: 44, why: "Never cut across the front of your own net on a breakout. A turnover there goes straight in." },
+          { x: 12, y: 72, why: "You went down to the puck. Now two of you are in one corner, one checker covers both, and there's nobody to pass to." },
+          { x: 22, y: 45, why: "Never cut across the front of your own net on a breakout. A turnover there goes straight in." },
         ],
       },
       C: {
-        best: { x: 26, y: 56, why: "Swing low through the middle. You're the closest option, you're moving with speed, and you can take it either way." },
+        best: { x: 26, y: 56, why: "Swing low through the middle. Low and slow, supporting your D \u2014 you're the closest option and you get it moving forward." },
         acceptable: [
-          { x: 44, y: 48, why: "You're an option in the middle lane and that can work — but you're further from the puck, so it's a harder pass with a forechecker on your D." },
+          { x: 50, y: 44, why: "Waiting high in the middle lane is a genuine option and it's quick up the ice \u2014 but it's a long pass with a forechecker on your D, and if it's picked off you're behind it." },
         ],
         wrong: [
-          { x: 33, y: 73, why: "You went to the same wall as your winger. Two players in one lane means one checker covers both." },
-          { x: 72, y: 44, why: "You've left the zone early. Your D has no short option and has to dump it away." },
+          { x: 34, y: 74, why: "You went to the same wall as your winger. Two players in one lane is one checker's job." },
+          { x: 76, y: 42, why: "You left the zone early. Your D has no short option and has to throw it away." },
         ],
       },
       RW: {
-        best: { x: 58, y: 24, why: "Wide on the weak side with speed. You stretch their coverage and you're ready to take a pass going forward." },
+        best: { x: 58, y: 22, why: "Wide on the weak side, building speed. You stretch their coverage and you take the pass going forward." },
         acceptable: [
-          { x: 52, y: 44, why: "Middle-lane support does give your team an option — but the middle is crowded here, and that pass gets picked off more often than the wide one." },
+          { x: 40, y: 38, why: "Coming into the middle to support does give another option \u2014 but that's the crowded lane, and a pass through the middle of your own zone is the one that gets picked off." },
         ],
         wrong: [
-          { x: 20, y: 62, why: "You collapsed all the way back to the puck. Now everyone is below it and there's nobody to break out to." },
-          { x: 80, y: 18, why: "Too far ahead. The pass can't reach you and you've taken yourself out of the play." },
+          { x: 18, y: 62, why: "You collapsed all the way back to the puck. Everyone is below it now and there's nobody to break out to." },
+          { x: 86, y: 16, why: "Too far ahead. The pass can't reach you and you've taken yourself out of the play." },
         ],
       },
       RD: {
-        best: { x: 16, y: 34, why: "On the other side of the net for the D-to-D. If the strong side is jammed, this is the safe reset." },
+        best: { x: 16, y: 34, why: "On the far side of the net for the D-to-D. If the strong side is jammed, this is the safe reset." },
         acceptable: [
-          { x: 28, y: 24, why: "You're available for a pass and that's fine — but a little higher means a longer pass, and you can't get back as quickly if it's lost." },
+          { x: 34, y: 20, why: "Going up the weak-side wall is a real breakout route \u2014 but it's a longer pass, and you can't get back as fast if it's lost." },
         ],
         wrong: [
-          { x: 58, y: 30, why: "You left up the ice before the puck did. If it's turned over there's only one defender back." },
-          { x: 10, y: 62, why: "Both defencemen on the same side of the net. The whole weak side is open now." },
+          { x: 60, y: 30, why: "You left up the ice before the puck did. If it's turned over there's one defender back." },
+          { x: 12, y: 62, why: "Both defencemen on the same side of the net. The entire weak side is open." },
         ],
       },
     },
@@ -119,9 +119,9 @@ HIQ.PLAYS = [
     players: {
       LD: { x: 23, y: 64 },
       RD: { x: 18, y: 44 },
-      C:  { x: 26, y: 52 },
+      C: { x: 28, y: 50 },
       LW: { x: 72, y: 68 },
-      RW: { x: 72, y: 24 },
+      RW: { x: 30, y: 34 },
     },
     opponents: [
       { x: 30, y: 76, label: "O1" },
@@ -132,53 +132,51 @@ HIQ.PLAYS = [
     ],
     reads: {
       LD: {
-        best: { x: 23, y: 64, why: "Between the puck and the net, tight to their winger. You take away the pass to the slot without diving out at the puck." },
-        acceptable: [
-          { x: 28, y: 71, why: "Pressuring the puck carrier can work if you're sure you'll win it — but if you miss, you've opened the slot behind you." },
-        ],
+        best: { x: 23, y: 64, why: "Between the puck and your net, tight to their winger. Stay on the defensive side \u2014 take the pass to the slot away without diving at the puck." },
+        acceptable: [],
         wrong: [
-          { x: 34, y: 80, why: "You chased all the way to the boards. One pass to the middle and nobody is home." },
+          // Kept because it is the classic mistake for this position, even though
+          // it sits close to the correct spot — free-drag mode still catches it,
+          // and it is documented in the spec.
+          { x: 34, y: 80, why: "You chased to the boards. One pass to the middle and nobody is home." },
           { x: 12, y: 40, why: "You drifted behind your own net. You're not defending anything from back there." },
+          { x: 60, y: 70, why: "You went up to cover their point. That's your winger's job \u2014 and the winger you left just walked into the slot." },
         ],
       },
       RD: {
-        best: { x: 18, y: 44, why: "Net-front on the weak side. The most dangerous player is the one nobody sees backdoor — that's yours." },
-        acceptable: [
-          { x: 23, y: 51, why: "You're still protecting the middle, which is the right idea — but stepping off the net-front gives their backdoor player a free look." },
-        ],
+        best: { x: 18, y: 44, why: "Net-front, weak side. The most dangerous player is the one nobody sees at the back post \u2014 that's yours." },
+        acceptable: [],
         wrong: [
-          { x: 30, y: 70, why: "Both defencemen went to the puck. The front of your net is now completely empty." },
+          { x: 32, y: 68, why: "Drifting to the strong side is the most common mistake a young defenceman makes. The front of your net is now empty." },
           { x: 48, y: 32, why: "You're too high. You've left the house, and everything dangerous happens below you." },
         ],
       },
       C: {
-        best: { x: 26, y: 52, why: "In the slot, stick in the passing lane. You're the one who takes away the middle so your D can stay home." },
+        best: { x: 28, y: 50, why: "Second layer in the slot, stick in the passing lane. You take the middle away so your D can stay home." },
         acceptable: [
-          { x: 24, y: 62, why: "Helping down low on the puck side is defensible — but the moment you leave the slot, someone has to fill it, and usually nobody does." },
+          { x: 16, y: 66, why: "Dropping low to back up your D is real hockey \u2014 it's your job if they get beaten out of the corner. Just know the slot is empty until you get back." },
         ],
         wrong: [
-          { x: 34, y: 74, why: "You went to the wall to double up. That's your winger's job, and now the middle is wide open." },
-          { x: 56, y: 46, why: "You're above the circles waiting for offence. Defend first — you're the last one back in the middle." },
+          { x: 34, y: 76, why: "You went to the wall to double up. That's your winger's job, and now the middle is wide open." },
+          { x: 56, y: 44, why: "You're above the circles waiting for offence. Defend first \u2014 you're the last one back through the middle." },
         ],
       },
       LW: {
-        best: { x: 72, y: 68, why: "Up on their defenceman at the blue line, on the puck side. You block the shot lane and you're first on the puck if it comes to you." },
-        acceptable: [
-          { x: 60, y: 70, why: "Sagging toward the wall keeps you closer to the play — but you've given their point man time and space to walk in and shoot." },
-        ],
+        best: { x: 72, y: 68, why: "Up on their defenceman at the blue line. Take away the pass to the point and be ready to block the shot." },
+        acceptable: [],
         wrong: [
-          { x: 28, y: 72, why: "You collapsed all the way down to the puck. Three of you on one player and their point is uncovered." },
-          { x: 92, y: 60, why: "You're already heading up the ice for offence. The puck isn't yours yet." },
+          { x: 34, y: 74, why: "You collapsed to the puck. Three of you on one player and their point is free to walk in." },
+          { x: 94, y: 60, why: "You're already heading up the ice for offence. The puck isn't yours yet." },
         ],
       },
       RW: {
-        best: { x: 72, y: 24, why: "Weak-side point at the blue line. When they swing it across, you have to be there — that pass is their best chance to score." },
+        best: { x: 30, y: 34, why: "Low slot on the weak side, watching their far defenceman. You're the one who takes away the backdoor play." },
         acceptable: [
-          { x: 60, y: 32, why: "Sliding toward the middle helps clog the slot, and that's not a bad instinct — but it gives their weak-side point a clean look." },
+          { x: 72, y: 24, why: "Going up to cover the weak point is how some teams play it, and it stops the cross-ice shot \u2014 but it leaves the low slot open, and that's the more dangerous ice." },
         ],
         wrong: [
-          { x: 30, y: 66, why: "You crossed to the puck side. The whole weak side is now open for the cross-ice pass." },
-          { x: 92, y: 20, why: "You've left the zone waiting for a breakout. Your team is defending a man short." },
+          { x: 30, y: 66, why: "You crossed to the puck side. The whole weak side is open for the cross-ice pass." },
+          { x: 92, y: 22, why: "You left the zone waiting for a breakout. Your team is defending a man short." },
         ],
       },
     },
@@ -199,7 +197,7 @@ HIQ.PLAYS = [
     carrier: "RW",
     players: {
       RW: { x: 195, y: 73 },
-      C:  { x: 178, y: 68 },
+      C: { x: 172, y: 64 },
       LW: { x: 184, y: 45 },
       RD: { x: 128, y: 60 },
       LD: { x: 128, y: 28 },
@@ -213,43 +211,43 @@ HIQ.PLAYS = [
     ],
     reads: {
       C: {
-        best: { x: 178, y: 68, why: "Low support on the wall side. Your winger can bump it back to you, and you're facing the net when you get it." },
+        best: { x: 172, y: 64, why: "Low support on the wall side. Your winger can bump it back and you're facing the net when you get it." },
         acceptable: [
-          { x: 172, y: 54, why: "The high slot is a real option and a dangerous place to shoot from — but you're a longer pass away, and there's a defender in between." },
+          { x: 166, y: 44, why: "The high slot is a dangerous place to shoot from and it's a real option \u2014 but it's a longer pass with a defender in between." },
         ],
         wrong: [
-          { x: 192, y: 66, why: "You went right to the puck. Now two of you are in the same corner and one defender covers both." },
-          { x: 152, y: 46, why: "You're too high. The cycle has no low support and the puck comes straight back out." },
+          { x: 192, y: 74, why: "You went right to the puck. Two of you in one corner and one defender covers both." },
+          { x: 146, y: 48, why: "Too high. The cycle has no low support and the puck comes straight back out." },
         ],
       },
       LW: {
-        best: { x: 184, y: 45, why: "Net-front on the far post. Most goals from a cycle come from someone standing right there." },
+        best: { x: 184, y: 45, why: "Net-front at the far post. Most goals off a cycle come from someone standing exactly there." },
         acceptable: [
-          { x: 176, y: 34, why: "Weak-side support gives an outlet and it works — but nobody is at the net, and that's where the puck ends up." },
+          { x: 168, y: 32, why: "Weak-side support gives an outlet and keeps possession \u2014 but nobody is at the net, and that's where the puck ends up." },
         ],
         wrong: [
-          { x: 192, y: 64, why: "You joined the puck battle in the corner. Two players down there and nobody in front of the net." },
-          { x: 140, y: 26, why: "You've drifted out to the point. That's your defenceman's job and you've left the net empty." },
+          { x: 192, y: 68, why: "You joined the battle in the corner. Two players down there and the net-front is empty." },
+          { x: 140, y: 30, why: "You drifted out to the point. That's your defenceman's job and the net is unguarded." },
         ],
       },
       RD: {
-        best: { x: 128, y: 60, why: "At the point on the puck side, just inside the blue line. You keep the puck in if it comes up the wall, and you're a shot option." },
+        best: { x: 128, y: 60, why: "At the point on the puck side, just inside the blue line. You keep it in and you're a shot option." },
         acceptable: [
-          { x: 150, y: 70, why: "Pinching down the wall can create a chance — but if you miss it, their winger is gone the other way and you're the one who has to catch him." },
+          { x: 152, y: 72, why: "Pinching down the wall can keep the cycle alive \u2014 but miss it and their winger is gone the other way, and you're the one chasing." },
         ],
         wrong: [
-          { x: 186, y: 68, why: "You went all the way down to the corner. If they win the puck it's a two-on-one going the other way." },
-          { x: 112, y: 55, why: "You've backed off past the blue line. The puck comes out and the zone is over." },
+          { x: 188, y: 70, why: "All the way to the corner. If they win it, it's a two-on-one going back." },
+          { x: 108, y: 56, why: "You backed off past the blue line. The puck comes out and the zone is over." },
         ],
       },
       LD: {
-        best: { x: 128, y: 28, why: "Weak-side point, ready to keep it in. When the puck swings across, you're the one who gets the shot." },
+        best: { x: 128, y: 28, why: "Weak-side point, ready to keep it in. When it swings across, you're the one who gets the shot." },
         acceptable: [
-          { x: 133, y: 40, why: "Sliding to the middle gives you a better shot angle — but you've left the weak-side boards, and that's where the puck escapes." },
+          { x: 134, y: 48, why: "Sliding to the middle gives a better shooting angle \u2014 but you've left the weak-side boards, and that's where the puck escapes." },
         ],
         wrong: [
-          { x: 172, y: 44, why: "You dropped into the slot. Both defencemen are now well inside the zone with nobody guarding the blue line." },
-          { x: 102, y: 30, why: "You're back at centre already. The puck comes out easily and the cycle is wasted." },
+          { x: 170, y: 44, why: "You dropped into the slot. Both defencemen are deep with nobody on the blue line." },
+          { x: 100, y: 30, why: "Back at centre already. The puck comes out easily and the cycle is wasted." },
         ],
       },
     },
@@ -269,10 +267,10 @@ HIQ.PLAYS = [
     puck: { x: 98, y: 42 },
     carrier: "C",
     players: {
-      C:  { x: 98, y: 42 },
-      RW: { x: 104, y: 66 },
-      LW: { x: 104, y: 20 },
-      RD: { x: 84, y: 50 },
+      C: { x: 98, y: 42 },
+      RW: { x: 112, y: 70 },
+      LW: { x: 112, y: 16 },
+      RD: { x: 88, y: 52 },
       LD: { x: 84, y: 34 },
     },
     opponents: [
@@ -284,43 +282,43 @@ HIQ.PLAYS = [
     ],
     reads: {
       RW: {
-        best: { x: 112, y: 70, why: "Wide and driving. Staying wide keeps their defenceman honest and opens the middle for your centre." },
+        best: { x: 112, y: 70, why: "Wide and driving. Staying wide holds their defenceman and opens the middle for your centre." },
         acceptable: [
-          { x: 122, y: 58, why: "Cutting toward the net is a real option and can score — but go too early and their D just steps into you, and the lane closes." },
+          { x: 128, y: 56, why: "Cutting to the net late is how these get finished \u2014 but go early and their D just steps into you and the lane shuts." },
         ],
         wrong: [
-          { x: 104, y: 46, why: "You cut into the middle beside your centre. Now one defender covers both of you." },
-          { x: 88, y: 62, why: "You're behind the puck. On a rush you can't help from back there — the numbers advantage is gone." },
+          { x: 104, y: 46, why: "You cut into the middle beside your centre. One defender now covers both of you." },
+          { x: 88, y: 62, why: "You're behind the puck. You can't help from back there and the extra man is gone." },
         ],
       },
       LW: {
-        best: { x: 112, y: 16, why: "Wide on the far side, staying onside. You stretch the two defenders apart and you're the far-post option." },
+        best: { x: 112, y: 16, why: "Wide on the far side, staying onside. You pull the two defenders apart and you're the far-post option." },
         acceptable: [
-          { x: 118, y: 28, why: "Angling toward the net gets you to a scoring area — but you've come closer to their defenceman, so the cross-ice pass is tighter." },
+          { x: 128, y: 30, why: "Angling toward the net gets you into a scoring area \u2014 but you've moved into their defenceman, so the cross-ice pass is tighter." },
         ],
         wrong: [
-          { x: 131, y: 20, why: "You've gone past their blue line ahead of the puck. That's offside and the whole rush comes back." },
-          { x: 98, y: 34, why: "You drifted into the middle with your centre. Three players in one lane and their two D have an easy job." },
+          { x: 132, y: 12, why: "You went past their blue line ahead of the puck. Offside, and the whole rush comes back." },
+          { x: 100, y: 34, why: "You drifted into the middle with your centre. Three of you in one lane and their two D have an easy job." },
         ],
       },
       RD: {
-        best: { x: 88, y: 52, why: "Trailing behind the rush. If it comes back to the point you're the late option — and you're back if it turns over." },
+        best: { x: 88, y: 52, why: "Trailing the rush. If it comes back you're the late option, and you're home if it turns over." },
         acceptable: [
-          { x: 104, y: 58, why: "Joining the rush as a fourth attacker can absolutely create a chance — just know that if they get it, you're the one caught." },
+          { x: 110, y: 62, why: "Jumping up as a fourth attacker absolutely creates chances \u2014 just know that if they get it, you're the one caught." },
         ],
         wrong: [
-          { x: 126, y: 62, why: "You've charged all the way in. If they break it out, it's an odd-man rush going the other way." },
-          { x: 62, y: 50, why: "You've stopped at your own blue line. You're not supporting anything from there." },
+          { x: 128, y: 64, why: "You charged all the way in. If they break out, it's an odd-man rush the other way." },
+          { x: 64, y: 50, why: "You stopped at your own blue line. You're not supporting anything from there." },
         ],
       },
       LD: {
-        best: { x: 84, y: 34, why: "Back and in the middle. Someone has to be the last man, and on a three-on-two that's you." },
+        best: { x: 84, y: 34, why: "Back and in the middle. Someone is the last man on a three-on-two, and that's you." },
         acceptable: [
-          { x: 96, y: 28, why: "Following the play up gives your team another option — but you're the safety valve here, and stepping up costs you a step if it comes back." },
+          { x: 104, y: 26, why: "Following the play up gives another option \u2014 but you're the safety valve here, and stepping up costs you a step if it comes back." },
         ],
         wrong: [
-          { x: 120, y: 28, why: "You're up with the forwards. Nobody is home and their counter-attack has open ice." },
-          { x: 84, y: 68, why: "You've drifted to the same side as your partner. The whole middle of the ice is unguarded." },
+          { x: 120, y: 30, why: "You're up with the forwards. Nobody is home and their counter has open ice." },
+          { x: 84, y: 62, why: "You drifted to your partner's side. The whole middle of the ice is unguarded." },
         ],
       },
     },
@@ -343,9 +341,9 @@ HIQ.PLAYS = [
     players: {
       LD: { x: 11, y: 68 },
       RD: { x: 17, y: 45 },
-      C:  { x: 24, y: 57 },
+      C: { x: 27, y: 52 },
       LW: { x: 72, y: 66 },
-      RW: { x: 72, y: 25 },
+      RW: { x: 30, y: 32 },
     },
     opponents: [
       { x: 6, y: 71, label: "O1" },
@@ -356,53 +354,47 @@ HIQ.PLAYS = [
     ],
     reads: {
       LD: {
-        best: { x: 11, y: 68, why: "On the puck carrier, body between them and the net. Win the battle or at least keep them on the outside." },
-        acceptable: [
-          { x: 14, y: 75, why: "Angling them deeper into the corner is sound — you just have to be certain you're not getting beaten back to the net." },
-        ],
+        best: { x: 11, y: 68, why: "On the puck carrier with your body between them and the net. Win it, or at least keep them on the outside." },
+        acceptable: [],
         wrong: [
-          { x: 17, y: 46, why: "You've left the battle and gone to the net. Now they walk out of the corner untouched." },
-          { x: 44, y: 66, why: "You're up above the circles. Everything dangerous is happening behind you." },
+          { x: 18, y: 46, why: "You left the battle for the net. Now they walk out of the corner untouched." },
+          { x: 40, y: 68, why: "You're above the circles. Everything dangerous is happening behind you." },
         ],
       },
       RD: {
-        best: { x: 17, y: 45, why: "Net-front, stick on their forward. This is the spot where goals are scored — you own it." },
-        acceptable: [
-          { x: 22, y: 53, why: "Helping toward the slot still protects the middle — but move any further and their net-front player is alone at the post." },
-        ],
+        best: { x: 17, y: 45, why: "Net-front, stick on their forward. This is where goals get scored and it's yours to protect." },
+        acceptable: [],
         wrong: [
-          { x: 10, y: 69, why: "Both defencemen in the corner. Nobody is guarding the front of your own net." },
-          { x: 46, y: 44, why: "You've gone up to the blue line looking for offence. Your net is undefended." },
+          { x: 10, y: 68, why: "Both defencemen in the corner. Nobody is in front of your own net." },
+          { x: 46, y: 44, why: "You went to the blue line looking for offence. Your net is undefended." },
         ],
       },
       C: {
-        best: { x: 24, y: 57, why: "Low support in the slot, ready to jump on a loose puck. You're the link between the corner and the front of the net." },
+        best: { x: 27, y: 52, why: "Low support in the slot, ready for a loose puck. You're the link between the corner and the front of the net." },
         acceptable: [
-          { x: 16, y: 64, why: "Going to help in the corner is honest hockey — but that's your D's battle, and when you leave, the slot is empty." },
+          { x: 12, y: 68, why: "Helping in the corner is your job if your D gets beaten \u2014 honest hockey, but the slot is empty while you're down there." },
         ],
         wrong: [
-          { x: 52, y: 46, why: "You're waiting up high for a breakout pass. Defend first — you're the third man low." },
-          { x: 8, y: 76, why: "Three of your players are now in one corner and there is nobody in front of your net." },
+          { x: 54, y: 46, why: "You're waiting high for a breakout pass. Defend first \u2014 you're the third man low." },
+          { x: 20, y: 34, why: "You slid across to the weak side. That's your winger's man, and now nobody is supporting the corner at all." },
         ],
       },
       LW: {
-        best: { x: 72, y: 66, why: "Up on their point man at the blue line. Take away the shot and be ready to block it." },
-        acceptable: [
-          { x: 58, y: 68, why: "Coming down the wall keeps you nearer the puck — but their defenceman now has time to step in and shoot." },
-        ],
+        best: { x: 72, y: 66, why: "Up on their point man at the blue line. Take the shot away and be ready to block it." },
+        acceptable: [],
         wrong: [
-          { x: 14, y: 66, why: "You've dropped into the corner too. Three players in one battle and their points are both free." },
-          { x: 92, y: 58, why: "You've already left the zone. Your team is defending a man short." },
+          { x: 16, y: 68, why: "You dropped into the corner too. Three in one battle and both their points are free." },
+          { x: 94, y: 58, why: "You already left the zone. Your team is defending a man short." },
         ],
       },
       RW: {
-        best: { x: 72, y: 25, why: "Weak-side point at the blue line. When it comes across, that's the most dangerous shot on the ice — and it's yours to stop." },
+        best: { x: 30, y: 32, why: "Low slot on the weak side, watching their far defenceman. The backdoor tap-in is the one you stop." },
         acceptable: [
-          { x: 58, y: 33, why: "Cheating toward the middle helps clog the slot — but their weak-side D now gets a clean shot with a screen." },
+          { x: 72, y: 25, why: "Covering the weak point stops the cross-ice shot and some teams play it that way \u2014 but it leaves the low slot open, and that's more dangerous ice." },
         ],
         wrong: [
-          { x: 26, y: 62, why: "You've crossed to the puck side. The whole weak side is wide open for a one-timer." },
-          { x: 92, y: 22, why: "You're up ice waiting for a pass. That's five-on-four for them." },
+          { x: 24, y: 62, why: "You crossed to the puck side. The weak side is wide open for a one-timer." },
+          { x: 92, y: 20, why: "You're up ice waiting for a pass. That's five-on-four for them." },
         ],
       },
     },
@@ -424,7 +416,7 @@ HIQ.PLAYS = [
     players: {
       RD: { x: 88, y: 30 },
       LD: { x: 82, y: 56 },
-      C:  { x: 98, y: 44 },
+      C: { x: 98, y: 44 },
       RW: { x: 108, y: 70 },
       LW: { x: 108, y: 16 },
     },
@@ -439,41 +431,41 @@ HIQ.PLAYS = [
       C: {
         best: { x: 98, y: 44, why: "Middle lane, curling with speed. You're the outlet who turns a regroup into a rush." },
         acceptable: [
-          { x: 92, y: 36, why: "Coming closer to your D gives an easy pass — but you'll receive it standing still, and a regroup is all about speed." },
+          { x: 78, y: 38, why: "Coming back low makes the pass easy and safe \u2014 but you'll take it standing still, and a regroup is all about hitting the line with speed." },
         ],
         wrong: [
-          { x: 90, y: 28, why: "You're right on top of your defenceman. One forechecker takes you both." },
-          { x: 122, y: 44, why: "You're too far ahead. The pass has to go through both their defencemen to reach you." },
+          { x: 88, y: 26, why: "You're right on top of your defenceman. One forechecker takes you both." },
+          { x: 122, y: 46, why: "Too far ahead. The pass has to beat both their defencemen to reach you." },
         ],
       },
       RW: {
-        best: { x: 108, y: 70, why: "Wide and building speed. You give a target up the boards and you hit the blue line flying." },
+        best: { x: 108, y: 70, why: "Wide and building speed. You give a target up the boards and hit the blue line flying." },
         acceptable: [
-          { x: 98, y: 62, why: "Coming back to support is a safe option — but you lose your speed, and you'll be entering the zone from a standstill." },
+          { x: 92, y: 58, why: "Coming back to support is the safe option \u2014 but you lose your speed and enter the zone from a standstill." },
         ],
         wrong: [
-          { x: 131, y: 68, why: "You're past their blue line before the puck. That's offside and the play is dead." },
-          { x: 96, y: 46, why: "You've come into the middle where your centre already is. Two players, one lane, one checker." },
+          { x: 132, y: 68, why: "Past their blue line before the puck. Offside, and the play is dead." },
+          { x: 98, y: 48, why: "You came into the middle where your centre already is. Two players, one lane, one checker." },
         ],
       },
       LW: {
-        best: { x: 108, y: 16, why: "Wide on the far side with speed. If they overload the puck side, you're the one with open ice." },
+        best: { x: 108, y: 16, why: "Wide on the far side with speed. If they overload the puck side, you're the one in open ice." },
         acceptable: [
-          { x: 100, y: 30, why: "Middle support does give another option — but the middle already has your centre, and the far wall is where the space is." },
+          { x: 94, y: 32, why: "Middle support is another option \u2014 but your centre is already there, and the far wall is where the space is." },
         ],
         wrong: [
-          { x: 84, y: 24, why: "You've come all the way back to the puck. Now nobody is ahead of it to attack with." },
-          { x: 131, y: 18, why: "You're offside waiting at their blue line. Whistle, and the regroup was for nothing." },
+          { x: 84, y: 26, why: "You came all the way back to the puck. Now nobody is ahead of it to attack with." },
+          { x: 132, y: 14, why: "Offside, waiting at their blue line. The regroup was for nothing." },
         ],
       },
       LD: {
-        best: { x: 82, y: 56, why: "Available for the D-to-D on the other side. If the forecheck takes away one side, you're the reset." },
+        best: { x: 82, y: 56, why: "Available for the D-to-D on the far side. If the forecheck takes one side away, you're the reset." },
         acceptable: [
-          { x: 88, y: 48, why: "Closer support makes the pass easier — but the tighter you are to your partner, the easier it is for one forechecker to take you both." },
+          { x: 94, y: 40, why: "Tighter support makes the pass easier \u2014 but the closer you are to your partner, the easier it is for one forechecker to take you both." },
         ],
         wrong: [
-          { x: 112, y: 52, why: "You've joined the rush ahead of the puck. If it's lost here, they're going the other way with numbers." },
-          { x: 64, y: 46, why: "You've retreated into your own zone. Your partner has no support and has to throw it away." },
+          { x: 112, y: 54, why: "You joined the rush ahead of the puck. Lose it here and they're going the other way with numbers." },
+          { x: 62, y: 48, why: "You retreated into your own zone. Your partner has no support and has to throw it away." },
         ],
       },
     },
