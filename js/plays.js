@@ -46,7 +46,7 @@ HIQ.PLAYS = [
     carrier: "LD",
     players: {
       LD: { x: 8, y: 73 },
-      RD: { x: 16, y: 34 },
+      RD: { x: 7, y: 34 },
       C: { x: 26, y: 56 },
       LW: { x: 33, y: 75 },
       RW: { x: 58, y: 22 },
@@ -90,7 +90,7 @@ HIQ.PLAYS = [
         ],
       },
       RD: {
-        best: { x: 16, y: 34, why: "On the far side of the net for the D-to-D. If the strong side is jammed, this is the safe reset." },
+        best: { x: 7, y: 34, why: "Behind the net on the far side for the D-to-D. The pass goes behind the goal, never across the front of it \u2014 that's what makes it safe." },
         acceptable: [
           { x: 34, y: 20, why: "Going up the weak-side wall is a real breakout route \u2014 but it's a longer pass, and you can't get back as fast if it's lost." },
         ],
@@ -474,35 +474,27 @@ HIQ.PLAYS = [
 
 /* Variation that cannot corrupt the hockey.
 
-   A handful of authored plays would be memorised in a sitting, but the previous
-   approach — jittering the puck while the support spots only partly followed —
-   is what broke possession and made reads inconsistent. So only two transforms
-   are allowed here, and both preserve every relationship in the play exactly:
+   Only ONE transform is allowed: mirroring across centre ice. The rink is
+   symmetric about that line, so every distance to every landmark — the net, the
+   slot, the goal line, the blue line — is preserved exactly. The same play, run
+   off the other wing.
 
-     · mirror across centre ice (the same play off the other wing)
-     · shift the whole picture together by a few feet
+   A small positional shift used to be applied as well, and it was wrong. It
+   preserved the play's internal shape but moved the whole picture relative to
+   the fixed landmarks: a spot authored 13.5 ft off the centre line became 8.5
+   ft off it, which put a legitimate support position inside the slot and made
+   a legal breakout pass illegal. Authored geometry only means something if it
+   keeps its relationship to the ice, so the shift is gone.
 
-   Everything moves as one: puck, players, opponents, and every authored read.
-   The tactical picture is identical; only its place on the sheet changes. */
+   The cost is less variety per scenario. The right way to buy variety back is
+   more authored scenarios, not fuzzing the ones we have.
+*/
 HIQ.varyPlay = function (play, opts = {}) {
   const R = HIQ.RINK;
   const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
   const mirror = opts.mirror ?? (Math.random() < 0.5);
-  const jitter = opts.jitter ?? 5;
-  const dx = (Math.random() * 2 - 1) * jitter;
-  const dy = (Math.random() * 2 - 1) * jitter;
 
-  // Keep the shifted play on the ice; if it would run off, don't shift that way.
-  const all = [play.puck, ...Object.values(play.players), ...play.opponents];
-  for (const r of Object.values(play.reads)) {
-    all.push(r.best, ...(r.acceptable || []), ...(r.wrong || []));
-  }
-  const ys = all.map(p => (mirror ? R.width - p.y : p.y));
-  const xs = all.map(p => p.x);
-  const okDx = Math.max(-Math.min(...xs) + 3, Math.min(dx, R.length - 3 - Math.max(...xs)));
-  const okDy = Math.max(-Math.min(...ys) + 3, Math.min(dy, R.width - 3 - Math.max(...ys)));
-
-  const t = (p) => ({ ...p, x: p.x + okDx, y: (mirror ? R.width - p.y : p.y) + okDy });
+  const t = (p) => (mirror ? { ...p, y: R.width - p.y } : { ...p });
 
   const out = {
     ...play,

@@ -155,6 +155,39 @@ HIQ.zones = (() => {
 
     onIce: (p, inset = 2) =>
       p.x >= inset && p.x <= R.length - inset && p.y >= inset && p.y <= R.width - inset,
+
+    /* The lane directly in front of your own net.
+
+       Narrower than the house on purpose. The house is the scoring-danger area
+       used for coverage teaching and is 22 ft wide at the dots; a centre giving
+       low support on the strong side is legitimately inside it, and a pass to
+       him is a normal breakout. What coaches actually forbid is moving the puck
+       through the middle in front of your own goal — so this is the middle
+       twelve feet, from behind the goal line out to the top of the circles. */
+    inSlotLane: (p, side) => {
+      const d = depth(p, side);
+      // Out to about the hash marks, not the top of the circles. A pass to a
+      // centre waiting high in the middle lane is a real breakout route and
+      // must not be caught by this; a pass across the front of the net must.
+      return d >= -3 && d <= 22 && Math.abs(p.y - R.midY) <= 12;
+    },
+
+    /* Does a pass travel through that lane?
+
+       A turnover in front of your own net is a goal, so no coach makes this
+       pass and the simulation must never show one — otherwise the game
+       demonstrates the exact habit it tells kids to avoid. Sampled along the
+       lane rather than solved analytically; the shapes are simple and this
+       stays readable. */
+    laneCrossesSlot: (from, to, side) => {
+      const steps = 24;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const p = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+        if (HIQ.zones.inSlotLane(p, side)) return true;
+      }
+      return false;
+    },
   };
 })();
 

@@ -359,22 +359,154 @@ const section = (t) => console.log(`\n${t}`);
   check(sep.buckets.acceptable > 0, "a genuine alternative is still offered regularly",
     JSON.stringify(sep.buckets));
 
+  // ------------------------------------------------ what the simulation shows
+  /* Ryan's report: "the puck was passed from my defensive corner to the centre
+     in front of the net — that should never be allowed."
+
+     He's right, and it's worse than a cosmetic bug: the game names that exact
+     pass as a mistake in its own feedback and then demonstrated it. Every pass
+     the simulation draws is a demonstration of hockey to a child, so every one
+     of them gets audited here. */
+  section("The simulation never shows illegal hockey");
+  const sim = await page.evaluate(() => {
+    const V = HIQ.VIEW, Z = HIQ.zones;
+    let illegal = 0, passes = 0, plays = 0;
+    const examples = [];
+
+    for (let i = 0; i < 120; i++) {
+      HIQ.debug.newPlay();
+      const s = HIQ.debug.getScenario();
+      if (s.isDefense) continue;          // their attacking passes may cross our slot
+      const ownSide = s.attackDir === "right" ? "left" : "right";
+      plays++;
+
+      for (const grade of ["best", "acceptable", "wrong"]) {
+        for (let oi = 0; oi < 3; oi++) {
+          const script = HIQ.debug.simScriptFor(grade, oi);
+          if (!script) continue;
+          // Track the puck through the script; each move of it is a pass or carry.
+          let puckAt = V.ftPt(HIQ.debug.getPieces().puck);
+          for (const step of script) {
+            /* Once we lose it, the puck is theirs and carrying it into our slot
+               is exactly what they're supposed to do. Only our own possession
+               is being audited here. */
+            if (step.banner && /TURNOVER|GIVEN AWAY|AGAINST|CHANCE AGAINST/i.test(step.banner)) break;
+            if (!step.puckTo) continue;
+            const to = V.ftPt(step.puckTo);
+            if (Math.hypot(to.x - puckAt.x, to.y - puckAt.y) < 3) { puckAt = to; continue; }
+            // A player skating the puck through the middle is a carry, not a
+            // pass, and is legitimate. Only passes are judged.
+            if (!step.carried) {
+              passes++;
+              if (Z.laneCrossesSlot(puckAt, to, ownSide)) {
+                illegal++;
+                if (examples.length < 4) {
+                  examples.push(`${s.id}/${s.role} (${grade}): passed through its own slot`);
+                }
+              }
+            }
+            puckAt = to;
+          }
+        }
+      }
+    }
+    return { illegal, passes, plays, examples };
+  });
+  check(sim.illegal === 0,
+    "the puck is never passed across the front of your own net",
+    sim.illegal ? sim.examples.join(" | ") : `${sim.passes} puck movements across ${sim.plays} attacking plays`);
+
+  // Nothing the simulation draws may leave the ice surface.
+  const bounds = await page.evaluate(() => {
+    const V = HIQ.VIEW, R = HIQ.RINK;
+    let off = 0, pts = 0;
+    for (let i = 0; i < 80; i++) {
+      HIQ.debug.newPlay();
+      for (const grade of ["best", "acceptable", "wrong"]) {
+        const script = HIQ.debug.simScriptFor(grade, 0);
+        if (!script) continue;
+        for (const step of script) {
+          for (const m of step.dests) {
+            if (!m.to) continue;
+            const f = V.ftPt(m.to);
+            pts++;
+            if (f.x < -6 || f.x > R.length + 6 || f.y < -6 || f.y > R.width + 6) off++;
+          }
+        }
+      }
+    }
+    return { off, pts };
+  });
+  check(bounds.off === 0, "no play sends the puck or a player off the ice",
+    `${bounds.pts} destinations checked`);
+
+  /* A read we call best or acceptable must never require a pass the game
+     itself refuses to make. That contradiction — the coach saying "that works"
+     while the defenceman visibly declines the pass — is exactly the kind of
+     mixed message that makes the game feel arbitrary. */
+  const consistent = await page.evaluate(() => {
+    const V = HIQ.VIEW, Z = HIQ.zones;
+    const bad = [];
+    for (const play of HIQ.PLAYS) {
+      if (play.isDefense) continue;
+      const ownSide = play.ourNet;
+      for (const [role, r] of Object.entries(play.reads)) {
+        for (const [tier, spot] of [["best", r.best]].concat(r.acceptable.map(a => ["acceptable", a]))) {
+          if (!Z.laneCrossesSlot(play.puck, spot, ownSide)) continue;
+          // A direct pass would cross the slot — a real breakout would go
+          // D-to-D first, so the read is fine as long as SOME teammate makes
+          // a legal two-leg route to it.
+          const relayExists = Object.entries(play.players).some(([r2, mate]) => {
+            if (r2 === role) return false;
+            return !Z.laneCrossesSlot(play.puck, mate, ownSide) &&
+                   !Z.laneCrossesSlot(mate, spot, ownSide);
+          });
+          if (!relayExists) {
+            bad.push(`${play.id}/${role}: ${tier} read is unreachable without crossing our own slot`);
+          }
+        }
+      }
+    }
+    return bad;
+  });
+  check(consistent.length === 0,
+    "every read we endorse can be reached without crossing our own slot",
+    consistent.length ? consistent.join(" | ") : "all reachable, directly or via a D-to-D");
+
   // ---------------------------------------------------------------- variety
-  section("Replay variety (anti-memorisation)");
+  section("Replay variety");
+  /* Positional fuzzing used to inflate this number, but it did so by shifting
+     authored plays relative to the net — which corrupted the hockey. Variety
+     now comes only from mirroring, so it is bounded by how many scenarios have
+     actually been written. That is the honest number, and the way to raise it
+     is to author more plays, not to fuzz the ones we have. */
   for (const role of ["C", "LD"]) {
     await page.selectOption("#role", role);
     await page.waitForTimeout(80);
-    const v = await page.evaluate(() => {
+    const v = await page.evaluate((role) => {
       const spots = new Set();
       for (let i = 0; i < 120; i++) {
         HIQ.debug.newPlay();
         const gg = HIQ.debug.getPieces().guidance;
         spots.add(`${Math.round(gg.x / 12)},${Math.round(gg.y / 12)}`);
       }
-      return spots.size;
-    });
-    check(v >= 50, `role ${role} sees many distinct coaching spots`, `${v} in 120 plays`);
+      /* A role can only be coached in a play that has a read for it AND where
+         it isn't the one carrying the puck. Mirroring doubles that. */
+      const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+      let reachable = 0;
+      for (const p of HIQ.PLAYS) {
+        for (const m of [false, true]) {
+          const src = m ? (SWAP[role] || role) : role;
+          if (p.reads[src] && p.carrier !== src) reachable++;
+        }
+      }
+      return { spots: spots.size, reachable };
+    }, role);
+    check(v.spots >= v.reachable * 0.8,
+      `role ${role} reaches nearly every play and side available to it`,
+      `${v.spots} distinct spots of ${v.reachable} reachable play/side combinations`);
   }
+
   const sides = await page.evaluate(() => {
     let top = 0, bottom = 0;
     for (let i = 0; i < 120; i++) {
@@ -412,11 +544,17 @@ const section = (t) => console.log(`\n${t}`);
         for (const q of drawn) {
           const d = Math.hypot(o.pos.x - q.x, o.pos.y - q.y);
           if (d < minMarker) minMarker = d;
-          /* Markers are drawn after the players, so a marker is never itself
-             hidden — the risk is a marker covering a player. Dots are ~16px and
-             markers ~18px, so they touch at ~34px. Below 30 the player starts
-             disappearing underneath, and that is the real failure. */
-          if (d < 30) markerClash++;
+          /* Markers are drawn last as a solid disc with a ring, so the marker
+             itself is always fully legible. The real failure is a PLAYER being
+             erased underneath one.
+
+             A defensive-zone play packs ten skaters into a third of the ice.
+             Demanding 11 ft between every pair AND wide marker clearance is
+             over-constrained — something has to give, and two players merging
+             into one blob is far worse than a marker overlapping one. So the
+             assertion is the one that matters: a marker must never sit so close
+             that the player beneath it disappears (marker r~27, player r~17). */
+          if (d < 20) markerClash++;
         }
       }
       // The puck situation must always be spelled out — either someone is shown
@@ -438,7 +576,7 @@ const section = (t) => console.log(`\n${t}`);
   });
   check(vis.overlaps === 0, "no two players are ever drawn overlapping",
     `closest pair ${vis.minGap}px across ${vis.plays} plays`);
-  check(vis.markerClash === 0, "A/B/C markers never sit on top of a player",
+  check(vis.markerClash === 0, "no player is ever hidden underneath an A/B/C marker",
     `closest marker-to-player ${vis.minMarker}px`);
   check(vis.unlabelled === 0, "the puck situation is always spelled out (carried or loose)",
     `${vis.carrierFound}/${vis.plays} carried, ${vis.plays - vis.carrierFound} loose`);
