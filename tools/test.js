@@ -263,7 +263,9 @@ const section = (t) => console.log(`\n${t}`);
     let top = 0, bottom = 0;
     for (let i = 0; i < 120; i++) {
       HIQ.debug.newPlay();
-      if (HIQ.debug.getPieces().puck.y < 310) top++; else bottom++;
+      // Compare against the rink's own midline in feet, not a hardcoded pixel.
+      const puckFt = HIQ.VIEW.ftPt(HIQ.debug.getPieces().puck);
+      if (puckFt.y < HIQ.RINK.midY) top++; else bottom++;
     }
     return { top, bottom };
   });
