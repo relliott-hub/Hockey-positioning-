@@ -8,7 +8,7 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
-const js = ["data", "audio", "sim", "app"]
+const js = ["rink", "plays", "data", "audio", "sim", "app"]
   .map(n => fs.readFileSync(path.join(root, "js", `${n}.js`), "utf8"))
   .join("\n");
 

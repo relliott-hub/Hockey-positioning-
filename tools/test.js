@@ -40,7 +40,8 @@ const section = (t) => console.log(`\n${t}`);
     await page.evaluate(() => document.getElementById("rink").scrollIntoView({ block: "center" }));
     const box = await page.locator("#rink").boundingBox();
     const c = await page.evaluate(({ x, y }) => HIQ.debug.worldToScreen(x, y), { x, y });
-    await page.mouse.click(box.x + c.x * (box.width / 1100), box.y + c.y * (box.height / 620));
+    const cw = await page.evaluate(() => [rink.width, rink.height]);
+    await page.mouse.click(box.x + c.x * (box.width / cw[0]), box.y + c.y * (box.height / cw[1]));
   };
   const settle = () => page.waitForFunction(() => !HIQ.debug.simRunning(), null, { timeout: 15000 });
 
@@ -66,21 +67,21 @@ const section = (t) => console.log(`\n${t}`);
   section("Core gameplay loop");
   let sc = await page.evaluate(() => HIQ.debug.getScenario());
   check(!!sc && !!sc.id, "a scenario is built on load", sc && sc.id);
-  let opts = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ c: o.correct, x: o.pos.x, y: o.pos.y, s: o.res.score })));
+  let opts = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ c: o.correct, tier: o.tier, x: o.pos.x, y: o.pos.y, s: o.res.score })));
   check(opts.length === 3, "three choices offered", `${opts.length} options`);
-  check(opts.filter(o => o.c).length === 1, "exactly one is correct");
+  check(opts.filter(o => o.c).length === 1, "exactly one is the best read");
 
   let right = opts.find(o => o.c);
   await tapCanvas(right.x, right.y);
   await settle();
   let status = await page.locator("#status").innerText();
-  check(/NICE READ/.test(status), "correct choice succeeds", status.slice(0, 45));
+  check(/BEST READ/.test(status), "the best read succeeds", status.slice(0, 45));
 
   await page.waitForTimeout(2200);
-  opts = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ c: o.correct, x: o.pos.x, y: o.pos.y })));
+  opts = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ c: o.correct, tier: o.tier, x: o.pos.x, y: o.pos.y })));
   check(opts.length === 3, "next play auto-starts");
 
-  const wrong = opts.find(o => !o.c);
+  const wrong = opts.find(o => o.tier === "wrong") || opts.find(o => !o.c);
   await tapCanvas(wrong.x, wrong.y);
   await settle();
   status = await page.locator("#status").innerText();
@@ -91,8 +92,8 @@ const section = (t) => console.log(`\n${t}`);
   await page.waitForTimeout(2000);
   const revealedFirst = await page.evaluate(() => HIQ.debug.guidanceShown());
   check(revealedFirst === false, "first miss re-asks without revealing the answer");
-  const opts2 = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ c: o.correct, x: o.pos.x, y: o.pos.y })));
-  const wrong2 = opts2.find(o => !o.c);
+  const opts2 = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ c: o.correct, tier: o.tier, x: o.pos.x, y: o.pos.y })));
+  const wrong2 = opts2.find(o => o.tier === "wrong") || opts2.find(o => !o.c);
   await tapCanvas(wrong2.x, wrong2.y);
   await settle();
   await page.waitForTimeout(2000);
@@ -107,103 +108,140 @@ const section = (t) => console.log(`\n${t}`);
   await page.click("#lockBtn");
   await settle();
   status = await page.locator("#status").innerText();
-  check(/NICE READ/.test(status), "placing on the ideal spot succeeds", status.slice(0, 40));
+  check(/BEST READ/.test(status), "placing on the coached spot succeeds", status.slice(0, 40));
   await page.selectOption("#answerStyle", "choices");
   await page.waitForTimeout(1800);
 
   // --------------------------------------------------------------- formats
-  section("Game formats");
-  for (const [fmt, ours, theirs] of [["5v5", 5, 5], ["5v4", 5, 4], ["4v5", 4, 5]]) {
-    await page.selectOption("#format", fmt);
-    await page.waitForTimeout(350);
-    const r = await page.evaluate(() => {
+  section("Rosters");
+  const roster = await page.evaluate(() => {
+    let bad = 0, n = 0;
+    for (let i = 0; i < 40; i++) {
+      HIQ.debug.newPlay();
       const p = HIQ.debug.getPieces();
-      return {
-        ours: p.controlled.length + p.offense.filter(q => q.role !== "G").length,
-        theirs: p.defense.filter(q => q.role !== "G").length,
-      };
-    });
-    check(r.ours === ours && r.theirs === theirs, `${fmt} puts the right skaters on the ice`, `${r.ours}v${r.theirs}`);
-  }
-
-  // Every role must land on a real position in every format/structure
-  let phantom = 0;
-  for (const fmt of ["5v4", "4v5"]) {
-    await page.selectOption("#format", fmt);
-    for (const struct of ["box", "diamond"]) {
-      await page.selectOption("#pkStruct", struct).catch(() => {});
-      for (const role of ROLES) {
-        await page.selectOption("#role", role);
-        await page.waitForTimeout(90);
-        const ok = await page.evaluate(() => {
-          const s = HIQ.debug.getScenario();
-          const p = HIQ.debug.getPieces();
-          return !!s.guidanceByRole[s.role] && p.controlled.length > 0;
-        });
-        if (!ok) phantom++;
-      }
+      const ours = p.controlled.filter(q => q.role !== "G").length + p.offense.filter(q => q.role !== "G").length;
+      const theirs = p.defense.filter(q => q.role !== "G").length;
+      const goalies = p.offense.filter(q => q.role === "G").length + p.defense.filter(q => q.role === "G").length;
+      n++;
+      if (ours !== 5 || theirs !== 5 || goalies !== 2) bad++;
     }
-  }
-  check(phantom === 0, "no role is ever assigned a position that isn't on the ice", `${phantom} phantom assignments`);
-  await page.selectOption("#format", "5v5");
-  await page.selectOption("#role", "C");
+    return { bad, n };
+  });
+  check(roster.bad === 0, "every play is a full 5v5 with both goalies", `${roster.n - roster.bad}/${roster.n}`);
 
-  // ------------------------------------------------- scoring invariants
-  section("Scoring invariants (the audit checks)");
-  let idealBad = 0, idealN = 0;
+  // ------------------------------------------------- authored-read invariants
+  section("Coaching correctness");
+
+  // The authored best read must always grade as the best read, at every setting.
+  let bestBad = 0, bestN = 0;
   for (const age of ["6-8", "9-11", "12-14"]) {
     for (const diff of ["easy", "med", "hard"]) {
       await page.selectOption("#age", age);
       await page.selectOption("#diff", diff);
-      await page.waitForTimeout(80);
+      await page.waitForTimeout(70);
       const r = await page.evaluate(() => {
         let bad = 0, n = 0;
-        for (let i = 0; i < 40; i++) {
+        for (let i = 0; i < 30; i++) {
           HIQ.debug.newPlay();
           const s = HIQ.debug.getScenario();
-          const gg = HIQ.debug.getPieces().guidance;
+          const b = s.reads[s.role].best;
+          const g = HIQ.debug.gradeAt(s.role, b.x, b.y);
           n++;
-          if (HIQ.debug.scoreAt(s.role, gg.x, gg.y).score < 100) bad++;
+          if (g.tier !== "best" || g.score < 95) bad++;
         }
         return { bad, n };
       });
-      idealBad += r.bad; idealN += r.n;
+      bestBad += r.bad; bestN += r.n;
     }
   }
-  check(idealBad === 0,
-    "the ideal spot always scores 100, in every age and difficulty",
-    `${idealN - idealBad}/${idealN} plays`);
+  check(bestBad === 0, "the coached best read always grades as best", `${bestN - bestBad}/${bestN} across all settings`);
 
   await page.selectOption("#age", "9-11");
   await page.selectOption("#diff", "med");
-  const quality = await page.evaluate(() => {
-    let beats = 0, n = 0, tooClose = 0;
+
+  // Every authored spot must grade as the tier it was authored as. This is the
+  // check that would have caught a defensible read being marked wrong.
+  const tiers = await page.evaluate(() => {
+    let mis = 0, n = 0; const examples = [];
     for (let i = 0; i < 120; i++) {
       HIQ.debug.newPlay();
-      const o = HIQ.debug.getChoices();
-      const r = o.find(x => x.correct);
-      const w = o.filter(x => !x.correct);
-      n++;
-      if (w.every(x => x.res.score < r.res.score)) beats++;
-      if (w.some(x => x.res.score >= r.res.score - 5)) tooClose++;
-    }
-    return { beats, n, tooClose };
-  });
-  check(quality.beats === quality.n, "the right answer always outscores both decoys", `${quality.beats}/${quality.n}`);
-  check(quality.tooClose === 0, "no decoy is ambiguously close to correct");
-
-  const decoyMistakes = await page.evaluate(() => {
-    let withMsg = 0, n = 0;
-    for (let i = 0; i < 60; i++) {
-      HIQ.debug.newPlay();
-      for (const o of HIQ.debug.getChoices().filter(x => !x.correct)) {
-        n++; if (o.mistake && o.mistake.length > 10) withMsg++;
+      const s = HIQ.debug.getScenario();
+      const reads = s.reads[s.role];
+      const cases = [["best", reads.best]]
+        .concat(reads.acceptable.map(a => ["acceptable", a]))
+        .concat(reads.wrong.map(w => ["wrong", w]));
+      for (const [want, spot] of cases) {
+        const g = HIQ.debug.gradeAt(s.role, spot.x, spot.y);
+        n++;
+        if (g.tier !== want) {
+          mis++;
+          if (examples.length < 4) examples.push(`${s.id}/${s.role} authored ${want} graded ${g.tier}`);
+        }
       }
     }
-    return { withMsg, n };
+    return { mis, n, examples };
   });
-  check(decoyMistakes.withMsg === decoyMistakes.n,
-    "every wrong answer names the mistake it represents", `${decoyMistakes.withMsg}/${decoyMistakes.n}`);
+  check(tiers.mis === 0, "every authored spot grades as the tier it was written as",
+    tiers.mis ? tiers.examples.join(" | ") : `${tiers.n} spots checked`);
+
+  // Score bands must not overlap, or "that works" and "that's wrong" blur.
+  const bands = await page.evaluate(() => {
+    const b = { best: [], acceptable: [], wrong: [] };
+    for (let i = 0; i < 120; i++) {
+      HIQ.debug.newPlay();
+      const s = HIQ.debug.getScenario();
+      const reads = s.reads[s.role];
+      b.best.push(HIQ.debug.gradeAt(s.role, reads.best.x, reads.best.y).score);
+      for (const a of reads.acceptable) b.acceptable.push(HIQ.debug.gradeAt(s.role, a.x, a.y).score);
+      for (const w of reads.wrong) b.wrong.push(HIQ.debug.gradeAt(s.role, w.x, w.y).score);
+    }
+    const lo = a => Math.min(...a), hi = a => Math.max(...a);
+    return {
+      best: [lo(b.best), hi(b.best)],
+      acceptable: [lo(b.acceptable), hi(b.acceptable)],
+      wrong: [lo(b.wrong), hi(b.wrong)],
+    };
+  });
+  check(bands.acceptable[1] < bands.best[0] && bands.wrong[1] < bands.acceptable[0],
+    "best / acceptable / wrong score in separate bands",
+    `wrong ${bands.wrong[0]}-${bands.wrong[1]}, acceptable ${bands.acceptable[0]}-${bands.acceptable[1]}, best ${bands.best[0]}-${bands.best[1]}`);
+
+  // Every option shown must carry a coaching reason written for it.
+  const reasons = await page.evaluate(() => {
+    let withWhy = 0, n = 0, tiersSeen = {};
+    for (let i = 0; i < 120; i++) {
+      HIQ.debug.newPlay();
+      for (const o of HIQ.debug.getChoices()) {
+        n++;
+        tiersSeen[o.tier] = (tiersSeen[o.tier] || 0) + 1;
+        if (o.why && o.why.length > 20) withWhy++;
+      }
+    }
+    return { withWhy, n, tiersSeen };
+  });
+  check(reasons.withWhy === reasons.n, "every option carries an authored coaching reason", `${reasons.withWhy}/${reasons.n}`);
+  check(!!reasons.tiersSeen.acceptable, "players are offered genuinely acceptable alternatives, not just traps",
+    JSON.stringify(reasons.tiersSeen));
+
+  // Outcome realism: a good read must not guarantee a goal.
+  section("Outcome realism");
+  const outcomes = await page.evaluate(() => {
+    const t = { best: {}, acceptable: {}, wrong: {} };
+    for (let i = 0; i < 900; i++) {
+      for (const g of ["best", "acceptable", "wrong"]) {
+        const o = HIQ.debug.outcomeFor(g);
+        t[g][o] = (t[g][o] || 0) + 1;
+      }
+    }
+    return t;
+  });
+  const goalRate = (t) => (t.great || 0) / 900;
+  check(goalRate(outcomes.best) > 0.4 && goalRate(outcomes.best) < 0.85,
+    "a best read creates a chance rather than a certain goal", `${Math.round(goalRate(outcomes.best) * 100)}% goals`);
+  check(goalRate(outcomes.acceptable) > 0.05 && goalRate(outcomes.acceptable) < goalRate(outcomes.best),
+    "an acceptable read can still score, but less often", `${Math.round(goalRate(outcomes.acceptable) * 100)}% goals`);
+  check((outcomes.wrong.bad || 0) / 900 < 0.45,
+    "a mistake usually costs possession rather than conceding", `${Math.round((outcomes.wrong.bad || 0) / 900 * 100)}% goals against`);
 
   // ---------------------------------------------------------------- variety
   section("Replay variety (anti-memorisation)");
@@ -289,7 +327,8 @@ const section = (t) => console.log(`\n${t}`);
   const camOk = await page.evaluate(() => {
     const c = HIQ.debug.getCamera();
     const p = HIQ.debug.worldToScreen(c.x, c.y);
-    return c.scale >= 1 && Math.abs(p.x - 550) < 1 && Math.abs(p.y - 310) < 1;
+    const cv = document.getElementById("rink");
+    return c.scale >= 1 && Math.abs(p.x - cv.width / 2) < 1 && Math.abs(p.y - cv.height / 2) < 1;
   });
   check(camOk, "camera transform is self-consistent (taps map back correctly)");
 

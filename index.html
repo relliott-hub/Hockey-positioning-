@@ -37,7 +37,8 @@
 
   <div id="rotateHint">📱 Tip: turn your phone sideways for a bigger rink!</div>
 
-  <canvas id="rink" width="1100" height="620"></canvas>
+  <!-- Regulation 200 x 85 ft sheet at 5.5 px/ft, plus a margin for the boards -->
+  <canvas id="rink" width="1152" height="520"></canvas>
 
   <div class="row" id="actionRow">
     <button id="newBtn">New Play</button>
@@ -68,8 +69,10 @@
       <label>Game format
         <select id="format">
           <option value="5v5" selected>5v5 (Even Strength)</option>
-          <option value="5v4">5v4 (Power Play)</option>
-          <option value="4v5">4v5 (Penalty Kill)</option>
+          <!-- Special teams are being re-authored against the same coaching
+               standard as the even-strength plays; disabled until they are. -->
+          <option value="5v4" disabled>5v4 Power Play — coming soon</option>
+          <option value="4v5" disabled>4v5 Penalty Kill — coming soon</option>
         </select>
       </label>
 
@@ -114,7 +117,6 @@
           <option value="Rush">Rush</option>
           <option value="O-zone">O-zone</option>
           <option value="Defend">Defend</option>
-          <option value="Special">Special Teams</option>
         </select>
       </label>
 
@@ -127,14 +129,14 @@
         </select>
       </label>
 
-      <label id="ppStructWrap">PP structure
+      <label id="ppStructWrap" hidden>PP structure
         <select id="ppStruct">
           <option value="umbrella" selected>Umbrella</option>
           <option value="one3one">1-3-1</option>
         </select>
       </label>
 
-      <label id="pkStructWrap">PK structure
+      <label id="pkStructWrap" hidden>PK structure
         <select id="pkStruct">
           <option value="box" selected>Box</option>
           <option value="diamond">Diamond</option>
@@ -222,6 +224,8 @@
   </div>
 </div>
 
+<script src="js/rink.js"></script>
+<script src="js/plays.js"></script>
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/sim.js"></script>

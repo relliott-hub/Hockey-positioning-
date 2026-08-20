@@ -219,7 +219,18 @@
   function attackSideOf(scen) {
     return scen.isDefense ? (scen.attackDir === "right" ? "left" : "right") : scen.attackDir;
   }
-  function netFor(side) { return side === "left" ? LM.leftNet : LM.rightNet; }
+  const V = HIQ.VIEW, RK = HIQ.RINK;
+  // Landmarks, converted from the regulation sheet into canvas pixels.
+  const PXLM = {
+    leftNet:   V.pt(RK.netLeft),
+    rightNet:  V.pt(RK.netRight),
+    leftSlot:  V.pt(RK.slotLeft),
+    rightSlot: V.pt(RK.slotRight),
+    centre:    V.pt(RK.centre),
+  };
+  // Distances judged in feet, so "ten feet of room" means the same in any direction.
+  const feetBetween = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by) / V.PX_PER_FT;
+  function netFor(side) { return side === "left" ? PXLM.leftNet : PXLM.rightNet; }
   function slotFor(side) {
     const n = netFor(side);
     return { x: side === "right" ? n.x - 125 : n.x + 125, y: 310 };
@@ -235,103 +246,89 @@
   // specific, coachable rule violations. Keeping them separate means the ideal
   // spot always scores 100 and the score degrades predictably with distance.
 
-  // Teaching rules only — no positional component. Also used to self-check scenario data.
-  function ruleViolations(role, pos, scen, skip = {}) {
-    const rules = (scen.rulesByRole && scen.rulesByRole[role]) ? scen.rulesByRole[role] : {};
-    const out = [];
-    const fail = (key, pts, msg) => { if (!skip[key]) out.push({ key, msg, pts }); };
+  /* Grading against authored reads.
 
-    if (rules.spacingFromPuck) {
-      const d = dist(pos.x, pos.y, puck.x, puck.y);
-      const { min, max } = rules.spacingFromPuck;
-      if (d < min) fail("spacing", 22, "Too close to the puck — give your teammate room.");
-      if (d > max) fail("spacing", 22, "Too far from the puck — you're not an option.");
-    }
+     There is no rule engine any more. Rules that scored a position by geometry
+     were the source of the authenticity problem: a third of the answers they
+     marked wrong were defensible hockey. Instead every read is authored per
+     scenario and per role, in three tiers, and a placement is judged by which
+     authored read it is closest to.
 
-    // "Be an outlet" only means something for a player waiting to receive. The
-    // one carrying the puck can't be an outlet for themselves.
-    if (rules.beOutlet && dist(pos.x, pos.y, puck.x, puck.y) > 60) {
-      const { preferX } = rules.beOutlet;
-      if (preferX === "greater" && pos.x < puck.x - 15) fail("outlet", 22, "You're behind the play — get ahead so they can pass to you.");
-      if (preferX === "less" && pos.x > puck.x + 15) fail("outlet", 22, "You're behind the play — get where they can pass to you.");
-    }
+     best       — what we're teaching. Full marks.
+     acceptable — genuinely works, second choice. Partial marks plus the reason
+                  the best read is stronger.
+     wrong      — a real mistake, with the reason it's a mistake. */
 
-    if (rules.protectSlot) {
-      const { slotSide, radius } = rules.protectSlot;
-      const slot = (slotSide === "left") ? LM.leftSlot : LM.rightSlot;
-      if (dist(pos.x, pos.y, slot.x, slot.y) > radius) fail("slot", 26, "You left the front of your net open — protect middle ice!");
-    }
-
-    if (rules.stayAbovePuck) {
-      const margin = rules.stayAbovePuck.margin ?? 25;
-      const tooDeep = (scen.attackDir === "right")
-        ? (pos.x > puck.x + margin && !rules.stayAbovePuck.allowDeeper)
-        : (pos.x < puck.x - margin && !rules.stayAbovePuck.allowDeeper);
-      if (tooDeep) fail("above", 18, "Too deep! Stay above the puck so you're not caught.");
-    }
-
-    return out;
+  // How close (in FEET) you must be to count as having chosen a given read.
+  function readRadiusFt() {
+    const age = ageSel.value, diff = diffSel.value;
+    const base = age === "6-8" ? 16 : age === "12-14" ? 10 : 13;
+    const tighten = diff === "hard" ? 0.78 : diff === "easy" ? 1.25 : 1;
+    return base * tighten;
   }
 
-  // A rule the ideal spot itself breaks is a data bug, not a player mistake.
-  // Disable it for that play so the canonical answer can never be punished.
-  function buildSkipRules(scen) {
-    const skip = {};
-    for (const role of Object.keys(scen.guidanceByRole || {})) {
-      const g = scen.guidanceByRole[role];
-      const v = ruleViolations(role, { x: g.x, y: g.y }, scen, {});
-      if (v.length) {
-        skip[role] = {};
-        v.forEach(f => { skip[role][f.key] = true; });
-        console.warn(`[HIQ] ${scen.id}/${role}: ideal spot violates [${v.map(f => f.key).join(", ")}] — rule disabled for this play (fix the scenario data).`);
-      }
-    }
-    return skip;
+  function readsFor(role, scen) {
+    return (scen && scen.reads && scen.reads[role]) || null;
   }
 
+  function gradePlacement(role, pos, scen) {
+    const reads = readsFor(role, scen);
+    if (!reads) return { tier: "wrong", score: 0, why: "No coaching read for this position." };
+
+    /* Whichever authored read the player is closest to is the one they chose.
+       Checking "best" first would swallow an acceptable spot that happens to
+       sit inside the best spot's radius, and grade a second-choice read as
+       full marks. */
+    const ft = (a) => feetBetween(pos.x, pos.y, a.x, a.y);
+    let nearest = { tier: "best", spot: reads.best, d: ft(reads.best) };
+    for (const a of reads.acceptable) {
+      const d = ft(a);
+      if (d < nearest.d) nearest = { tier: "acceptable", spot: a, d };
+    }
+    for (const w of reads.wrong) {
+      const d = ft(w);
+      if (d < nearest.d) nearest = { tier: "wrong", spot: w, d };
+    }
+
+    const R = readRadiusFt();
+    const better = nearest.tier === "best" ? null : reads.best;
+
+    // Too far from anything anyone coached: off-book, and judged on how far
+    // out of position it is.
+    if (nearest.d > R * 1.5) {
+      const dBest = ft(reads.best);
+      return {
+        tier: "wrong",
+        score: Math.max(0, Math.round(40 - dBest * 0.9)),
+        why: dBest > 45
+          ? "That's the wrong part of the ice for your position on this play."
+          : "You're out of position for what this play needs.",
+        better,
+      };
+    }
+
+    // Inside a coached read: score by tier, easing off with distance from it.
+    const slip = Math.min(1, nearest.d / R);
+    if (nearest.tier === "best") {
+      return { tier: "best", score: Math.round(100 - 8 * slip), why: nearest.spot.why, spot: nearest.spot };
+    }
+    if (nearest.tier === "acceptable") {
+      return { tier: "acceptable", score: Math.round(78 - 10 * slip), why: nearest.spot.why, spot: nearest.spot, better };
+    }
+    return { tier: "wrong", score: Math.round(38 - 14 * slip), why: nearest.spot.why, spot: nearest.spot, better };
+  }
+
+  // Kept for the older call sites that just want a number.
   function scorePlacement(role, pos, scen) {
-    const ageCfg = getAgeSettings();
-    const skip = (scen._skipRules && scen._skipRules[role]) || {};
-
-    // Positional accuracy: 100 at the coaching spot, decaying smoothly outward.
-    const g = scen.guidanceByRole && scen.guidanceByRole[role];
-    let base = 100;
-    let posMiss = null;
-    if (g) {
-      const r = Math.max(35, difficultyTighten(g.r, scen.diff) * ageCfg.guidanceScale);
-      const d = dist(pos.x, pos.y, g.x, g.y);
-      base = clamp(Math.round(100 - 30 * Math.pow(d / r, 1.3)), 0, 100);
-      if (base < 88) {
-        posMiss = {
-          key: "position",
-          pts: 100 - base,
-          msg: d > r * 2
-            ? "That's the wrong area of the ice for your position."
-            : "Close — but not quite in your support spot."
-        };
-      }
-    }
-
-    const violations = ruleViolations(role, pos, scen, skip);
-    violations.sort((a, b) => b.pts - a.pts);
-    const enforced = violations.slice(0, ageCfg.maxRulesToEnforce);
-
-    let score = base;
-    for (const f of enforced) score -= f.pts;
-    score = clamp(Math.round(score), 0, 100);
-
-    // Coaching cues: specific rule mistakes first, positional drift as backup.
-    const cues = enforced.concat(posMiss ? [posMiss] : []);
-    return { score, failures: cues, allFailures: violations };
+    const g = gradePlacement(role, pos, scen);
+    return { score: g.score, failures: g.tier === "best" ? [] : [{ key: g.tier, msg: g.why, pts: 100 - g.score }], allFailures: [], grade: g };
   }
 
-  // --- Scenario selection / building
   function getCandidateTemplates(fmt) {
-    if (fmt === "5v4" || fmt === "4v5") {
-      const st = HIQ.buildSpecialTeamsScenario(fmt, ppStructSel.value, pkStructSel.value);
-      return st ? [st] : [];
-    }
-    return HIQ.TEMPLATES_EVEN.filter(t => t.allowedFormats.includes("5v5"));
+    // Special teams have not been re-authored on the new model yet, so the
+    // even-strength set is used for every format rather than shipping
+    // positions we can no longer vouch for.
+    return HIQ.PLAYS.slice();
   }
 
   function applyFormat(offenseFull, defenseFull, fmt) {
@@ -356,13 +353,10 @@
   }
 
   function coachHints(role, scen) {
-    const rules = (scen.rulesByRole && scen.rulesByRole[role]) || {};
-    const hints = [];
-    if (rules.protectSlot) hints.push("🛡️ Protect the front of your net — don't chase the puck!");
-    if (rules.beOutlet) hints.push("🏒 Get open where your teammate can pass to you.");
-    if (rules.spacingFromPuck) hints.push("↔️ Not too close to the puck, not too far.");
-    if (rules.stayAbovePuck) hints.push("⬆️ Don't get caught too deep — stay above the puck.");
-    return hints.slice(0, 2);
+    // For the youngest players, give away the thinking behind the best read.
+    const reads = readsFor(role, scen);
+    if (!reads) return [];
+    return ["\uD83C\uDFD2 " + reads.best.why];
   }
 
   function buildScenario() {
@@ -384,109 +378,104 @@
 
     let candidates = getCandidateTemplates(fmt);
     const phaseFilter = phaseFilterSel.value;
-    const pressureFilter = pressureFilterSel.value;
-
     candidates = candidates.filter(t => phaseFilter === "any" || t.phase === phaseFilter);
-    if (candidates.length === 0) candidates = getCandidateTemplates(fmt);
-    if (candidates.length === 0) { statusEl.textContent = "No scenarios available for those filters."; return; }
+    if (!candidates.length) candidates = getCandidateTemplates(fmt);
+    if (!candidates.length) { statusEl.textContent = "No scenarios available for those filters."; return; }
 
-    // Every play is a fresh read: mirrored ice, a moved puck, and support spots
-    // and opposition that respond. Special teams already vary by puck location.
-    //
-    // One situation is rejected outright: a play where the puck belongs to the
-    // very role the player is being asked to position. The question is "where
-    // should you go to help" — if you already have the puck that makes no sense,
-    // and since your token is hidden while choosing, nobody visible would be
-    // carrying it. Re-roll for a play where a teammate or opponent has it.
-    let tpl = null, pressure = null;
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const base = pick(candidates);
-      const pr = (pressureFilter === "any") ? pick(base.pressures || ["Med"]) : pressureFilter;
-      const id = base.id || "";
-      const isSpecialTpl = id.startsWith("PP_") || id.startsWith("PK_");
-      const cand = isSpecialTpl ? base : HIQ.varyScenario(base, {
-        mirror: Math.random() < 0.5,
-        pressure: pr,
-        jitter: getAgeSettings().scenarioJitter
-      });
-
-      const g = cand.guidanceByRole && cand.guidanceByRole[role];
-      const youHaveThePuck = g && dist(g.x, g.y, cand.puck.x, cand.puck.y) < 62;
-      if (mode === "single" && youHaveThePuck && attempt < 7) continue;
-
-      tpl = cand; pressure = pr;
+    /* Pick a play the chosen position actually has a coached read for, and never
+       one where that position is the puck carrier — "where should you go to
+       help?" makes no sense when the puck is already on your stick. */
+    let play = null;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      // Mirror and shift the whole picture together, so the play lands somewhere
+      // new without any of its coached relationships changing.
+      const cand = HIQ.varyPlay(pick(candidates));
+      const hasRead = cand.reads && cand.reads[role];
+      const isCarrier = cand.carrier === role;
+      if ((!hasRead || isCarrier) && attempt < 11) continue;
+      play = cand;
       break;
     }
+    if (!play) play = HIQ.varyPlay(candidates[0]);
+
+    // Fall back to a position this play does coach, if the chosen one isn't in it.
+    let playRole = role;
+    if (!play.reads[playRole] || play.carrier === playRole) {
+      playRole = Object.keys(play.reads).find(r => r !== play.carrier) || Object.keys(play.reads)[0];
+    }
+
+    const px = HIQ.playToPixels(play);
 
     scenario = {
-      id: tpl.id,
-      phase: tpl.phase,
-      pressure, fmt, mode, role, diff,
-      attackDir: tpl.attackDir || "right",
-      isDefense: !!tpl.isDefense,
-      rulesByRole: tpl.rulesByRole || {},
-      guidanceByRole: tpl.guidanceByRole || {},
-      prompt: tpl.prompt ? tpl.prompt(role, fmt) : `${fmt} — ${tpl.phase}. You are ${role}.`
+      id: play.id,
+      phase: play.phase,
+      name: play.name,
+      situation: play.situation,
+      pressure: play.pressure || "Med",
+      fmt, mode, diff,
+      role: playRole,
+      attackDir: play.attackDir,
+      isDefense: !!play.isDefense,
+      carrier: play.carrier,
+      reads: px.reads,
+      prompt: `${play.name} — you are ${playRole}. ${play.situation}`,
     };
-
-    puck.x = tpl.puck.x;
-    puck.y = tpl.puck.y;
-
-    const applied = applyFormat(tpl.offenseFull, tpl.defenseFull, fmt);
-    defense = applied.def.map(p => ({ ...p, r: 16 }));
-
-    // The player must be assigned a position that is actually on the ice in this
-    // format (e.g. a 4-man penalty kill has no 5th spot to stand in).
-    const onIce = applied.off.map(p => p.role);
-    let playRole = role;
-    if (!onIce.includes(playRole) || !scenario.guidanceByRole[playRole]) {
-      playRole = onIce.find(r2 => scenario.guidanceByRole[r2]) || onIce[0];
-      scenario.roleNote = `On this unit you're covering the ${playRole} spot.`;
+    if (playRole !== role) {
+      scenario.roleNote = `This play doesn't use ${role} — you're playing ${playRole}.`;
     }
-    scenario.role = playRole;
-    scenario.prompt = tpl.prompt ? tpl.prompt(playRole, fmt) : `${fmt} — ${tpl.phase}. You are ${playRole}.`;
+
+    puck.x = px.puck.x;
+    puck.y = px.puck.y;
+
+    // Our skaters, minus the position the player is taking.
+    const teammates = Object.entries(px.players)
+      .filter(([r]) => r !== playRole)
+      .map(([r, pt]) => ({ role: r, x: pt.x, y: pt.y, r: 16 }));
+
+    defense = px.opponents.map(o => ({ role: o.label, x: o.x, y: o.y, r: 16 }));
+    // Their goalie sits in the net they're defending.
+    const theirNet = netFor(attackSideOf(scenario));
+    defense.push({ role: "G", x: theirNet.x, y: theirNet.y, r: 17 });
+    // Ours in the net we're defending.
+    const ourNet = netFor(ownSideOf(scenario));
+    offense = teammates.concat([{ role: "G", x: ourNet.x, y: ourNet.y, r: 17 }]);
 
     if (mode === "single") {
-      // Your role always takes one of the team's spots (never adds an extra skater).
-      const others = applied.off.filter(p => p.role !== playRole);
-      controlled = [{ role: playRole, x: 550, y: 310, r: 19, dragging: false }];
-      offense = others.map(p => ({ ...p, r: 16 }));
+      controlled = [{ role: playRole, x: PXLM.centre.x, y: PXLM.centre.y, r: 19, dragging: false }];
     } else {
-      controlled = applied.off.map(p => ({ ...p, r: 19, dragging: false }));
-      offense = [];
+      controlled = teammates.map(p => ({ ...p, r: 19, dragging: false }));
+      offense = [{ role: "G", x: ourNet.x, y: ourNet.y, r: 17 }];
     }
 
-    const ageCfg = getAgeSettings();
-    const g = scenario.guidanceByRole?.[playRole] || { x: 550, y: 310, r: 90 };
-    guidance = { x: g.x, y: g.y, r: difficultyTighten(g.r, diff) * ageCfg.guidanceScale };
+    const best = scenario.reads[playRole].best;
+    guidance = { x: best.x, y: best.y, r: readRadiusFt() * HIQ.VIEW.PX_PER_FT };
 
-    // Positions settle FIRST: spread the skaters apart and clear the coaching
-    // spot, moving the puck with its carrier so possession survives. Everything
-    // derived from positions — the rule self-check, the choices — comes after,
-    // so nothing is computed against coordinates that later shift.
+    // Positions settle before anything is derived from them.
     choice = { active: false, options: [] };
     spreadForClarity([guidance]);
-    scenario._skipRules = buildSkipRules(scenario);
 
     if (isChoiceMode()) {
       choice.options = generateChoices();
       choice.active = choice.options.length > 0;
+      // The authored spots are fixed hockey, so it's the players that move to
+      // keep the options visible.
+      if (choice.active) spreadForClarity(choice.options.map(o => o.pos));
     }
 
-    // Park the (hidden) player token equidistant from the three options, so when
-    // they answer it skates in from a neutral spot that's already on screen.
+    // Park the (hidden) token equidistant from the options so it skates in from
+    // somewhere neutral and already on screen.
     if (choice.active && controlled.length) {
       const n = choice.options.length;
-      controlled[0].x = choice.options.reduce((s, o) => s + o.pos.x, 0) / n;
-      controlled[0].y = choice.options.reduce((s, o) => s + o.pos.y, 0) / n;
+      controlled[0].x = choice.options.reduce((a, o) => a + o.pos.x, 0) / n;
+      controlled[0].y = choice.options.reduce((a, o) => a + o.pos.y, 0) / n;
     }
 
-    camera.ready = false; // snap to the new play rather than gliding across the ice
+    camera.ready = false;
 
     // UI
     phaseEl.textContent = scenario.phase;
     pressureEl.textContent = scenario.pressure;
-    structureEl.textContent = structureLabel(fmt);
+    structureEl.textContent = scenario.name;
     promptEl.textContent = scenario.prompt;
     scoreEl.textContent = "—";
     lockBtn.style.display = choice.active ? "none" : "";
@@ -505,16 +494,11 @@
       statusEl.textContent = "Drag your whole team (blue) into a better shape, then tap Lock In.";
     }
 
-    renderState.intro = { text: `${scenario.phase.toUpperCase()}  •  ${fmt}`, at: performance.now() };
+    renderState.intro = { text: `${scenario.phase.toUpperCase()}  \u2022  ${scenario.name}`, at: performance.now() };
     HIQ.audio.play("faceoff");
     setCoach("think");
   }
 
-  /* Ten players inside one zone will overlap if you place them where a coach
-     would draw them, and overlapping dots are unreadable — especially on a
-     phone. Nudge skaters apart to a minimum gap, and push them off the A/B/C
-     markers so the choices stay visible. A few feet of separation never changes
-     the read; being unable to tell two players apart certainly does. */
   function spreadForClarity(keepClear) {
     const MIN_GAP = 62;
     const skaters = [...offense, ...defense].filter(p => p.role !== "G");
@@ -640,118 +624,42 @@
     };
   }
 
-  // --- A/B/C choice generation
-  // Decoys are deliberate near-misses: each one is a real positioning mistake,
-  // placed a difficulty-scaled distance from the coaching spot. Obvious decoys
-  // teach nothing, so tighter difficulties pull them closer to the right answer.
+  // --- A/B/C choices, taken from the authored reads for this play.
+  // One best, one that genuinely works, one real mistake. Nothing generated by
+  // pushing a marker in a direction and calling it wrong.
   function generateChoices() {
     const role = scenario.role;
-    const g = scenario.guidanceByRole?.[role] || { x: 550, y: 310, r: 90 };
-    const correctPos = { x: g.x, y: g.y };
-    const correctRes = scorePlacement(role, correctPos, scenario);
+    const reads = scenario.reads[role];
+    if (!reads) return [];
 
-    const atk = attackSideOf(scenario);
-    const ownS = ownSideOf(scenario);
-    const atkNet = netFor(atk);
-    const ownNet = netFor(ownS);
-    const ageCfg = getAgeSettings();
-    const r = difficultyTighten(g.r, scenario.diff) * ageCfg.guidanceScale;
-
-    // How far a wrong answer sits from the right one, by difficulty.
-    const spreadBand = { easy: [2.0, 2.8], med: [1.5, 2.1], hard: [1.1, 1.5] }[scenario.diff] || [1.5, 2.1];
-    const near = r * spreadBand[0];
-    const far = r * spreadBand[1];
-
-    const unit = (from, to) => {
-      const dx = to.x - from.x, dy = to.y - from.y;
-      const m = Math.hypot(dx, dy) || 1;
-      return { x: dx / m, y: dy / m };
-    };
-    const at = (dir, d, mistake) => ({
-      pos: {
-        x: clamp(correctPos.x + dir.x * d, 55, 1045),
-        y: clamp(correctPos.y + dir.y * d, 55, 565)
-      },
-      mistake
+    const mk = (spot, tier) => ({
+      pos: { x: spot.x, y: spot.y },
+      why: spot.why,
+      tier,
+      correct: tier === "best",
+      res: gradePlacement(role, { x: spot.x, y: spot.y }, scenario),
     });
 
-    const toPuck = unit(correctPos, puck);
-    const toOwnNet = unit(correctPos, ownNet);
-    const toAtkNet = unit(correctPos, atkNet);
-    const toMiddle = unit(correctPos, { x: correctPos.x, y: 310 });
-    const toBoards = { x: 0, y: correctPos.y < 310 ? -1 : 1 };
+    const opts = [mk(reads.best, "best")];
+    if (reads.acceptable.length) opts.push(mk(pick(reads.acceptable), "acceptable"));
+    if (reads.wrong.length) opts.push(mk(pick(reads.wrong), "wrong"));
 
-    const candidates = [
-      at(toPuck, near, "You chased the puck instead of holding your support spot."),
-      at(toOwnNet, far, "You hung back too far — you weren't an option for your teammate."),
-      at(toAtkNet, near, scenario.isDefense
-        ? "You got caught up ice while your team was defending."
-        : "You drifted too deep and skated yourself out of the play."),
-      at(toMiddle, far, "You floated into the middle and left your lane uncovered."),
-      at(toBoards, near, "You hugged the boards — no passing angle from there."),
-    ];
-
-    // Keep only genuinely worse options, well separated from each other.
-    const scored = candidates
-      .map(c => ({ ...c, res: scorePlacement(role, c.pos, scenario) }))
-      .filter(c => c.res.score <= correctRes.score - 12)
-      .filter(c => dist(c.pos.x, c.pos.y, correctPos.x, correctPos.y) > r * 0.9);
-
-    // Prefer decoys that already sit in open ice — a marker drawn on top of a
-    // player is hard to see and harder to tap.
-    const occupied = [...offense, ...defense].filter(p => p.role !== "G");
-    const isClear = c => occupied.every(p => dist(c.pos.x, c.pos.y, p.x, p.y) >= 62);
-    const shuffled = shuffle(scored);
-    const ordered = [...shuffled.filter(isClear), ...shuffled.filter(c => !isClear(c))];
-
-    const spread = [];
-    for (const c of ordered) {
-      if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
-      if (spread.length === 2) break;
-    }
-    // Fallback: push straight out from the ideal spot in opposite directions.
-    let angle = Math.random() * Math.PI * 2;
-    while (spread.length < 2) {
-      const dir = { x: Math.cos(angle), y: Math.sin(angle) };
-      const c = at(dir, far, "That's not your spot on this play.");
-      c.res = scorePlacement(role, c.pos, scenario);
-      if (spread.every(s => dist(s.pos.x, s.pos.y, c.pos.x, c.pos.y) > r * 0.9)) spread.push(c);
-      angle += Math.PI * 0.7;
-    }
-
-    // A decoy sitting on top of a player is unreadable — and the "you chased the
-    // puck" decoy lands on the puck carrier by its very nature. Slide such a
-    // decoy clear of the player and re-score it where it actually ends up.
-    const skaters = [...offense, ...defense].filter(p => p.role !== "G");
-    for (const c of spread) {
-      for (let i = 0; i < 6; i++) {
-        let worst = null, worstD = Infinity;
-        for (const p of skaters) {
-          const d = dist(c.pos.x, c.pos.y, p.x, p.y);
-          if (d < 62 && d < worstD) { worst = p; worstD = d; }
-        }
-        if (!worst) break;
-        let dx = c.pos.x - worst.x, dy = c.pos.y - worst.y;
-        let d = Math.hypot(dx, dy);
-        if (d < 0.5) { dx = correctPos.x - worst.x; dy = correctPos.y - worst.y; d = Math.hypot(dx, dy) || 1; }
-        c.pos = {
-          x: clamp(c.pos.x + (dx / d) * (62 - worstD), 58, 1042),
-          y: clamp(c.pos.y + (dy / d) * (62 - worstD), 58, 562)
-        };
+    // Top up from whichever pool can still offer something distinct.
+    const far = (a, b) => dist(a.pos.x, a.pos.y, b.pos.x, b.pos.y) > readRadiusFt() * HIQ.VIEW.PX_PER_FT;
+    for (const [pool, tier] of [[reads.wrong, "wrong"], [reads.acceptable, "acceptable"]]) {
+      for (const spot of pool) {
+        if (opts.length >= 3) break;
+        const cand = mk(spot, tier);
+        if (opts.every(o => far(o, cand))) opts.push(cand);
       }
-      c.res = scorePlacement(role, c.pos, scenario);
     }
+    if (opts.length < 3) return [];
 
-    const opts = shuffle([
-      { pos: correctPos, res: correctRes, correct: true },
-      { pos: spread[0].pos, res: spread[0].res, correct: false, mistake: spread[0].mistake },
-      { pos: spread[1].pos, res: spread[1].res, correct: false, mistake: spread[1].mistake },
-    ]);
-    opts.forEach((o, i) => { o.label = "ABC"[i]; });
-    return opts;
+    const shuffled = shuffle(opts.slice(0, 3));
+    shuffled.forEach((o, i) => { o.label = "ABC"[i]; });
+    return shuffled;
   }
 
-  // --- Snapshots (restore after a failed attempt so the player can retry)
   function takeSnapshot() {
     snapshot = {
       controlled: controlled.map(p => ({ x: p.x, y: p.y })),
@@ -946,10 +854,19 @@
   }
 
   // --- Lock In / outcome
-  function tierFor(score, ok) {
-    const pass = passThreshold();
-    if (ok) return score >= Math.min(96, pass + 12) ? "great" : "good";
-    return score >= pass - 25 ? "miss" : "bad";
+  /* Outcome tiers.
+
+     Position improves your odds; it does not decide the result. A best read
+     creates a good chance and usually — not always — finishes. A read that
+     works keeps the play alive and sometimes scores. A mistake normally just
+     costs possession; only a bad mistake in a dangerous area ends up in your
+     own net. Teaching "right spot = guaranteed goal" would be teaching a lie
+     about the sport. */
+  function outcomeFor(grade) {
+    const roll = Math.random();
+    if (grade === "best")       return roll < 0.62 ? "great" : "good";
+    if (grade === "acceptable") return roll < 0.24 ? "great" : roll < 0.86 ? "good" : "miss";
+    return roll < 0.72 ? "miss" : "bad";
   }
 
   function lockIn(chosen = null) {
@@ -961,52 +878,41 @@
     const pass = passThreshold();
     const ageCfg = getAgeSettings();
 
-    let ok, score, failures, receiver, reportRole;
+    let grade, score, why, better, receiver, reportRole;
 
     if (mode === "single") {
       const you = controlled[0];
-      const res = chosen ? chosen.res : scorePlacement(scenario.role, { x: you.x, y: you.y }, scenario);
-      score = res.score;
-      failures = res.failures;
-      ok = chosen ? chosen.correct : (score >= pass);
+      const g = chosen ? chosen.res : gradePlacement(scenario.role, { x: you.x, y: you.y }, scenario);
+      grade = chosen ? chosen.tier : g.tier;
+      score = g.score;
+      why = chosen ? chosen.why : g.why;
+      better = g.better || (grade !== "best" ? scenario.reads[scenario.role].best : null);
       receiver = you;
       reportRole = scenario.role;
     } else {
-      const results = controlled.map(p => scorePlacement(p.role, { x: p.x, y: p.y }, scenario));
+      const results = controlled
+        .filter(p => p.role !== "G")
+        .map(p => gradePlacement(p.role, { x: p.x, y: p.y }, scenario));
       score = Math.round(results.reduce((a, r) => a + r.score, 0) / Math.max(1, results.length));
-      const missCounts = {};
-      let worst = null;
-      for (const r of results) {
-        for (const f of r.failures) {
-          missCounts[f.key] = (missCounts[f.key] || 0) + 1;
-          if (!worst || f.pts > worst.pts) worst = f;
-        }
-      }
-      const topKey = Object.entries(missCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-      const teamMsgs = {
-        slot: "Too much slot exposure — protect inside ice.",
-        spacing: "Spacing is off — don't crowd the puck or disappear.",
-        outlet: "Not enough passing options — get open.",
-        above: "Too many players too deep — stay above the puck.",
-        guidance: "Players drifting out of structure — hold your shape."
-      };
-      failures = topKey ? [{ key: topKey, msg: teamMsgs[topKey], pts: worst?.pts || 0 }] : [];
-      ok = score >= pass;
+      const worst = results.slice().sort((a, b) => a.score - b.score)[0];
+      grade = score >= 88 ? "best" : score >= 68 ? "acceptable" : "wrong";
+      why = worst ? worst.why : "";
+      better = null;
       const anchor = scenario.isDefense ? toward(puck, slotFor(ownSideOf(scenario)), 0.5) : puck;
-      receiver = nearestTo(controlled, anchor.x, anchor.y) || controlled[0];
+      receiver = nearestTo(controlled.filter(p => p.role !== "G"), anchor.x, anchor.y) || controlled[0];
       reportRole = "TEAM";
     }
 
-    const tier = tierFor(score, ok);
+    const ok = grade !== "wrong";
+    const failures = ok ? [] : [{ key: grade, msg: why, pts: 100 - score }];
+
+    const tier = outcomeFor(grade);
     const top = failures[0];
-    const second = failures[1];
-    const cues = [];
-    // A picked decoy knows exactly which mistake it represents — say that first.
-    if (!ok && chosen && chosen.mistake) cues.push(chosen.mistake);
-    if (top && cues.length === 0) cues.push(top.msg);
-    else if (top && ageCfg.showSecondCue) cues.push(top.msg);
-    if (ageCfg.showSecondCue && second && cues.length < 2) cues.push(second.msg);
-    const subMsg = cues[0] || (top ? top.msg : "Not the best option this time.");
+    // The coaching line is the authored reason for the spot the player chose.
+    const cues = [why].filter(Boolean);
+    if (grade === "acceptable" && better) cues.push("The stronger read: " + better.why);
+    else if (grade === "wrong" && better && ageCfg.showSecondCue) cues.push("Best here: " + better.why);
+    const subMsg = cues[0] || "Not the best option this time.";
 
     // Update stats immediately
     scoreEl.textContent = `${score}`;
@@ -1026,10 +932,11 @@
     } else {
       recentMisses += 1;
     }
-    if (tier === "great") { stats.goals += 1; stats.greats += 1; sessionGoals += 1; }
-    if (score === 100) stats.perfects += 1;
+    if (tier === "great") { stats.goals += 1; sessionGoals += 1; }
+    if (grade === "best") stats.greats += 1;
+    if (grade === "best" && score >= 98) stats.perfects += 1;
     stats.bestStreak = Math.max(stats.bestStreak, streak);
-    awardXP(tier === "great" ? 100 : tier === "good" ? 60 : 15);
+    awardXP(grade === "best" ? 100 : grade === "acceptable" ? 55 : 15);
     checkBadges({ comeback: wasComeback });
     saveStore("hiq_stats", stats);
 
@@ -1055,24 +962,31 @@
       },
       onDone: (banner) => {
         setBanner(banner);
-        setCoach(ok ? (tier === "great" ? "goal" : "happy") : "sad");
-        if (ok) {
-          statusEl.innerHTML = tier === "great"
-            ? "<b>NICE READ ✅</b> You finished the play with a goal! Next play coming…"
-            : "<b>NICE READ ✅</b> You kept the play alive. Next play coming…";
-          pendingTimer = setTimeout(buildScenario, 1500);
+        setCoach(grade === "best" ? (tier === "great" ? "goal" : "happy")
+               : grade === "acceptable" ? "happy" : "sad");
+
+        if (grade === "best") {
+          const outcome = tier === "great"
+            ? "You got to the right spot and it ended in a goal!"
+            : "You got to the right spot and kept the play alive — the chance was there.";
+          statusEl.innerHTML = `<b>BEST READ \u2705</b> ${outcome}`;
+          pendingTimer = setTimeout(buildScenario, 1700);
+
+        } else if (grade === "acceptable") {
+          // The whole point: this works, and the coach still shows you better.
+          statusEl.innerHTML = `<b>THAT WORKS \uD83D\uDC4D</b> ${why}` +
+            (better ? `<br/><span class="muted">Even better: ${better.why}</span>` : "");
+          pendingTimer = setTimeout(buildScenario, 2600);
+
         } else {
-          // Revealing the answer on the first miss teaches kids to tap the green
-          // circle instead of reading the play. Give them a cue and a second look
-          // first; only show the spot once they've genuinely had two goes.
-          // The youngest group still gets the answer right away.
           const alwaysReveal = (ageSel.value === "6-8" || diffSel.value === "easy");
           scenario._attempts = (scenario._attempts || 0) + 1;
           const reveal = alwaysReveal || scenario._attempts >= 2;
 
           statusEl.innerHTML = reveal
-            ? `<b>NOT QUITE ❌</b> ${cues.join(" ")}<br/><span class="muted">Here's the spot the coach wanted — remember that shape.</span>`
-            : `<b>NOT THIS TIME ❌</b> ${cues.join(" ")}<br/><span class="muted">Have another look — where should you be?</span>`;
+            ? `<b>NOT QUITE \u274C</b> ${why}` +
+              (better ? `<br/><span class="muted">Where you wanted to be: ${better.why}</span>` : "")
+            : `<b>NOT THIS TIME \u274C</b> ${why}<br/><span class="muted">Have another look \u2014 where should you be?</span>`;
 
           pendingTimer = setTimeout(() => {
             restoreSnapshot();
@@ -1080,7 +994,7 @@
             if (isChoiceMode() && choice.options.length) choice.active = true;
             renderState.showGuidance = reveal;
             renderState.guidanceOk = false;
-          }, 1600);
+          }, 1700);
         }
       }
     });
@@ -1273,8 +1187,8 @@
   function updateGoalies(dt) {
     for (const p of [...defense, ...offense]) {
       if (p.role !== "G") continue;
-      const net = dist(p.x, p.y, LM.leftNet.x, LM.leftNet.y) < dist(p.x, p.y, LM.rightNet.x, LM.rightNet.y)
-        ? LM.leftNet : LM.rightNet;
+      const net = dist(p.x, p.y, PXLM.leftNet.x, PXLM.leftNet.y) < dist(p.x, p.y, PXLM.rightNet.x, PXLM.rightNet.y)
+        ? PXLM.leftNet : PXLM.rightNet;
       const ty = clamp(puck.y, net.y - 26, net.y + 26);
       const tx = net.x + (net.x < 550 ? 8 : -8);
       p.y += (ty - p.y) * Math.min(1, dt * 3);
@@ -1311,8 +1225,8 @@
 
   // --- Static rink pre-rendered once to an offscreen layer
   const rinkLayer = document.createElement("canvas");
-  rinkLayer.width = 1100;
-  rinkLayer.height = 620;
+  rinkLayer.width = canvas.width;
+  rinkLayer.height = canvas.height;
 
   function roundRectPath(c, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
@@ -1326,111 +1240,113 @@
   }
 
   function buildRinkLayer() {
+    const R = HIQ.RINK, V = HIQ.VIEW;
     const c = rinkLayer.getContext("2d");
-    c.clearRect(0, 0, 1100, 620);
+    c.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Ice with subtle vertical sheen
-    roundRectPath(c, 20, 20, 1060, 580, 110);
-    const grad = c.createLinearGradient(0, 20, 0, 600);
+    const X = (ft) => V.x(ft), Y = (ft) => V.y(ft), S = (ft) => V.px(ft);
+    const boardsX = X(0), boardsY = Y(0);
+    const boardsW = S(R.length), boardsH = S(R.width);
+
+    // Ice
+    roundRectPath(c, boardsX, boardsY, boardsW, boardsH, S(R.cornerRadius));
+    const grad = c.createLinearGradient(0, boardsY, 0, boardsY + boardsH);
     grad.addColorStop(0, "#f8fcff");
     grad.addColorStop(0.5, "#eef6fd");
     grad.addColorStop(1, "#e3eff9");
     c.fillStyle = grad;
     c.fill();
-
     c.save();
-    roundRectPath(c, 20, 20, 1060, 580, 110);
     c.clip();
 
-    // Ice texture: faint skate-scuff speckles
-    for (let i = 0; i < 420; i++) {
+    // Faint skate marks
+    for (let i = 0; i < 380; i++) {
       c.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,0.5)" : "rgba(160,190,220,0.18)";
-      const sx = 20 + Math.random() * 1060;
-      const sy = 20 + Math.random() * 580;
-      c.fillRect(sx, sy, 1 + Math.random() * 2, 1);
+      const sx = boardsX + Math.random() * boardsW;
+      const sy = boardsY + Math.random() * boardsH;
+      c.fillRect(sx, sy, 12 + Math.random() * 26, 1);
     }
 
-    // Goal lines
+    // Goal lines (red), full width between the boards
     c.strokeStyle = "#d94141";
-    c.lineWidth = 3;
-    c.beginPath(); c.moveTo(95, 20); c.lineTo(95, 600); c.stroke();
-    c.beginPath(); c.moveTo(1005, 20); c.lineTo(1005, 600); c.stroke();
-
-    // Blue lines + center red line
-    c.fillStyle = "rgba(37, 99, 235, 0.75)";
-    c.fillRect(354, 20, 12, 580);
-    c.fillRect(734, 20, 12, 580);
-    c.fillStyle = "rgba(220, 60, 60, 0.75)";
-    c.fillRect(544, 20, 12, 580);
-
-    // Center circle with a faint home logo
-    c.strokeStyle = "rgba(37, 99, 235, 0.6)";
-    c.lineWidth = 3;
-    c.beginPath(); c.arc(550, 310, 65, 0, Math.PI * 2); c.stroke();
-    c.font = "bold 34px system-ui";
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillStyle = "rgba(37, 99, 235, 0.12)";
-    c.fillText("HIQ", 550, 310);
-    c.fillStyle = "rgba(220, 60, 60, 0.8)";
-    c.beginPath(); c.arc(550, 310, 5, 0, Math.PI * 2); c.fill();
-
-    // Board advertising strips (arena feel)
-    c.font = "bold 13px system-ui";
-    c.fillStyle = "rgba(18, 38, 58, 0.22)";
-    for (const y of [34, 588]) {
-      for (const x of [300, 550, 800]) {
-        c.fillText(x === 550 ? "★ HOCKEY IQ TRAINER ★" : "GO  TEAM  GO!", x, y);
-      }
+    c.lineWidth = 2;
+    for (const gx of [R.goalLineLeft, R.goalLineRight]) {
+      c.beginPath(); c.moveTo(X(gx), boardsY); c.lineTo(X(gx), boardsY + boardsH); c.stroke();
     }
 
-    // Zone faceoff circles + dots
+    // Blue lines (1 ft wide) and the centre red line
+    c.fillStyle = "rgba(37, 99, 235, 0.75)";
+    for (const bx of [R.blueLineLeft, R.blueLineRight]) {
+      c.fillRect(X(bx) - S(0.5), boardsY, S(1), boardsH);
+    }
+    c.fillStyle = "rgba(220, 60, 60, 0.75)";
+    c.fillRect(X(R.centreLine) - S(0.5), boardsY, S(1), boardsH);
+
+    // Centre circle and dot
+    c.strokeStyle = "rgba(37, 99, 235, 0.6)";
+    c.lineWidth = 2;
+    c.beginPath(); c.arc(X(R.centre.x), Y(R.centre.y), S(R.centreCircleR), 0, Math.PI * 2); c.stroke();
+    c.fillStyle = "rgba(220, 60, 60, 0.8)";
+    c.beginPath(); c.arc(X(R.centre.x), Y(R.centre.y), S(R.dotR), 0, Math.PI * 2); c.fill();
+
+    // End-zone faceoff circles + dots
     c.strokeStyle = "rgba(217, 65, 65, 0.55)";
     c.fillStyle = "rgba(217, 65, 65, 0.8)";
-    for (const [fx, fy] of [[222, 170], [222, 450], [878, 170], [878, 450]]) {
-      c.beginPath(); c.arc(fx, fy, 55, 0, Math.PI * 2); c.stroke();
-      c.beginPath(); c.arc(fx, fy, 6, 0, Math.PI * 2); c.fill();
+    for (const k of ["leftTop", "leftBottom", "rightTop", "rightBottom"]) {
+      const d = R.dots[k];
+      c.beginPath(); c.arc(X(d.x), Y(d.y), S(R.faceoffCircleR), 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.arc(X(d.x), Y(d.y), S(R.dotR), 0, Math.PI * 2); c.fill();
     }
-    // Neutral zone dots
-    for (const [fx, fy] of [[460, 170], [460, 450], [640, 170], [640, 450]]) {
-      c.beginPath(); c.arc(fx, fy, 6, 0, Math.PI * 2); c.fill();
+    // Neutral-zone dots
+    for (const k of ["nzLeftTop", "nzLeftBottom", "nzRightTop", "nzRightBottom"]) {
+      const d = R.dots[k];
+      c.beginPath(); c.arc(X(d.x), Y(d.y), S(R.dotR), 0, Math.PI * 2); c.fill();
     }
 
     // Creases
     c.fillStyle = "rgba(147, 197, 253, 0.55)";
     c.strokeStyle = "#d94141";
-    c.lineWidth = 2;
-    c.beginPath(); c.arc(95, 310, 45, -Math.PI / 2, Math.PI / 2); c.closePath(); c.fill(); c.stroke();
-    c.beginPath(); c.arc(1005, 310, 45, Math.PI / 2, -Math.PI / 2); c.closePath(); c.fill(); c.stroke();
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.arc(X(R.goalLineLeft), Y(R.midY), S(R.creaseR), -Math.PI / 2, Math.PI / 2);
+    c.closePath(); c.fill(); c.stroke();
+    c.beginPath();
+    c.arc(X(R.goalLineRight), Y(R.midY), S(R.creaseR), Math.PI / 2, -Math.PI / 2);
+    c.closePath(); c.fill(); c.stroke();
 
     // Nets
     for (const side of ["left", "right"]) {
-      const n = netFor(side);
-      const w = 30, h = 58;
-      const x0 = side === "left" ? n.x - w : n.x;
+      const gx = side === "left" ? R.goalLineLeft : R.goalLineRight;
+      const w = S(R.goalDepth), h = S(R.goalWidth);
+      const x0 = side === "left" ? X(gx) - w : X(gx);
       c.fillStyle = "rgba(255,255,255,0.9)";
-      c.fillRect(x0, n.y - h / 2, w, h);
+      c.fillRect(x0, Y(R.midY) - h / 2, w, h);
       c.strokeStyle = "#b93030";
-      c.lineWidth = 3;
-      c.strokeRect(x0, n.y - h / 2, w, h);
-      c.strokeStyle = "rgba(120,120,120,0.5)";
-      c.lineWidth = 1;
-      for (let i = 1; i < 4; i++) {
-        c.beginPath(); c.moveTo(x0 + (w / 4) * i, n.y - h / 2); c.lineTo(x0 + (w / 4) * i, n.y + h / 2); c.stroke();
-        c.beginPath(); c.moveTo(x0, n.y - h / 2 + (h / 4) * i); c.lineTo(x0 + w, n.y - h / 2 + (h / 4) * i); c.stroke();
+      c.lineWidth = 2;
+      c.strokeRect(x0, Y(R.midY) - h / 2, w, h);
+    }
+
+    // Rink-side lettering
+    c.font = "bold 12px system-ui";
+    c.fillStyle = "rgba(18, 38, 58, 0.18)";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    for (const yy of [3.2, R.width - 3.2]) {
+      for (const xx of [55, 100, 145]) {
+        c.fillText(xx === 100 ? "\u2605 HOCKEY IQ TRAINER \u2605" : "GO  TEAM  GO!", X(xx), Y(yy));
       }
     }
 
     c.restore();
 
-    // Boards with inner glow
-    c.lineWidth = 9;
+    // Boards
+    c.lineWidth = 8;
     c.strokeStyle = "rgba(18, 38, 58, 0.12)";
-    roundRectPath(c, 20, 20, 1060, 580, 110);
+    roundRectPath(c, boardsX, boardsY, boardsW, boardsH, S(R.cornerRadius));
     c.stroke();
-    c.lineWidth = 5;
+    c.lineWidth = 4;
     c.strokeStyle = "#12263a";
-    roundRectPath(c, 20, 20, 1060, 580, 110);
+    roundRectPath(c, boardsX, boardsY, boardsW, boardsH, S(R.cornerRadius));
     c.stroke();
   }
 
@@ -1457,8 +1373,8 @@
         ctx.closePath();
         ctx.stroke();
       };
-      drawHouse(LM.leftSlot.x);
-      drawHouse(LM.rightSlot.x);
+      drawHouse(PXLM.leftSlot.x);
+      drawHouse(PXLM.rightSlot.x);
     }
     ctx.restore();
   }
@@ -2061,6 +1977,9 @@
     getProfile: () => profile,
     guidanceShown: () => renderState.showGuidance,
     getCamera: () => ({ ...camera }),
+    gradeAt: (role, x, y) => gradePlacement(role, { x, y }, scenario),
+    outcomeFor: (grade) => outcomeFor(grade),
+    readRadiusFt: () => readRadiusFt(),
     choose: (opt) => chooseOption(opt),
     // What the player is told about possession on this play.
     puckState: () => {
