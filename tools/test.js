@@ -522,6 +522,64 @@ const section = (t) => console.log(`\n${t}`);
   });
   check(sides.top > 25 && sides.bottom > 25, "plays run off both sides of the ice", `${sides.top} top / ${sides.bottom} bottom`);
 
+  // ---------------------------------------------------------- principles
+  /* The game is meant to teach ideas that transfer, not pictures to memorise.
+     Every read carries the principle it teaches or breaks, the player is told
+     which one, and the coach report reports in those terms. */
+  section("Principles");
+  const prin = await page.evaluate(() => {
+    let total = 0, tagged = 0, unknown = 0;
+    const used = {};
+    for (const play of HIQ.PLAYS) {
+      for (const r of Object.values(play.reads)) {
+        for (const o of [r.best, ...r.acceptable, ...r.wrong]) {
+          total++;
+          if (!o.principle) continue;
+          tagged++;
+          if (!HIQ.PRINCIPLES[o.principle]) unknown++;
+          used[o.principle] = (used[o.principle] || 0) + 1;
+        }
+      }
+    }
+    return { total, tagged, unknown, used, defined: Object.keys(HIQ.PRINCIPLES).length };
+  });
+  check(prin.tagged === prin.total, "every authored read names the principle behind it",
+    `${prin.tagged}/${prin.total}`);
+  check(prin.unknown === 0, "no read points at a principle that doesn't exist");
+  check(Object.keys(prin.used).length === prin.defined,
+    "every principle is actually taught by something", `${Object.keys(prin.used).length}/${prin.defined} used`);
+
+  // The player is told the idea, not just the outcome.
+  await page.selectOption("#age", "9-11");
+  await page.selectOption("#diff", "med");
+  await page.waitForTimeout(120);
+  await page.evaluate(() => {
+    HIQ.debug.newPlay();
+    HIQ.debug.choose(HIQ.debug.getChoices().find(o => o.tier === "best"));
+  });
+  await settle();
+  const shown = await page.locator("#status").innerHTML();
+  check(/class="principle"/.test(shown), "the principle is named in the feedback",
+    (await page.locator("#status").innerText()).replace(/\s+/g, " ").slice(0, 70));
+
+  // The 6-8 tier leads with the idea rather than the system.
+  await page.selectOption("#age", "6-8");
+  await page.waitForTimeout(200);
+  await page.evaluate(() => HIQ.debug.newPlay());
+  await page.waitForTimeout(150);
+  const youngPrompt = await page.locator("#prompt").innerHTML();
+  check(/class="principle"/.test(youngPrompt),
+    "the 6-8 tier states the principle up front instead of the system",
+    (await page.locator("#prompt").innerText()).replace(/\s+/g, " ").slice(0, 70));
+  const radius = await page.evaluate(() => HIQ.debug.readRadiusFt());
+  await page.selectOption("#age", "12-14");
+  await page.waitForTimeout(120);
+  const radiusOld = await page.evaluate(() => HIQ.debug.readRadiusFt());
+  check(radius > radiusOld * 1.5, "the youngest players get a much more forgiving target",
+    `${radius.toFixed(0)} ft vs ${radiusOld.toFixed(0)} ft`);
+  await page.selectOption("#age", "9-11");
+  await page.waitForTimeout(120);
+
   // ------------------------------------------------------------ readability
   // A play you can't read teaches nothing, so these are correctness checks too.
   section("Readability");

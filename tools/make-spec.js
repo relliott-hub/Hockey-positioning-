@@ -83,6 +83,20 @@ w();
 w("---");
 w();
 
+w("## The principles being taught");
+w();
+w("Every read below is tagged with the idea underneath it. The game names the");
+w("principle when it gives feedback, and the coach report shows which ones a");
+w("player has absorbed and which keep costing them — because the idea is what");
+w("transfers to a real game, not the picture.");
+w();
+w("| Principle | What a kid is told |");
+w("|---|---|");
+for (const [, d] of Object.entries(HIQ.PRINCIPLES)) w(`| **${d.name}** | ${d.kid} |`);
+w();
+w("---");
+w();
+
 w("## Plays");
 w();
 w(`${HIQ.PLAYS.length} scenarios. Special teams are not yet re-authored and are disabled in the game.`);
@@ -111,7 +125,11 @@ for (const play of HIQ.PLAYS) {
   for (const [role, r] of Object.entries(play.reads)) {
     w(`#### Playing ${role}`);
     w();
-    w(`**Best read** — ${describe(r.best, play)}`);
+    const pr = (o) => {
+      const d = HIQ.PRINCIPLES[o.principle];
+      return d ? `  *(${d.name})*` : "";
+    };
+    w(`**Best read** — ${describe(r.best, play)}${pr(r.best)}`);
     w();
     w(`> ${r.best.why}`);
     w();
@@ -119,7 +137,7 @@ for (const play of HIQ.PLAYS) {
       w("**Also acceptable** *(partial credit — works, but not first choice)*");
       w();
       for (const a of r.acceptable) {
-        w(`- ${describe(a, play)}`);
+        w(`- ${describe(a, play)}${pr(a)}`);
         w(`  > ${a.why}`);
       }
       w();
@@ -128,7 +146,7 @@ for (const play of HIQ.PLAYS) {
       w("**Mistakes**");
       w();
       for (const x of r.wrong) {
-        w(`- ${describe(x, play)}`);
+        w(`- ${describe(x, play)}${pr(x)}`);
         w(`  > ${x.why}`);
       }
       w();

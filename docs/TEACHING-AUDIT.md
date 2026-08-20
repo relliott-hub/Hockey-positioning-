@@ -86,17 +86,17 @@ a vague notion of "the middle".
 
 ## 4. Where it falls short — honestly
 
-### The biggest gap: it teaches spots, not principles
+### ~~The biggest gap: it teaches spots, not principles~~ — addressed
 
-A player learns *"in this picture, go there."* What transfers to a real game is
-the underlying rule — *support the puck, protect the middle, don't chase* — and
-the game states those only in the feedback text, never as something the player
-is asked to apply.
+All 118 authored reads now carry the principle they teach or break, drawn from
+a deliberately small set of seven. The game names the principle in its feedback,
+and the coach report leads with which ideas have landed and which keep costing
+the player:
 
-**Recommendation:** name the principle behind each read and track it. Show the
-player "you've made 12 good *support the puck* reads and 3 poor *protect the
-middle* ones." That turns a set of memorised pictures into transferable ideas
-and makes the coach report genuinely useful to a parent.
+> **Work on this** — Stay above the puck: 0 of 7
+> **Going well** — Protect the middle: 7 of 7
+
+That is a sentence a parent can act on. "68% correct" is not.
 
 ### Six scenarios is not a season
 
@@ -119,21 +119,21 @@ puck carrier instead of taking away a lane, every system breaks down"* — which
 makes skating straight at the carrier the wrong option, and holding the middle
 in a containment forecheck a legitimate second choice.
 
-### The 6–8 age group may be teaching the wrong thing entirely
+### ~~The 6–8 age group may be teaching the wrong thing~~ — re-framed
 
-This is the finding I am least comfortable with. USA Hockey's development model
-warns that **teaching position too early can stifle creativity and a player's
-ability to think on the fly**, and that young players should not be overwhelmed
-with systems.
+USA Hockey's development model warns that **teaching position too early can
+stifle creativity and a player's ability to think on the fly**. The game had a
+6–8 setting that taught positional systems, which that guidance would object to.
 
-This game has a 6–8 setting that teaches positional systems.
+The tier has been re-framed rather than removed. It now leads with the
+**principle** — "Protect the middle: the front of your net is the most dangerous
+ice" — instead of the system, and the target is twice as forgiving (20 ft versus
+10 ft for the oldest group). The situation underneath is still real hockey; it
+simply isn't asking a seven-year-old to memorise a breakout.
 
-**Recommendation:** re-frame that tier, or remove it. For that age the
-defensible content is not "stand at the hash marks" but "don't all chase the
-puck" and "be somewhere your friend can pass to you" — one idea per play,
-loosely scored. If we keep a 6–8 mode teaching systems, we are building
-something a knowledgeable coach would object to, and that objection would be
-correct.
+Removing the tier would have thrown away the audience most likely to buy this.
+Teaching that age the *idea* rather than the *system* is defensible to any coach,
+and it is what the guidance actually asks for.
 
 ### No evidence it works
 

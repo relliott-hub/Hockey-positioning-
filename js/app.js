@@ -262,7 +262,7 @@
   // How close (in FEET) you must be to count as having chosen a given read.
   function readRadiusFt() {
     const age = ageSel.value, diff = diffSel.value;
-    const base = age === "6-8" ? 16 : age === "12-14" ? 10 : 13;
+    const base = age === "6-8" ? 20 : age === "12-14" ? 10 : 13;
     const tighten = diff === "hard" ? 0.78 : diff === "easy" ? 1.25 : 1;
     return base * tighten;
   }
@@ -310,12 +310,12 @@
     // Inside a coached read: score by tier, easing off with distance from it.
     const slip = Math.min(1, nearest.d / R);
     if (nearest.tier === "best") {
-      return { tier: "best", score: Math.round(100 - 8 * slip), why: nearest.spot.why, spot: nearest.spot };
+      return { tier: "best", score: Math.round(100 - 8 * slip), why: nearest.spot.why, principle: nearest.spot.principle, spot: nearest.spot };
     }
     if (nearest.tier === "acceptable") {
-      return { tier: "acceptable", score: Math.round(78 - 10 * slip), why: nearest.spot.why, spot: nearest.spot, better };
+      return { tier: "acceptable", score: Math.round(78 - 10 * slip), why: nearest.spot.why, principle: nearest.spot.principle, spot: nearest.spot, better };
     }
-    return { tier: "wrong", score: Math.round(38 - 14 * slip), why: nearest.spot.why, spot: nearest.spot, better };
+    return { tier: "wrong", score: Math.round(38 - 14 * slip), why: nearest.spot.why, principle: nearest.spot.principle, spot: nearest.spot, better };
   }
 
   // Kept for the older call sites that just want a number.
@@ -496,7 +496,20 @@
     scoreEl.textContent = "—";
     lockBtn.style.display = choice.active ? "none" : "";
 
-    const showHints = (diffSel.value === "easy" || ageSel.value === "6-8");
+    /* USA Hockey's development model warns that teaching position too early can
+       stifle a young player's ability to think on the fly. So for 6-8 the game
+       leads with the IDEA rather than the system: one principle, stated plainly
+       up front, and a generous target. The situation is still real hockey — it
+       just isn't asking a seven-year-old to memorise a breakout. */
+    const youngest = ageSel.value === "6-8";
+    if (youngest) {
+      const best = scenario.reads[scenario.role] && scenario.reads[scenario.role].best;
+      const pr = best && HIQ.PRINCIPLES[best.principle];
+      if (pr) promptEl.innerHTML =
+        `<span class="principle">\uD83D\uDCA1 ${pr.name}</span><br/>${pr.kid} You are ${scenario.role}.`;
+    }
+
+    const showHints = (diffSel.value === "easy" || youngest);
     const hints = showHints ? coachHints(scenario.role, scenario) : [];
     if (scenario.roleNote) hints.unshift(scenario.roleNote);
     hintEl.textContent = hints.join("   ");
@@ -700,6 +713,7 @@
     const mk = (spot, tier) => ({
       pos: { x: spot.x, y: spot.y },
       why: spot.why,
+      principle: spot.principle,
       tier,
       correct: tier === "best",
       res: gradePlacement(role, { x: spot.x, y: spot.y }, scenario),
@@ -1113,7 +1127,7 @@
     const pass = passThreshold();
     const ageCfg = getAgeSettings();
 
-    let grade, score, why, better, receiver, reportRole;
+    let grade, score, why, better, receiver, reportRole, principle;
 
     if (mode === "single") {
       const you = controlled[0];
@@ -1121,6 +1135,7 @@
       grade = chosen ? chosen.tier : g.tier;
       score = g.score;
       why = chosen ? chosen.why : g.why;
+      principle = chosen ? chosen.principle : g.principle;
       better = g.better || (grade !== "best" ? scenario.reads[scenario.role].best : null);
       receiver = you;
       reportRole = scenario.role;
@@ -1132,6 +1147,7 @@
       const worst = results.slice().sort((a, b) => a.score - b.score)[0];
       grade = score >= 88 ? "best" : score >= 68 ? "acceptable" : "wrong";
       why = worst ? worst.why : "";
+      principle = worst ? worst.principle : null;
       better = null;
       const anchor = scenario.isDefense ? toward(puck, slotFor(ownSideOf(scenario)), 0.5) : puck;
       receiver = nearestTo(controlled.filter(p => p.role !== "G"), anchor.x, anchor.y) || controlled[0];
@@ -1170,6 +1186,12 @@
     if (tier === "great") { stats.goals += 1; sessionGoals += 1; }
     if (grade === "best") stats.greats += 1;
     if (grade === "best" && score >= 98) stats.perfects += 1;
+    if (principle) {
+      stats.byPrinciple = stats.byPrinciple || {};
+      const bucket = stats.byPrinciple[principle] || { good: 0, missed: 0 };
+      if (grade === "wrong") bucket.missed += 1; else bucket.good += 1;
+      stats.byPrinciple[principle] = bucket;
+    }
     stats.bestStreak = Math.max(stats.bestStreak, streak);
     awardXP(grade === "best" ? 100 : grade === "acceptable" ? 55 : 15);
     checkBadges({ comeback: wasComeback });
@@ -1200,17 +1222,20 @@
         setCoach(grade === "best" ? (tier === "great" ? "goal" : "happy")
                : grade === "acceptable" ? "happy" : "sad");
 
+        const pr = principle && HIQ.PRINCIPLES[principle];
+        const prLine = pr ? `<br/><span class="principle">\uD83D\uDCA1 ${pr.name} — ${pr.kid}</span>` : "";
+
         if (grade === "best") {
           const outcome = tier === "great"
             ? "You got to the right spot and it ended in a goal!"
             : "You got to the right spot and kept the play alive — the chance was there.";
-          statusEl.innerHTML = `<b>BEST READ \u2705</b> ${outcome}`;
+          statusEl.innerHTML = `<b>BEST READ \u2705</b> ${outcome}${prLine}`;
           pendingTimer = setTimeout(buildScenario, 1700);
 
         } else if (grade === "acceptable") {
           // The whole point: this works, and the coach still shows you better.
           statusEl.innerHTML = `<b>THAT WORKS \uD83D\uDC4D</b> ${why}` +
-            (better ? `<br/><span class="muted">Even better: ${better.why}</span>` : "");
+            (better ? `<br/><span class="muted">Even better: ${better.why}</span>` : "") + prLine;
           pendingTimer = setTimeout(buildScenario, 2600);
 
         } else {
@@ -1220,8 +1245,8 @@
 
           statusEl.innerHTML = reveal
             ? `<b>NOT QUITE \u274C</b> ${why}` +
-              (better ? `<br/><span class="muted">Where you wanted to be: ${better.why}</span>` : "")
-            : `<b>NOT THIS TIME \u274C</b> ${why}<br/><span class="muted">Have another look \u2014 where should you be?</span>`;
+              (better ? `<br/><span class="muted">Where you wanted to be: ${better.why}</span>` : "") + prLine
+            : `<b>NOT THIS TIME \u274C</b> ${why}<br/><span class="muted">Have another look \u2014 where should you be?</span>${prLine}`;
 
           pendingTimer = setTimeout(() => {
             restoreSnapshot();
@@ -1242,6 +1267,37 @@
     renderReport();
   }
 
+  /* What a parent or coach actually wants to know: not "68% correct", but which
+     ideas have landed and which keep costing them. */
+  function principleSummary() {
+    const by = stats.byPrinciple || {};
+    const rows = Object.entries(by)
+      .map(([key, v]) => ({ key, ...v, total: v.good + v.missed }))
+      .filter(r => r.total >= 2)
+      .sort((a, b) => (a.good / a.total) - (b.good / b.total));
+    if (!rows.length) return "";
+
+    const line = (r, cls) => {
+      const p = HIQ.PRINCIPLES[r.key];
+      if (!p) return "";
+      const pctp = Math.round((r.good / r.total) * 100);
+      return `<div class="pr-row ${cls}"><b>${p.name}</b> — ${r.good} of ${r.total} (${pctp}%)<br/>` +
+             `<span class="muted">${p.kid}</span></div>`;
+    };
+
+    const weakest = rows.filter(r => r.good / r.total < 0.7).slice(0, 2);
+    const strongest = rows.slice().reverse().filter(r => r.good / r.total >= 0.7).slice(0, 2);
+
+    let html = `<div class="pr-block">`;
+    if (weakest.length) {
+      html += `<div class="pr-head">Work on this</div>` + weakest.map(r => line(r, "weak")).join("");
+    }
+    if (strongest.length) {
+      html += `<div class="pr-head">Going well</div>` + strongest.map(r => line(r, "strong")).join("");
+    }
+    return html + `</div>`;
+  }
+
   function renderReport() {
     const total = report.length;
     const correct = report.filter(r => r.ok).length;
@@ -1256,7 +1312,8 @@
       if (!r.ok && r.topMissKey) missKeys[r.topMissKey] = (missKeys[r.topMissKey] || 0) + 1;
     }
 
-    reportSummaryEl.textContent = `Attempts: ${total} | Correct: ${correct} (${pct}%)`;
+    reportSummaryEl.innerHTML =
+      `Attempts: ${total} &nbsp;|&nbsp; Good reads: ${correct} (${pct}%)` + principleSummary();
 
     reportChipsEl.innerHTML = "";
     Object.keys(byPhase).sort().forEach(ph => {

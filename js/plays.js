@@ -557,6 +557,91 @@ HIQ.PLAYS = [
   },
 ];
 
+/* The principles.
+
+   A player who learns "in this picture, go there" has learned a picture. What
+   transfers to a real game is the rule underneath it — and the rule is the same
+   whether you're breaking out, forechecking or defending your own corner.
+
+   Every authored read is tagged with the principle it teaches or breaks, so the
+   game can name it, and the coach report can show a parent which ideas their
+   kid has actually absorbed and which ones keep costing them.
+
+   The set is deliberately small. Six or seven ideas a child can hold in their
+   head beat twenty they cannot. */
+HIQ.PRINCIPLES = {
+  support:   { name: "Support the puck",     kid: "Be somewhere your teammate can pass to." },
+  middle:    { name: "Protect the middle",   kid: "The front of your net is the most dangerous ice." },
+  above:     { name: "Stay above the puck",  kid: "Don't get caught below it." },
+  lanes:     { name: "Keep your lanes apart", kid: "Two of you in one lane is one checker's job." },
+  weakside:  { name: "Cover the weak side",  kid: "Someone has to be there when it comes across." },
+  dontchase: { name: "Don't chase the puck", kid: "If everyone goes to the puck, nobody is anywhere." },
+  yourjob:   { name: "Do your own job",      kid: "Cover your own man — don't take a teammate's." },
+};
+
+/* Which principle each read teaches, in order: best, then acceptable, then
+   wrong. Assigned by hand — keyword matching got two thirds of them right,
+   which is not good enough for the thing the whole game is built on. */
+const PRINCIPLE_MAP = {
+  breakout_corner_pressure: {
+    LW: ["support", "support", "dontchase", "middle"],
+    C:  ["support", "support", "lanes", "above"],
+    RW: ["weakside", "lanes", "dontchase", "above"],
+    RD: ["support", "support", "above", "weakside"],
+  },
+  dzone_halfwall_coverage: {
+    LD: ["middle", "dontchase", "middle", "yourjob"],
+    RD: ["middle", "weakside", "middle"],
+    C:  ["middle", "yourjob", "yourjob", "above"],
+    LW: ["yourjob", "dontchase", "above"],
+    RW: ["weakside", "weakside", "weakside", "above"],
+  },
+  ozone_cycle_support: {
+    C:  ["support", "support", "dontchase", "support"],
+    LW: ["middle", "support", "dontchase", "yourjob"],
+    RD: ["yourjob", "support", "above", "above"],
+    LD: ["weakside", "weakside", "above", "above"],
+  },
+  rush_three_on_two: {
+    RW: ["lanes", "support", "lanes", "above"],
+    LW: ["lanes", "support", "above", "lanes"],
+    RD: ["above", "support", "above", "support"],
+    LD: ["above", "support", "above", "middle"],
+  },
+  dzone_corner_battle: {
+    LD: ["middle", "yourjob", "above"],
+    RD: ["middle", "dontchase", "above"],
+    C:  ["middle", "yourjob", "above", "yourjob"],
+    LW: ["yourjob", "dontchase", "above"],
+    RW: ["weakside", "weakside", "weakside", "above"],
+  },
+  nz_regroup: {
+    C:  ["support", "support", "lanes", "above"],
+    RW: ["support", "support", "above", "lanes"],
+    LW: ["weakside", "lanes", "above", "above"],
+    LD: ["support", "lanes", "above", "support"],
+  },
+  forecheck_1_2_2: {
+    C:  ["middle", "middle", "dontchase", "above"],
+    LW: ["above", "support", "above", "yourjob"],
+    RW: ["above", "weakside", "dontchase", "yourjob"],
+    RD: ["yourjob", "support", "above", "dontchase"],
+    LD: ["weakside", "weakside", "above"],
+  },
+};
+
+// Attach the principle to every read, in the order the map lists them.
+(() => {
+  for (const play of HIQ.PLAYS) {
+    const forPlay = PRINCIPLE_MAP[play.id] || {};
+    for (const [role, r] of Object.entries(play.reads)) {
+      const list = forPlay[role] || [];
+      const ordered = [r.best, ...r.acceptable, ...r.wrong];
+      ordered.forEach((opt, i) => { opt.principle = list[i] || null; });
+    }
+  }
+})();
+
 /* Variation that cannot corrupt the hockey.
 
    Only ONE transform is allowed: mirroring across centre ice. The rink is
@@ -623,10 +708,13 @@ HIQ.playToPixels = function (play) {
   };
   for (const [role, pt] of Object.entries(play.players)) out.players[role] = p(pt);
   for (const [role, r] of Object.entries(play.reads)) {
+    // Carry everything the read carries — dropping a field here silently
+    // disconnects it from the running game.
+    const conv = (o) => ({ ...o, ...p(o) });
     out.reads[role] = {
-      best: { ...p(r.best), why: r.best.why },
-      acceptable: (r.acceptable || []).map(a => ({ ...p(a), why: a.why })),
-      wrong: (r.wrong || []).map(w => ({ ...p(w), why: w.why })),
+      best: conv(r.best),
+      acceptable: (r.acceptable || []).map(conv),
+      wrong: (r.wrong || []).map(conv),
     };
   }
   return out;

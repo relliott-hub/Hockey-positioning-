@@ -253,6 +253,32 @@ th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes popIn { from { transform: scale(0.9) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* Principles — the idea behind each read */
+.principle {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef7ff;
+  border: 1px solid #bcdcff;
+  color: #10457f;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pr-block { margin-top: 12px; }
+.pr-head {
+  font-size: 11px; font-weight: 800; letter-spacing: 1.2px;
+  text-transform: uppercase; color: #64809c; margin: 10px 0 6px;
+}
+.pr-row {
+  border-left: 4px solid #cbd5e1;
+  padding: 6px 0 6px 10px;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+}
+.pr-row.weak { border-left-color: #f59e0b; }
+.pr-row.strong { border-left-color: #16a34a; }
+
 /* Game-first layout */
 #scorebar { margin-bottom: 4px; }
 canvas { margin-top: 6px; }
