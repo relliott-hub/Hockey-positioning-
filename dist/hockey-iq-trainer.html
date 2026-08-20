@@ -417,6 +417,7 @@ canvas { margin-top: 6px; }
           <option value="Rush">Rush</option>
           <option value="O-zone">O-zone</option>
           <option value="Defend">Defend</option>
+          <option value="Forecheck">Forecheck</option>
         </select>
       </label>
 
@@ -1212,6 +1213,91 @@ HIQ.PLAYS = [
         wrong: [
           { x: 112, y: 54, why: "You joined the rush ahead of the puck. Lose it here and they're going the other way with numbers." },
           { x: 62, y: 48, why: "You retreated into your own zone. Your partner has no support and has to throw it away." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  {
+    id: "forecheck_1_2_2",
+    phase: "Forecheck",
+    name: "Forechecking their breakout",
+    situation:
+      "Their defenceman has the puck in the corner below his own goal line and " +
+      "is trying to break out. You're first in on the forecheck.",
+    claims: { puck: ["belowGoalLine", "inCorner"], ourDAtBlueLine: true },
+    attackDir: "right",
+    ourNet: "left",
+    /* NOT isDefense. That flag means "we are defending our own end", and it
+       flips which net counts as ours. On a forecheck the opposition has the
+       puck but we are in THEIR end attacking — marking it defensive pointed
+       the attacking net at our own goal. `forecheck` carries the possession
+       meaning on its own. */
+    forecheck: true,
+    puck: { x: 194, y: 72 },
+    carrier: "opp",
+    players: {
+      C:  { x: 178, y: 54 },
+      LW: { x: 170, y: 74 },
+      RW: { x: 156, y: 44 },
+      RD: { x: 128, y: 62 },
+      LD: { x: 128, y: 28 },
+    },
+    opponents: [
+      { x: 194, y: 72, label: "O1" },
+      { x: 193, y: 40, label: "O2" },
+      { x: 178, y: 78, label: "O3" },
+      { x: 176, y: 58, label: "O4" },
+      { x: 172, y: 22, label: "O5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 178, y: 54, why: "Angle him from the inside. Your first angle decides the whole forecheck \u2014 take the middle away so the only place he can go is the wall. You're not trying to steal it, you're trying to make him rush the pass." },
+        acceptable: [
+          { x: 158, y: 44, why: "Holding the middle and letting them come to you is a real forecheck and it gives up nothing the other way \u2014 but it hands their defenceman time to pick a clean first pass." },
+        ],
+        wrong: [
+          { x: 193, y: 71, why: "You skated straight at him. With no angle he simply steps around you, and every layer behind you is now beaten." },
+          { x: 196, y: 45, why: "You chased behind the net. He goes the other way and your whole forecheck is caught below the puck." },
+        ],
+      },
+      LW: {
+        best: { x: 170, y: 74, why: "Above the puck on the wall. When your centre forces the panicked pass up the boards, you're the one who steps into it." },
+        acceptable: [
+          { x: 190, y: 74, why: "Going in as the second man works when your centre already has him sealed on the wall \u2014 but if he doesn't, two of you are below the puck and their breakout is free." },
+        ],
+        wrong: [
+          { x: 196, y: 52, why: "You dropped below the goal line. Everything they do now happens above you and you can't get back to it." },
+          { x: 168, y: 48, why: "You left the wall for the middle. The boards are where the pass is going, and now nobody is there." },
+        ],
+      },
+      RW: {
+        best: { x: 156, y: 44, why: "High in the middle, above everyone. You're the safety valve \u2014 you stop the odd-man rush and you're first on anything that comes up the middle." },
+        acceptable: [
+          { x: 156, y: 22, why: "Taking the weak-side wall does shut down that outlet \u2014 but a breakout through the middle is the one that really hurts, and now nobody is covering it." },
+        ],
+        wrong: [
+          { x: 188, y: 68, why: "Three forwards below the puck. If it comes out, there is nobody home at all." },
+          { x: 130, y: 44, why: "You backed all the way to the blue line. That's your defenceman's job and the forecheck has lost its third layer." },
+        ],
+      },
+      RD: {
+        best: { x: 128, y: 62, why: "Hold the blue line on the puck side. You keep it in when it comes up the wall, and you're the shot if it comes back to you." },
+        acceptable: [
+          { x: 150, y: 74, why: "Pinching down the wall keeps the puck in and it's the right call when you know you'll get there \u2014 but miss it and their winger is gone the other way with you caught." },
+        ],
+        wrong: [
+          { x: 108, y: 60, why: "You backed off into the neutral zone. The puck comes out clean and the whole forecheck was wasted." },
+          { x: 186, y: 70, why: "You went all the way to the corner. If they win that battle it's a two-on-one going back." },
+        ],
+      },
+      LD: {
+        best: { x: 128, y: 28, why: "Hold the weak-side blue line. When they try to swing it across to break out, you're the one who kills it." },
+        acceptable: [],
+        wrong: [
+          { x: 140, y: 66, why: "Both defencemen on the puck side. If it comes out the other way there is nobody there." },
+          { x: 104, y: 28, why: "You retreated to centre. They walk out of their zone with speed and you've given up the line for nothing." },
         ],
       },
     },
@@ -2599,6 +2685,7 @@ HIQ.Sim = (() => {
       role: playRole,
       attackDir: play.attackDir,
       isDefense: !!play.isDefense,
+      forecheck: !!play.forecheck,
       carrier: play.carrier,
       reads: px.reads,
       prompt: `${play.name} — you are ${playRole}. ${play.situation}`,
@@ -3004,6 +3091,67 @@ HIQ.Sim = (() => {
 
     const atkSlot = slotFor(atk);
 
+    if (scen.forecheck) {
+      /* Forechecking. We don't have the puck, but the play is in their end and
+         the generic defensive script — which walks the puck down to our own
+         slot — would be the wrong picture entirely. */
+      const R = HIQ.RINK, V = HIQ.VIEW;
+      const theirGoalLine = atk === "right" ? R.goalLineRight : R.goalLineLeft;
+      const puckFt = V.ftPt(puck);
+      const nearBoards = puckFt.y > R.midY ? R.width - 8 : 8;
+      // Above the puck on the same wall — where a rushed breakout pass goes.
+      const wall = V.pt({ x: atk === "right" ? theirGoalLine - 20 : theirGoalLine + 20, y: nearBoards });
+
+      if (tier === "great" || tier === "good") {
+        steps.push({ d: 450, msg: "You close him down — watch what he does…" });
+        steps.push({
+          d: 500, sound: "pass",
+          movers: [mv(puck, wall.x, wall.y), ...driftAll(oppSk, [], wall, 0.08)]
+        });
+        steps.push({
+          d: 380, sound: "catch",
+          poss: "us", banner: { text: "TURNOVER! 🛡️", sub: "Your pressure forced the rushed pass.", color: "#4ade80" },
+          fx: { type: "ring", x: wall.x, y: wall.y, color: "74, 222, 128" },
+          movers: [mv(receiver, wall.x, wall.y)]
+        });
+        if (tier === "great") {
+          steps.push({
+            d: 620,
+            movers: [
+              mv(receiver, atkSlot.x, atkSlot.y), mv(puck, atkSlot.x, atkSlot.y),
+              ...driftAll(friendlySk, [receiver], atkSlot, 0.14)
+            ]
+          });
+          steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
+          steps.push({ d: 1400, sound: "goal", shake: 1, banner: { text: "GOAL! 🚨", sub: "Forecheck straight into a goal!", color: "#4ade80", light: atk, fx: "confetti" } });
+        } else {
+          steps.push({ d: 1300, sound: "good", banner: { text: "PUCK BACK! ⚡", sub: "You kept it in their end — keep the pressure on.", color: "#7dd3fc" } });
+        }
+      } else {
+        steps.push({ d: 450, msg: "Uh oh — he's got a lane…" });
+        // A clean exit up the middle of the ice.
+        const outFt = { x: R.centreLine, y: puckFt.y > R.midY ? R.midY + 14 : R.midY - 14 };
+        const out = V.pt(outFt);
+        steps.push({
+          d: 640, sound: "pass",
+          movers: [mv(puck, out.x, out.y), ...driftAll(oppSk, [], out, 0.16), ...driftAll(friendlySk, [], out, 0.06)]
+        });
+        steps.push({ d: 320, poss: "them", banner: { text: "CLEAN BREAKOUT ❌", sub: subMsg, color: "#fca5a5" } });
+        if (tier === "bad") {
+          const danger = slotFor(ownS);
+          steps.push({
+            d: 780, banner: null,
+            movers: [mv(puck, danger.x, danger.y), ...driftAll(oppSk, [], danger, 0.2)]
+          });
+          steps.push({ d: 260, sound: "shot", movers: [mv(puck, ownNet.x, ownNet.y)] });
+          steps.push({ d: 1500, sound: "goalAgainst", shake: 0.7, banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
+        } else {
+          steps.push({ d: 1300, sound: "whistle", banner: { text: "THEY'RE OUT ❌", sub: subMsg, color: "#fca5a5" } });
+        }
+      }
+      return steps;
+    }
+
     if (!scen.isDefense) {
       // We have the puck.
       const route = passRoute(puck, receiver, friendlySk);
@@ -3024,7 +3172,7 @@ HIQ.Sim = (() => {
         });
         steps.push({
           d: 1500, sound: "whistle",
-          banner: { text: "PUCK GIVEN AWAY \u274C", sub: subMsg || "There was no safe pass to where you went.", color: "#fca5a5" }
+          poss: "them", banner: { text: "PUCK GIVEN AWAY \u274C", sub: subMsg || "There was no safe pass to where you went.", color: "#fca5a5" }
         });
         return steps;
       }
@@ -3103,10 +3251,10 @@ HIQ.Sim = (() => {
           ]
         });
         if (tier === "miss") {
-          steps.push({ d: 1400, sound: "whistle", banner: { text: "TURNOVER ❌", sub: subMsg, color: "#fca5a5" } });
+          steps.push({ d: 1400, sound: "whistle", poss: "them", banner: { text: "TURNOVER ❌", sub: subMsg, color: "#fca5a5" } });
         } else {
           const counter = slotFor(ownS);
-          steps.push({ d: 300, banner: { text: "TURNOVER ❌", sub: "They're coming back the other way!", color: "#fca5a5" } });
+          steps.push({ d: 300, poss: "them", banner: { text: "TURNOVER ❌", sub: "They're coming back the other way!", color: "#fca5a5" } });
           steps.push({
             d: 700,
             movers: [
@@ -3133,7 +3281,7 @@ HIQ.Sim = (() => {
             ...driftAll(friendlySk, [receiver], dangerSpot, 0.08)
           ]
         });
-        steps.push({ d: 400, sound: "catch", banner: { text: "TAKEAWAY! 🛡️", sub: "You read the play!", color: "#4ade80" }, fx: { type: "ring", x: cut.x, y: cut.y, color: "74, 222, 128" } });
+        steps.push({ d: 400, sound: "catch", poss: "us", banner: { text: "TAKEAWAY! 🛡️", sub: "You read the play!", color: "#4ade80" }, fx: { type: "ring", x: cut.x, y: cut.y, color: "74, 222, 128" } });
         if (tier === "great") {
           const counter = slotFor(atk);
           steps.push({
@@ -3927,9 +4075,13 @@ HIQ.Sim = (() => {
     ctx.save();
     ctx.font = "700 12px 'Segoe UI', system-ui, Arial";
     const w = ctx.measureText(label).width + 14;
-    // Keep it inside the boards, and flip below if there's no room above.
-    const bx = clamp(cx - w / 2, 26, 1074 - w);
-    const by = cy - 9 < 26 ? cy + 26 : cy - 9;
+    /* Keep it inside the boards, and put it on whichever side of the player has
+       room — above normally, below when they're tight to the top boards, where
+       a label above would sit on whoever is behind them. */
+    const V = HIQ.VIEW, R = HIQ.RINK;
+    const bx = clamp(cx - w / 2, V.x(2), V.x(R.length - 2) - w);
+    const nearTop = V.ftY(cy) < R.width * 0.28;
+    const by = nearTop ? cy + 44 : cy - 9;
     ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.lineWidth = 1.5;
@@ -3975,6 +4127,9 @@ HIQ.Sim = (() => {
   }
 
   function drawDirectionTag() {
+    // The play title occupies the top strip for its first moment; don't collide.
+    const intro = renderState.intro;
+    if (intro && performance.now() - intro.at < 1500 && !renderState.banner) return;
     if (!scenario) return;
     const atk = attackSideOf(scenario);
     const ownS = ownSideOf(scenario);
@@ -4340,11 +4495,12 @@ HIQ.Sim = (() => {
       const saved = { x: you.x, y: you.y };
       you.x = opt.pos.x; you.y = opt.pos.y;
       const script = buildSimScript(grade === "best" ? "great" : grade === "acceptable" ? "good" : "bad", you, "audit");
+      const startPoss = scenario.carrier === "opp" ? "them" : "us";
       you.x = saved.x; you.y = saved.y;
       /* Distinguish a PASS (the puck travels alone) from a CARRY (a player
          skates with it). A centre carrying the puck up the middle on a breakout
          is normal hockey; passing it through there is not. */
-      return script.map(st => {
+      const out = script.map(st => {
         const movers = st.movers || [];
         const puckMove = movers.find(m => m.obj === puck);
         const playerDests = movers.filter(m => m.obj !== puck).map(m => m.to);
@@ -4353,10 +4509,13 @@ HIQ.Sim = (() => {
         return {
           puckTo: puckMove ? { ...puckMove.to } : null,
           carried,
+          poss: st.poss || null,
           dests: movers.map(m => ({ to: m.to || null })),
           banner: st.banner ? st.banner.text : null,
         };
       });
+      out.startPoss = startPoss;
+      return out;
     },
     // What the player is told about possession on this play.
     puckState: () => {

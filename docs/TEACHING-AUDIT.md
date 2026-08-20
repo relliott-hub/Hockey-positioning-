@@ -104,16 +104,20 @@ Missing situations a youth player meets **every single game**:
 
 | Situation | Status |
 |---|---|
-| Forechecking (F1 / F2 / F3) | **missing** |
+| Forechecking (F1 / F2 / F3) | **added** — 1-2-2, five coached positions |
 | Backchecking / getting back | **missing** |
 | Faceoffs (all four dots) | **missing** |
 | Power play | **missing** — disabled in the UI |
 | Penalty kill | **missing** — disabled in the UI |
 | Defending an odd-man rush | **missing** |
 
-Forechecking is the most valuable of these: it is a genuine three-way role
-decision (F1 pressures, F2 takes the strong side, F3 stays high) and it is where
-young teams most often collapse into a swarm.
+Forechecking has since been added, built on the 1-2-2 that the sources
+recommend for youth teams because the two middle forwards always outnumber the
+first pass option. The centre's read is the angle itself — *"a forecheck is only
+as good as F1's first angle; if your deepest forward skates straight at the
+puck carrier instead of taking away a lane, every system breaks down"* — which
+makes skating straight at the carrier the wrong option, and holding the middle
+in a containment forecheck a legitimate second choice.
 
 ### The 6–8 age group may be teaching the wrong thing entirely
 
@@ -145,8 +149,8 @@ handful of players and watch. That is worth more than another twenty scenarios.
 ## 5. What I would do next, in order
 
 1. **Name and track the principle** behind each read — turns pictures into ideas
-2. **Add forechecking** — the highest-value missing situation
-3. **Re-frame or remove the 6–8 tier** — currently at odds with published guidance
+2. ~~Add forechecking~~ — **done**
+3. **Re-frame or remove the 6–8 tier** — currently at odds with published guidance, and needs an owner's decision
 4. **Re-author special teams** to the same standard and re-enable them
 5. **Add faceoffs and backchecking**
 6. **Test with real kids and a real coach** before anything goes on sale

@@ -431,6 +431,7 @@
       role: playRole,
       attackDir: play.attackDir,
       isDefense: !!play.isDefense,
+      forecheck: !!play.forecheck,
       carrier: play.carrier,
       reads: px.reads,
       prompt: `${play.name} — you are ${playRole}. ${play.situation}`,
@@ -836,6 +837,67 @@
 
     const atkSlot = slotFor(atk);
 
+    if (scen.forecheck) {
+      /* Forechecking. We don't have the puck, but the play is in their end and
+         the generic defensive script — which walks the puck down to our own
+         slot — would be the wrong picture entirely. */
+      const R = HIQ.RINK, V = HIQ.VIEW;
+      const theirGoalLine = atk === "right" ? R.goalLineRight : R.goalLineLeft;
+      const puckFt = V.ftPt(puck);
+      const nearBoards = puckFt.y > R.midY ? R.width - 8 : 8;
+      // Above the puck on the same wall — where a rushed breakout pass goes.
+      const wall = V.pt({ x: atk === "right" ? theirGoalLine - 20 : theirGoalLine + 20, y: nearBoards });
+
+      if (tier === "great" || tier === "good") {
+        steps.push({ d: 450, msg: "You close him down — watch what he does…" });
+        steps.push({
+          d: 500, sound: "pass",
+          movers: [mv(puck, wall.x, wall.y), ...driftAll(oppSk, [], wall, 0.08)]
+        });
+        steps.push({
+          d: 380, sound: "catch",
+          poss: "us", banner: { text: "TURNOVER! 🛡️", sub: "Your pressure forced the rushed pass.", color: "#4ade80" },
+          fx: { type: "ring", x: wall.x, y: wall.y, color: "74, 222, 128" },
+          movers: [mv(receiver, wall.x, wall.y)]
+        });
+        if (tier === "great") {
+          steps.push({
+            d: 620,
+            movers: [
+              mv(receiver, atkSlot.x, atkSlot.y), mv(puck, atkSlot.x, atkSlot.y),
+              ...driftAll(friendlySk, [receiver], atkSlot, 0.14)
+            ]
+          });
+          steps.push({ d: 260, sound: "shot", movers: [mv(puck, atkNet.x, atkNet.y)] });
+          steps.push({ d: 1400, sound: "goal", shake: 1, banner: { text: "GOAL! 🚨", sub: "Forecheck straight into a goal!", color: "#4ade80", light: atk, fx: "confetti" } });
+        } else {
+          steps.push({ d: 1300, sound: "good", banner: { text: "PUCK BACK! ⚡", sub: "You kept it in their end — keep the pressure on.", color: "#7dd3fc" } });
+        }
+      } else {
+        steps.push({ d: 450, msg: "Uh oh — he's got a lane…" });
+        // A clean exit up the middle of the ice.
+        const outFt = { x: R.centreLine, y: puckFt.y > R.midY ? R.midY + 14 : R.midY - 14 };
+        const out = V.pt(outFt);
+        steps.push({
+          d: 640, sound: "pass",
+          movers: [mv(puck, out.x, out.y), ...driftAll(oppSk, [], out, 0.16), ...driftAll(friendlySk, [], out, 0.06)]
+        });
+        steps.push({ d: 320, poss: "them", banner: { text: "CLEAN BREAKOUT ❌", sub: subMsg, color: "#fca5a5" } });
+        if (tier === "bad") {
+          const danger = slotFor(ownS);
+          steps.push({
+            d: 780, banner: null,
+            movers: [mv(puck, danger.x, danger.y), ...driftAll(oppSk, [], danger, 0.2)]
+          });
+          steps.push({ d: 260, sound: "shot", movers: [mv(puck, ownNet.x, ownNet.y)] });
+          steps.push({ d: 1500, sound: "goalAgainst", shake: 0.7, banner: { text: "GOAL AGAINST 😖", sub: subMsg, color: "#fca5a5", light: ownS } });
+        } else {
+          steps.push({ d: 1300, sound: "whistle", banner: { text: "THEY'RE OUT ❌", sub: subMsg, color: "#fca5a5" } });
+        }
+      }
+      return steps;
+    }
+
     if (!scen.isDefense) {
       // We have the puck.
       const route = passRoute(puck, receiver, friendlySk);
@@ -856,7 +918,7 @@
         });
         steps.push({
           d: 1500, sound: "whistle",
-          banner: { text: "PUCK GIVEN AWAY \u274C", sub: subMsg || "There was no safe pass to where you went.", color: "#fca5a5" }
+          poss: "them", banner: { text: "PUCK GIVEN AWAY \u274C", sub: subMsg || "There was no safe pass to where you went.", color: "#fca5a5" }
         });
         return steps;
       }
@@ -935,10 +997,10 @@
           ]
         });
         if (tier === "miss") {
-          steps.push({ d: 1400, sound: "whistle", banner: { text: "TURNOVER ❌", sub: subMsg, color: "#fca5a5" } });
+          steps.push({ d: 1400, sound: "whistle", poss: "them", banner: { text: "TURNOVER ❌", sub: subMsg, color: "#fca5a5" } });
         } else {
           const counter = slotFor(ownS);
-          steps.push({ d: 300, banner: { text: "TURNOVER ❌", sub: "They're coming back the other way!", color: "#fca5a5" } });
+          steps.push({ d: 300, poss: "them", banner: { text: "TURNOVER ❌", sub: "They're coming back the other way!", color: "#fca5a5" } });
           steps.push({
             d: 700,
             movers: [
@@ -965,7 +1027,7 @@
             ...driftAll(friendlySk, [receiver], dangerSpot, 0.08)
           ]
         });
-        steps.push({ d: 400, sound: "catch", banner: { text: "TAKEAWAY! 🛡️", sub: "You read the play!", color: "#4ade80" }, fx: { type: "ring", x: cut.x, y: cut.y, color: "74, 222, 128" } });
+        steps.push({ d: 400, sound: "catch", poss: "us", banner: { text: "TAKEAWAY! 🛡️", sub: "You read the play!", color: "#4ade80" }, fx: { type: "ring", x: cut.x, y: cut.y, color: "74, 222, 128" } });
         if (tier === "great") {
           const counter = slotFor(atk);
           steps.push({
@@ -1759,9 +1821,13 @@
     ctx.save();
     ctx.font = "700 12px 'Segoe UI', system-ui, Arial";
     const w = ctx.measureText(label).width + 14;
-    // Keep it inside the boards, and flip below if there's no room above.
-    const bx = clamp(cx - w / 2, 26, 1074 - w);
-    const by = cy - 9 < 26 ? cy + 26 : cy - 9;
+    /* Keep it inside the boards, and put it on whichever side of the player has
+       room — above normally, below when they're tight to the top boards, where
+       a label above would sit on whoever is behind them. */
+    const V = HIQ.VIEW, R = HIQ.RINK;
+    const bx = clamp(cx - w / 2, V.x(2), V.x(R.length - 2) - w);
+    const nearTop = V.ftY(cy) < R.width * 0.28;
+    const by = nearTop ? cy + 44 : cy - 9;
     ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.lineWidth = 1.5;
@@ -1807,6 +1873,9 @@
   }
 
   function drawDirectionTag() {
+    // The play title occupies the top strip for its first moment; don't collide.
+    const intro = renderState.intro;
+    if (intro && performance.now() - intro.at < 1500 && !renderState.banner) return;
     if (!scenario) return;
     const atk = attackSideOf(scenario);
     const ownS = ownSideOf(scenario);
@@ -2172,11 +2241,12 @@
       const saved = { x: you.x, y: you.y };
       you.x = opt.pos.x; you.y = opt.pos.y;
       const script = buildSimScript(grade === "best" ? "great" : grade === "acceptable" ? "good" : "bad", you, "audit");
+      const startPoss = scenario.carrier === "opp" ? "them" : "us";
       you.x = saved.x; you.y = saved.y;
       /* Distinguish a PASS (the puck travels alone) from a CARRY (a player
          skates with it). A centre carrying the puck up the middle on a breakout
          is normal hockey; passing it through there is not. */
-      return script.map(st => {
+      const out = script.map(st => {
         const movers = st.movers || [];
         const puckMove = movers.find(m => m.obj === puck);
         const playerDests = movers.filter(m => m.obj !== puck).map(m => m.to);
@@ -2185,10 +2255,13 @@
         return {
           puckTo: puckMove ? { ...puckMove.to } : null,
           carried,
+          poss: st.poss || null,
           dests: movers.map(m => ({ to: m.to || null })),
           banner: st.banner ? st.banner.text : null,
         };
       });
+      out.startPoss = startPoss;
+      return out;
     },
     // What the player is told about possession on this play.
     puckState: () => {

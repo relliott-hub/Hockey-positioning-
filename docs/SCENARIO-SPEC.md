@@ -36,7 +36,7 @@ across the ice is measured the same way as one up the ice.
 
 ## Plays
 
-6 scenarios. Special teams are not yet re-authored and are disabled in the game.
+7 scenarios. Special teams are not yet re-authored and are disabled in the game.
 
 ### Breakout under pressure
 
@@ -607,6 +607,113 @@ Your defenceman has the puck in the neutral zone and the team is regrouping to a
   > You joined the rush ahead of the puck. Lose it here and they're going the other way with numbers.
 - in your defensive zone, in the middle of the ice (62 ft from the end boards, 6 ft near of centre)
   > You retreated into your own zone. Your partner has no support and has to throw it away.
+
+---
+
+### Forechecking their breakout
+
+*Forecheck · `forecheck_1_2_2`*
+
+Their defenceman has the puck in the corner below his own goal line and is trying to break out. You're first in on the forecheck.
+
+**Puck:** in the offensive zone, toward the near side (194 ft from the end boards, 30 ft near of centre)  
+**Carried by:** an opponent  
+**Attacking:** left to right
+
+**Starting positions**
+
+| Player | Where |
+|---|---|
+| C | in the offensive zone, toward the near side (178 ft from the end boards, 12 ft near of centre) |
+| LW | in the offensive zone, tight to the near boards (170 ft from the end boards, 32 ft near of centre) |
+| RW | in the offensive zone, in the middle of the ice (156 ft from the end boards, 2 ft near of centre) |
+| RD | in the offensive zone, toward the near side (128 ft from the end boards, 20 ft near of centre) |
+| LD | in the offensive zone, toward the far side (128 ft from the end boards, 15 ft far of centre) |
+
+#### Playing C
+
+**Best read** — in the offensive zone, toward the near side (178 ft from the end boards, 12 ft near of centre)
+
+> Angle him from the inside. Your first angle decides the whole forecheck — take the middle away so the only place he can go is the wall. You're not trying to steal it, you're trying to make him rush the pass.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the offensive zone, in the middle of the ice (158 ft from the end boards, 2 ft near of centre)
+  > Holding the middle and letting them come to you is a real forecheck and it gives up nothing the other way — but it hands their defenceman time to pick a clean first pass.
+
+**Mistakes**
+
+- in the offensive zone, toward the near side (193 ft from the end boards, 29 ft near of centre)
+  > You skated straight at him. With no angle he simply steps around you, and every layer behind you is now beaten.
+- in the offensive zone, in the middle of the ice (196 ft from the end boards, 3 ft near of centre)
+  > You chased behind the net. He goes the other way and your whole forecheck is caught below the puck.
+
+#### Playing LW
+
+**Best read** — in the offensive zone, tight to the near boards (170 ft from the end boards, 32 ft near of centre)
+
+> Above the puck on the wall. When your centre forces the panicked pass up the boards, you're the one who steps into it.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the offensive zone, tight to the near boards (190 ft from the end boards, 32 ft near of centre)
+  > Going in as the second man works when your centre already has him sealed on the wall — but if he doesn't, two of you are below the puck and their breakout is free.
+
+**Mistakes**
+
+- in the offensive zone, toward the near side (196 ft from the end boards, 10 ft near of centre)
+  > You dropped below the goal line. Everything they do now happens above you and you can't get back to it.
+- in the offensive zone, in the middle of the ice (168 ft from the end boards, 6 ft near of centre)
+  > You left the wall for the middle. The boards are where the pass is going, and now nobody is there.
+
+#### Playing RW
+
+**Best read** — in the offensive zone, in the middle of the ice (156 ft from the end boards, 2 ft near of centre)
+
+> High in the middle, above everyone. You're the safety valve — you stop the odd-man rush and you're first on anything that comes up the middle.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the offensive zone, toward the far side (156 ft from the end boards, 21 ft far of centre)
+  > Taking the weak-side wall does shut down that outlet — but a breakout through the middle is the one that really hurts, and now nobody is covering it.
+
+**Mistakes**
+
+- in the offensive zone, toward the near side (188 ft from the end boards, 26 ft near of centre)
+  > Three forwards below the puck. If it comes out, there is nobody home at all.
+- in the offensive zone, in the middle of the ice (130 ft from the end boards, 2 ft near of centre)
+  > You backed all the way to the blue line. That's your defenceman's job and the forecheck has lost its third layer.
+
+#### Playing RD
+
+**Best read** — in the offensive zone, toward the near side (128 ft from the end boards, 20 ft near of centre)
+
+> Hold the blue line on the puck side. You keep it in when it comes up the wall, and you're the shot if it comes back to you.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the offensive zone, tight to the near boards (150 ft from the end boards, 32 ft near of centre)
+  > Pinching down the wall keeps the puck in and it's the right call when you know you'll get there — but miss it and their winger is gone the other way with you caught.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (108 ft from the end boards, 18 ft near of centre)
+  > You backed off into the neutral zone. The puck comes out clean and the whole forecheck was wasted.
+- in the offensive zone, toward the near side (186 ft from the end boards, 28 ft near of centre)
+  > You went all the way to the corner. If they win that battle it's a two-on-one going back.
+
+#### Playing LD
+
+**Best read** — in the offensive zone, toward the far side (128 ft from the end boards, 15 ft far of centre)
+
+> Hold the weak-side blue line. When they try to swing it across to break out, you're the one who kills it.
+
+**Mistakes**
+
+- in the offensive zone, toward the near side (140 ft from the end boards, 24 ft near of centre)
+  > Both defencemen on the puck side. If it comes out the other way there is nobody there.
+- in the neutral zone, toward the far side (104 ft from the end boards, 15 ft far of centre)
+  > You retreated to centre. They walk out of their zone with speed and you've given up the line for nothing.
 
 ---
 
