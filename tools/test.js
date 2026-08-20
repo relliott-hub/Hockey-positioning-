@@ -129,6 +129,86 @@ const section = (t) => console.log(`\n${t}`);
   });
   check(roster.bad === 0, "every play is a full 5v5 with both goalies", `${roster.n - roster.bad}/${roster.n}`);
 
+  // ------------------------------------------------------- geometry claims
+  /* A scenario that says "the puck is below the goal line" while drawing it
+     thirteen feet above the goal line teaches the wrong vocabulary for the
+     sport. Every claim a situation makes is checked against the actual ice. */
+  section("Situation text matches the ice");
+  const geo = await page.evaluate(() => {
+    const Z = HIQ.zones, R = HIQ.RINK;
+    const problems = [];
+    let claimsChecked = 0;
+
+    for (const play of HIQ.PLAYS) {
+      const ourSide = play.ourNet;
+      const theirSide = ourSide === "left" ? "right" : "left";
+      const puckSide = Z.nearestEnd(play.puck);
+      const claims = play.claims || {};
+
+      for (const claim of (claims.puck || [])) {
+        claimsChecked++;
+        const ok = Z[claim](play.puck, puckSide);
+        if (!ok) problems.push(`${play.id}: puck is not ${claim} (x=${play.puck.x}, y=${play.puck.y})`);
+      }
+
+      // Points are defencemen standing on the blue line of the attacking zone.
+      if (claims.opponentDAtBlueLine) {
+        claimsChecked++;
+        for (const o of play.opponents.filter(o => /^D/.test(o.label))) {
+          if (!Z.atBlueLine(o, ourSide)) {
+            problems.push(`${play.id}: opponent ${o.label} at x=${o.x} is not on the blue line (${ourSide === "left" ? R.blueLineLeft : R.blueLineRight})`);
+          }
+        }
+      }
+      if (claims.ourDAtBlueLine) {
+        claimsChecked++;
+        for (const role of ["LD", "RD"]) {
+          const d = play.players[role];
+          if (d && !Z.atBlueLine(d, theirSide)) {
+            problems.push(`${play.id}: our ${role} at x=${d.x} is not on the attacking blue line`);
+          }
+        }
+      }
+
+      // Nobody, in any authored read, may be off the ice.
+      const everyone = [play.puck, ...Object.values(play.players), ...play.opponents];
+      for (const r of Object.values(play.reads)) {
+        everyone.push(r.best, ...r.acceptable, ...r.wrong);
+      }
+      for (const pt of everyone) {
+        if (!Z.onIce(pt)) problems.push(`${play.id}: a position is off the ice (x=${pt.x}, y=${pt.y})`);
+      }
+    }
+    return { problems, claimsChecked, plays: HIQ.PLAYS.length };
+  });
+  check(geo.problems.length === 0,
+    "every situation's wording matches where things actually are",
+    geo.problems.length ? geo.problems.slice(0, 5).join(" | ") : `${geo.claimsChecked} claims across ${geo.plays} plays`);
+
+  // Any scenario mentioning a landmark in its text must actually place the puck there.
+  const wording = await page.evaluate(() => {
+    const Z = HIQ.zones;
+    const bad = [];
+    const phrases = [
+      [/below (your own |their |the )?goal line/i, "belowGoalLine"],
+      [/in (your |their |the )?corner/i, "inCorner"],
+      [/half-wall/i, "onHalfWall"],
+      [/neutral zone/i, "inNeutralZone"],
+    ];
+    for (const play of HIQ.PLAYS) {
+      const side = Z.nearestEnd(play.puck);
+      for (const [re, fn] of phrases) {
+        if (!re.test(play.situation)) continue;
+        if (!Z[fn](play.puck, side)) {
+          bad.push(`${play.id}: text says "${re.source}" but puck fails ${fn}`);
+        }
+      }
+    }
+    return bad;
+  });
+  check(wording.length === 0, "no scenario describes the puck somewhere it isn't",
+    wording.length ? wording.join(" | ") : "all wording verified against geometry");
+
   // ------------------------------------------------- authored-read invariants
   section("Coaching correctness");
 
@@ -296,7 +376,11 @@ const section = (t) => console.log(`\n${t}`);
         for (const q of drawn) {
           const d = Math.hypot(o.pos.x - q.x, o.pos.y - q.y);
           if (d < minMarker) minMarker = d;
-          if (d < 40) markerClash++;
+          /* Markers are drawn after the players, so a marker is never itself
+             hidden — the risk is a marker covering a player. Dots are ~16px and
+             markers ~18px, so they touch at ~34px. Below 30 the player starts
+             disappearing underneath, and that is the real failure. */
+          if (d < 30) markerClash++;
         }
       }
       // The puck situation must always be spelled out — either someone is shown
@@ -305,9 +389,11 @@ const section = (t) => console.log(`\n${t}`);
       if (st.label === "HAS PUCK") carrierFound++;
       else if (st.label !== "LOOSE PUCK") unlabelled++;
 
-      // You should never be asked where to go on a play where you have the puck.
-      const g = p.guidance;
-      if (Math.hypot(g.x - p.puck.x, g.y - p.puck.y) < 55) youHadPuck++;
+      /* You should never be assigned the position that is carrying the puck.
+         Proximity to the puck is NOT the test — when you're defending, being
+         right on the carrier is precisely the read we're teaching. */
+      const sc = HIQ.debug.getScenario();
+      if (sc.carrier === sc.role) youHadPuck++;
     }
     return {
       overlaps, markerClash, plays, unlabelled, youHadPuck,
@@ -322,7 +408,7 @@ const section = (t) => console.log(`\n${t}`);
     `${vis.carrierFound}/${vis.plays} carried, ${vis.plays - vis.carrierFound} loose`);
   check(vis.carrierFound / vis.plays > 0.7, "most plays show a clear puck carrier",
     `${Math.round(vis.carrierFound / vis.plays * 100)}% carried`);
-  check(vis.youHadPuck === 0, "you are never asked to reposition on a play you already have the puck on",
+  check(vis.youHadPuck === 0, "you are never assigned the position that is carrying the puck",
     `${vis.youHadPuck} such plays`);
 
   // Taps must land through the camera transform, not just at 1:1
