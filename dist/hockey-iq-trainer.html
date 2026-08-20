@@ -2478,18 +2478,33 @@ HIQ.Sim = (() => {
     /* Pick a play the chosen position actually has a coached read for, and never
        one where that position is the puck carrier — "where should you go to
        help?" makes no sense when the puck is already on your stick. */
-    let play = null;
-    for (let attempt = 0; attempt < 12; attempt++) {
-      // Mirror and shift the whole picture together, so the play lands somewhere
-      // new without any of its coached relationships changing.
-      const cand = HIQ.varyPlay(pick(candidates));
-      const hasRead = cand.reads && cand.reads[role];
-      const isCarrier = cand.carrier === role;
-      if ((!hasRead || isCarrier) && attempt < 11) continue;
-      play = cand;
-      break;
+    /* Choose uniformly among every (play, mirrored?) combination this position
+       can actually be coached in.
+
+       Rolling the play and the mirror together and re-rolling on a miss biases
+       the result: whether a position is the puck carrier flips with the mirror,
+       so rejection sampling quietly favours one orientation and the play lands
+       on the same side of the ice about twice as often. Enumerating first keeps
+       both wings equally represented. */
+    const combos = [];
+    for (const cand of candidates) {
+      for (const mirror of [false, true]) {
+        const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+        const sourceRole = mirror ? (SWAP[role] || role) : role;
+        if (!cand.reads[sourceRole]) continue;   // this play doesn't coach it
+        if (cand.carrier === sourceRole) continue; // you'd be carrying the puck
+        combos.push({ cand, mirror });
+      }
     }
-    if (!play) play = HIQ.varyPlay(candidates[0]);
+
+    let play;
+    if (combos.length) {
+      const chosen = pick(combos);
+      play = HIQ.varyPlay(chosen.cand, { mirror: chosen.mirror });
+    } else {
+      // Nothing coaches this position — fall back and reassign below.
+      play = HIQ.varyPlay(pick(candidates));
+    }
 
     // Fall back to a position this play does coach, if the chosen one isn't in it.
     let playRole = role;
