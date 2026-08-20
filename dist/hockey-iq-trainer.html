@@ -257,6 +257,32 @@ th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes popIn { from { transform: scale(0.9) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* Principles — the idea behind each read */
+.principle {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef7ff;
+  border: 1px solid #bcdcff;
+  color: #10457f;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pr-block { margin-top: 12px; }
+.pr-head {
+  font-size: 11px; font-weight: 800; letter-spacing: 1.2px;
+  text-transform: uppercase; color: #64809c; margin: 10px 0 6px;
+}
+.pr-row {
+  border-left: 4px solid #cbd5e1;
+  padding: 6px 0 6px 10px;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+}
+.pr-row.weak { border-left-color: #f59e0b; }
+.pr-row.strong { border-left-color: #16a34a; }
+
 /* Game-first layout */
 #scorebar { margin-bottom: 4px; }
 canvas { margin-top: 6px; }
@@ -360,7 +386,7 @@ canvas { margin-top: 6px; }
     <div class="row" style="margin-top:10px;">
       <label>Age group
         <select id="age">
-          <option value="6-8">6–8 (Learn basics)</option>
+          <option value="6-8">6–8 (Big ideas, not systems)</option>
           <option value="9-11" selected>9–11 (Develop hockey IQ)</option>
           <option value="12-14">12–14 (Advanced reads)</option>
         </select>
@@ -1304,6 +1330,91 @@ HIQ.PLAYS = [
   },
 ];
 
+/* The principles.
+
+   A player who learns "in this picture, go there" has learned a picture. What
+   transfers to a real game is the rule underneath it — and the rule is the same
+   whether you're breaking out, forechecking or defending your own corner.
+
+   Every authored read is tagged with the principle it teaches or breaks, so the
+   game can name it, and the coach report can show a parent which ideas their
+   kid has actually absorbed and which ones keep costing them.
+
+   The set is deliberately small. Six or seven ideas a child can hold in their
+   head beat twenty they cannot. */
+HIQ.PRINCIPLES = {
+  support:   { name: "Support the puck",     kid: "Be somewhere your teammate can pass to." },
+  middle:    { name: "Protect the middle",   kid: "The front of your net is the most dangerous ice." },
+  above:     { name: "Stay above the puck",  kid: "Don't get caught below it." },
+  lanes:     { name: "Keep your lanes apart", kid: "Two of you in one lane is one checker's job." },
+  weakside:  { name: "Cover the weak side",  kid: "Someone has to be there when it comes across." },
+  dontchase: { name: "Don't chase the puck", kid: "If everyone goes to the puck, nobody is anywhere." },
+  yourjob:   { name: "Do your own job",      kid: "Cover your own man — don't take a teammate's." },
+};
+
+/* Which principle each read teaches, in order: best, then acceptable, then
+   wrong. Assigned by hand — keyword matching got two thirds of them right,
+   which is not good enough for the thing the whole game is built on. */
+const PRINCIPLE_MAP = {
+  breakout_corner_pressure: {
+    LW: ["support", "support", "dontchase", "middle"],
+    C:  ["support", "support", "lanes", "above"],
+    RW: ["weakside", "lanes", "dontchase", "above"],
+    RD: ["support", "support", "above", "weakside"],
+  },
+  dzone_halfwall_coverage: {
+    LD: ["middle", "dontchase", "middle", "yourjob"],
+    RD: ["middle", "weakside", "middle"],
+    C:  ["middle", "yourjob", "yourjob", "above"],
+    LW: ["yourjob", "dontchase", "above"],
+    RW: ["weakside", "weakside", "weakside", "above"],
+  },
+  ozone_cycle_support: {
+    C:  ["support", "support", "dontchase", "support"],
+    LW: ["middle", "support", "dontchase", "yourjob"],
+    RD: ["yourjob", "support", "above", "above"],
+    LD: ["weakside", "weakside", "above", "above"],
+  },
+  rush_three_on_two: {
+    RW: ["lanes", "support", "lanes", "above"],
+    LW: ["lanes", "support", "above", "lanes"],
+    RD: ["above", "support", "above", "support"],
+    LD: ["above", "support", "above", "middle"],
+  },
+  dzone_corner_battle: {
+    LD: ["middle", "yourjob", "above"],
+    RD: ["middle", "dontchase", "above"],
+    C:  ["middle", "yourjob", "above", "yourjob"],
+    LW: ["yourjob", "dontchase", "above"],
+    RW: ["weakside", "weakside", "weakside", "above"],
+  },
+  nz_regroup: {
+    C:  ["support", "support", "lanes", "above"],
+    RW: ["support", "support", "above", "lanes"],
+    LW: ["weakside", "lanes", "above", "above"],
+    LD: ["support", "lanes", "above", "support"],
+  },
+  forecheck_1_2_2: {
+    C:  ["middle", "middle", "dontchase", "above"],
+    LW: ["above", "support", "above", "yourjob"],
+    RW: ["above", "weakside", "dontchase", "yourjob"],
+    RD: ["yourjob", "support", "above", "dontchase"],
+    LD: ["weakside", "weakside", "above"],
+  },
+};
+
+// Attach the principle to every read, in the order the map lists them.
+(() => {
+  for (const play of HIQ.PLAYS) {
+    const forPlay = PRINCIPLE_MAP[play.id] || {};
+    for (const [role, r] of Object.entries(play.reads)) {
+      const list = forPlay[role] || [];
+      const ordered = [r.best, ...r.acceptable, ...r.wrong];
+      ordered.forEach((opt, i) => { opt.principle = list[i] || null; });
+    }
+  }
+})();
+
 /* Variation that cannot corrupt the hockey.
 
    Only ONE transform is allowed: mirroring across centre ice. The rink is
@@ -1370,10 +1481,13 @@ HIQ.playToPixels = function (play) {
   };
   for (const [role, pt] of Object.entries(play.players)) out.players[role] = p(pt);
   for (const [role, r] of Object.entries(play.reads)) {
+    // Carry everything the read carries — dropping a field here silently
+    // disconnects it from the running game.
+    const conv = (o) => ({ ...o, ...p(o) });
     out.reads[role] = {
-      best: { ...p(r.best), why: r.best.why },
-      acceptable: (r.acceptable || []).map(a => ({ ...p(a), why: a.why })),
-      wrong: (r.wrong || []).map(w => ({ ...p(w), why: w.why })),
+      best: conv(r.best),
+      acceptable: (r.acceptable || []).map(conv),
+      wrong: (r.wrong || []).map(conv),
     };
   }
   return out;
@@ -2516,7 +2630,7 @@ HIQ.Sim = (() => {
   // How close (in FEET) you must be to count as having chosen a given read.
   function readRadiusFt() {
     const age = ageSel.value, diff = diffSel.value;
-    const base = age === "6-8" ? 16 : age === "12-14" ? 10 : 13;
+    const base = age === "6-8" ? 20 : age === "12-14" ? 10 : 13;
     const tighten = diff === "hard" ? 0.78 : diff === "easy" ? 1.25 : 1;
     return base * tighten;
   }
@@ -2564,12 +2678,12 @@ HIQ.Sim = (() => {
     // Inside a coached read: score by tier, easing off with distance from it.
     const slip = Math.min(1, nearest.d / R);
     if (nearest.tier === "best") {
-      return { tier: "best", score: Math.round(100 - 8 * slip), why: nearest.spot.why, spot: nearest.spot };
+      return { tier: "best", score: Math.round(100 - 8 * slip), why: nearest.spot.why, principle: nearest.spot.principle, spot: nearest.spot };
     }
     if (nearest.tier === "acceptable") {
-      return { tier: "acceptable", score: Math.round(78 - 10 * slip), why: nearest.spot.why, spot: nearest.spot, better };
+      return { tier: "acceptable", score: Math.round(78 - 10 * slip), why: nearest.spot.why, principle: nearest.spot.principle, spot: nearest.spot, better };
     }
-    return { tier: "wrong", score: Math.round(38 - 14 * slip), why: nearest.spot.why, spot: nearest.spot, better };
+    return { tier: "wrong", score: Math.round(38 - 14 * slip), why: nearest.spot.why, principle: nearest.spot.principle, spot: nearest.spot, better };
   }
 
   // Kept for the older call sites that just want a number.
@@ -2750,7 +2864,20 @@ HIQ.Sim = (() => {
     scoreEl.textContent = "—";
     lockBtn.style.display = choice.active ? "none" : "";
 
-    const showHints = (diffSel.value === "easy" || ageSel.value === "6-8");
+    /* USA Hockey's development model warns that teaching position too early can
+       stifle a young player's ability to think on the fly. So for 6-8 the game
+       leads with the IDEA rather than the system: one principle, stated plainly
+       up front, and a generous target. The situation is still real hockey — it
+       just isn't asking a seven-year-old to memorise a breakout. */
+    const youngest = ageSel.value === "6-8";
+    if (youngest) {
+      const best = scenario.reads[scenario.role] && scenario.reads[scenario.role].best;
+      const pr = best && HIQ.PRINCIPLES[best.principle];
+      if (pr) promptEl.innerHTML =
+        `<span class="principle">\uD83D\uDCA1 ${pr.name}</span><br/>${pr.kid} You are ${scenario.role}.`;
+    }
+
+    const showHints = (diffSel.value === "easy" || youngest);
     const hints = showHints ? coachHints(scenario.role, scenario) : [];
     if (scenario.roleNote) hints.unshift(scenario.roleNote);
     hintEl.textContent = hints.join("   ");
@@ -2954,6 +3081,7 @@ HIQ.Sim = (() => {
     const mk = (spot, tier) => ({
       pos: { x: spot.x, y: spot.y },
       why: spot.why,
+      principle: spot.principle,
       tier,
       correct: tier === "best",
       res: gradePlacement(role, { x: spot.x, y: spot.y }, scenario),
@@ -3367,7 +3495,7 @@ HIQ.Sim = (() => {
     const pass = passThreshold();
     const ageCfg = getAgeSettings();
 
-    let grade, score, why, better, receiver, reportRole;
+    let grade, score, why, better, receiver, reportRole, principle;
 
     if (mode === "single") {
       const you = controlled[0];
@@ -3375,6 +3503,7 @@ HIQ.Sim = (() => {
       grade = chosen ? chosen.tier : g.tier;
       score = g.score;
       why = chosen ? chosen.why : g.why;
+      principle = chosen ? chosen.principle : g.principle;
       better = g.better || (grade !== "best" ? scenario.reads[scenario.role].best : null);
       receiver = you;
       reportRole = scenario.role;
@@ -3386,6 +3515,7 @@ HIQ.Sim = (() => {
       const worst = results.slice().sort((a, b) => a.score - b.score)[0];
       grade = score >= 88 ? "best" : score >= 68 ? "acceptable" : "wrong";
       why = worst ? worst.why : "";
+      principle = worst ? worst.principle : null;
       better = null;
       const anchor = scenario.isDefense ? toward(puck, slotFor(ownSideOf(scenario)), 0.5) : puck;
       receiver = nearestTo(controlled.filter(p => p.role !== "G"), anchor.x, anchor.y) || controlled[0];
@@ -3424,6 +3554,12 @@ HIQ.Sim = (() => {
     if (tier === "great") { stats.goals += 1; sessionGoals += 1; }
     if (grade === "best") stats.greats += 1;
     if (grade === "best" && score >= 98) stats.perfects += 1;
+    if (principle) {
+      stats.byPrinciple = stats.byPrinciple || {};
+      const bucket = stats.byPrinciple[principle] || { good: 0, missed: 0 };
+      if (grade === "wrong") bucket.missed += 1; else bucket.good += 1;
+      stats.byPrinciple[principle] = bucket;
+    }
     stats.bestStreak = Math.max(stats.bestStreak, streak);
     awardXP(grade === "best" ? 100 : grade === "acceptable" ? 55 : 15);
     checkBadges({ comeback: wasComeback });
@@ -3454,17 +3590,20 @@ HIQ.Sim = (() => {
         setCoach(grade === "best" ? (tier === "great" ? "goal" : "happy")
                : grade === "acceptable" ? "happy" : "sad");
 
+        const pr = principle && HIQ.PRINCIPLES[principle];
+        const prLine = pr ? `<br/><span class="principle">\uD83D\uDCA1 ${pr.name} — ${pr.kid}</span>` : "";
+
         if (grade === "best") {
           const outcome = tier === "great"
             ? "You got to the right spot and it ended in a goal!"
             : "You got to the right spot and kept the play alive — the chance was there.";
-          statusEl.innerHTML = `<b>BEST READ \u2705</b> ${outcome}`;
+          statusEl.innerHTML = `<b>BEST READ \u2705</b> ${outcome}${prLine}`;
           pendingTimer = setTimeout(buildScenario, 1700);
 
         } else if (grade === "acceptable") {
           // The whole point: this works, and the coach still shows you better.
           statusEl.innerHTML = `<b>THAT WORKS \uD83D\uDC4D</b> ${why}` +
-            (better ? `<br/><span class="muted">Even better: ${better.why}</span>` : "");
+            (better ? `<br/><span class="muted">Even better: ${better.why}</span>` : "") + prLine;
           pendingTimer = setTimeout(buildScenario, 2600);
 
         } else {
@@ -3474,8 +3613,8 @@ HIQ.Sim = (() => {
 
           statusEl.innerHTML = reveal
             ? `<b>NOT QUITE \u274C</b> ${why}` +
-              (better ? `<br/><span class="muted">Where you wanted to be: ${better.why}</span>` : "")
-            : `<b>NOT THIS TIME \u274C</b> ${why}<br/><span class="muted">Have another look \u2014 where should you be?</span>`;
+              (better ? `<br/><span class="muted">Where you wanted to be: ${better.why}</span>` : "") + prLine
+            : `<b>NOT THIS TIME \u274C</b> ${why}<br/><span class="muted">Have another look \u2014 where should you be?</span>${prLine}`;
 
           pendingTimer = setTimeout(() => {
             restoreSnapshot();
@@ -3496,6 +3635,37 @@ HIQ.Sim = (() => {
     renderReport();
   }
 
+  /* What a parent or coach actually wants to know: not "68% correct", but which
+     ideas have landed and which keep costing them. */
+  function principleSummary() {
+    const by = stats.byPrinciple || {};
+    const rows = Object.entries(by)
+      .map(([key, v]) => ({ key, ...v, total: v.good + v.missed }))
+      .filter(r => r.total >= 2)
+      .sort((a, b) => (a.good / a.total) - (b.good / b.total));
+    if (!rows.length) return "";
+
+    const line = (r, cls) => {
+      const p = HIQ.PRINCIPLES[r.key];
+      if (!p) return "";
+      const pctp = Math.round((r.good / r.total) * 100);
+      return `<div class="pr-row ${cls}"><b>${p.name}</b> — ${r.good} of ${r.total} (${pctp}%)<br/>` +
+             `<span class="muted">${p.kid}</span></div>`;
+    };
+
+    const weakest = rows.filter(r => r.good / r.total < 0.7).slice(0, 2);
+    const strongest = rows.slice().reverse().filter(r => r.good / r.total >= 0.7).slice(0, 2);
+
+    let html = `<div class="pr-block">`;
+    if (weakest.length) {
+      html += `<div class="pr-head">Work on this</div>` + weakest.map(r => line(r, "weak")).join("");
+    }
+    if (strongest.length) {
+      html += `<div class="pr-head">Going well</div>` + strongest.map(r => line(r, "strong")).join("");
+    }
+    return html + `</div>`;
+  }
+
   function renderReport() {
     const total = report.length;
     const correct = report.filter(r => r.ok).length;
@@ -3510,7 +3680,8 @@ HIQ.Sim = (() => {
       if (!r.ok && r.topMissKey) missKeys[r.topMissKey] = (missKeys[r.topMissKey] || 0) + 1;
     }
 
-    reportSummaryEl.textContent = `Attempts: ${total} | Correct: ${correct} (${pct}%)`;
+    reportSummaryEl.innerHTML =
+      `Attempts: ${total} &nbsp;|&nbsp; Good reads: ${correct} (${pct}%)` + principleSummary();
 
     reportChipsEl.innerHTML = "";
     Object.keys(byPhase).sort().forEach(ph => {
