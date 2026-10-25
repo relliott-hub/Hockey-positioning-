@@ -61,6 +61,10 @@ holds special teams back until U13.
 - **Progression** — XP, levels, streaks, and 12 trophies to unlock
 - **Coach report** — tracks your session and shows your most common mistakes
 - **Plays offline** — install it to your home screen and it works at the rink
+- **Runs smoothly on a phone** — players and chips are pre-rendered rather than
+  re-traced every frame, and the pixel buffer is sized to what the device can
+  actually afford, so a slow phone gives up a little sharpness instead of
+  dropping frames
 
 ---
 
@@ -82,7 +86,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 71 end-to-end checks against a real browser
+npm test           # 81 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
@@ -103,6 +107,8 @@ the **coaching correctness invariants**:
 - the simulation never shows a pass across the front of your own net
 - every situation's wording matches where things actually are on the ice
 - the season plan serves one unit at a time and only a best read advances it
+- nobody is ever pushed off the ice by the spacing pass
+- a frame costs a sane number of canvas operations, and frames don't stall
 
 Each of these exists because something was found to be wrong. An audit found
 the game marking *perfect* placements as turnovers; a third of option pairs

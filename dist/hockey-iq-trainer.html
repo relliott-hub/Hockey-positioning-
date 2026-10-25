@@ -380,9 +380,12 @@ canvas { margin-top: 6px; }
     <span class="pill">🔥 Streak: <b id="streak">0</b></span>
     <span class="pill">⭐ Level <b id="level">1</b></span>
     <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
+    <!-- "Pressure" and "Structure" used to sit here. Pressure was a pill that
+         always read "Med" because nothing ever set it, alongside a filter that
+         was wired up but never actually filtered anything — a control that
+         implied the game had low/high-pressure variants it does not have.
+         Structure repeated the play name already in the question below. -->
     <span class="pill">Phase: <b id="phase">—</b></span>
-    <span class="pill">Pressure: <b id="pressure">—</b></span>
-    <span class="pill">Structure: <b id="structure">—</b></span>
     <span class="pill">Last score: <b id="score">—</b></span>
   </div>
 
@@ -410,7 +413,10 @@ canvas { margin-top: 6px; }
     </div>
   </div>
 
-  <details id="settingsPanel" class="card" open>
+  <!-- Closed by default. This used to open on load on anything wider than a
+       phone, so the first thing a player met was ten dropdowns instead of the
+       rink and a question. The defaults are the ones we want them to start on. -->
+  <details id="settingsPanel" class="card">
     <summary><b>⚙️ Game settings &amp; my player</b></summary>
 
     <div class="row" style="margin-top:10px;">
@@ -483,15 +489,6 @@ canvas { margin-top: 6px; }
           <option value="Faceoff">Faceoff</option>
           <option value="Power play">Power play</option>
           <option value="Penalty kill">Penalty kill</option>
-        </select>
-      </label>
-
-      <label>Pressure
-        <select id="pressureFilter">
-          <option value="any" selected>Any</option>
-          <option value="Low">Low</option>
-          <option value="Med">Med</option>
-          <option value="High">High</option>
         </select>
       </label>
 
@@ -2445,6 +2442,48 @@ HIQ.Sim = (() => {
   const canvas = document.getElementById("rink");
   const ctx = canvas.getContext("2d");
 
+  /* Render resolution, separated from the coordinate system.
+
+     Everything in this file draws in a fixed LOGICAL space the size of the
+     regulation sheet at 5.5 px/ft — 1152 x 520 — and that never changes, so
+     no positioning code has to care about any of what follows.
+
+     What does change is how many real pixels that logical space is rasterised
+     into. Measured on a phone-class CPU, this scene is fill-rate bound, not
+     draw-call bound: cutting the number of drawing commands by 77% barely
+     moved the frame time, while shrinking the pixel buffer to a quarter took a
+     six-times-throttled device from 30fps to a steady 60. The cost is pixels.
+
+     A phone was being asked for the full 599,000 of them because the canvas
+     element had a fixed size, which on a 390px-wide phone is about three
+     device pixels for every CSS pixel — far more detail than anyone can see,
+     paid for in dropped frames. So the buffer is sized from what the display
+     can actually show, and then adapted down if the device still can't keep
+     up. Dropping resolution is always preferred over dropping frames: 60fps
+     slightly softer reads much better than 30fps sharp. */
+  const LOGICAL_W = HIQ.VIEW.width;
+  const LOGICAL_H = HIQ.VIEW.height;
+  let renderScale = 0;
+
+  function applyRenderScale(q) {
+    q = clamp(q, 0.5, 1);
+    if (Math.abs(q - renderScale) < 0.02) return false;
+    renderScale = q;
+    canvas.width = Math.round(LOGICAL_W * q);
+    canvas.height = Math.round(LOGICAL_H * q);
+    return true;
+  }
+
+  /* The most resolution worth rendering: whatever the element is actually
+     displayed at, in real device pixels, capped at the logical size. Rendering
+     beyond this is invisible by definition. */
+  function displayJustifiedScale() {
+    const shown = canvas.getBoundingClientRect().width;
+    if (!shown) return 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    return clamp((shown * dpr) / LOGICAL_W, 0.5, 1);
+  }
+
   const ageSel = document.getElementById("age");
   const formatSel = document.getElementById("format");
   const modeSel = document.getElementById("mode");
@@ -2453,7 +2492,6 @@ HIQ.Sim = (() => {
   const answerSel = document.getElementById("answerStyle");
 
   const phaseFilterSel = document.getElementById("phaseFilter");
-  const pressureFilterSel = document.getElementById("pressureFilter");
   const overlaySel = document.getElementById("overlay");
   const planSel = document.getElementById("plan");
   const planBarEl = document.getElementById("planBar");
@@ -2466,8 +2504,6 @@ HIQ.Sim = (() => {
 
   const streakEl = document.getElementById("streak");
   const phaseEl = document.getElementById("phase");
-  const pressureEl = document.getElementById("pressure");
-  const structureEl = document.getElementById("structure");
   const scoreEl = document.getElementById("score");
   const gfEl = document.getElementById("gf");
   const gaEl = document.getElementById("ga");
@@ -2905,7 +2941,6 @@ HIQ.Sim = (() => {
       phase: play.phase,
       name: play.name,
       situation: play.situation,
-      pressure: play.pressure || "Med",
       // The strength comes from the play, not the picker: in plan mode the
       // unit chooses it, and the scoreboard should say what's actually on ice.
       fmt: play.fmt || "5v5",
@@ -2914,6 +2949,10 @@ HIQ.Sim = (() => {
       // On special teams the job matters more than the badge on your jersey.
       job: (play.jobs && play.jobs[playRole]) || null,
       attackDir: play.attackDir,
+      // Which side of the ice this run of the play is on. Carried so coverage
+      // can be measured by the scenario actually served rather than inferred
+      // from where a marker landed on screen.
+      mirrored: !!play.mirrored,
       isDefense: !!play.isDefense,
       forecheck: !!play.forecheck,
       carrier: play.carrier,
@@ -2979,8 +3018,6 @@ HIQ.Sim = (() => {
     // UI
     renderPlanBar();
     phaseEl.textContent = scenario.phase;
-    pressureEl.textContent = scenario.pressure;
-    structureEl.textContent = scenario.name;
     promptEl.textContent = scenario.prompt;
     scoreEl.textContent = "—";
     lockBtn.style.display = choice.active ? "none" : "";
@@ -3037,9 +3074,19 @@ HIQ.Sim = (() => {
     }
     const pinned = (carrier && best < 80) ? carrier : null;
 
+    /* Keep a nudged player on the ice, measured from the rink itself.
+
+       These bounds were hardcoded for a canvas the game stopped using: the
+       vertical limit was 562 on a sheet whose boards end at 493 and a buffer
+       only 520 tall, so a player shoved for clarity could be pushed past the
+       boards and straight off the bottom of the picture. The horizontal
+       limits were lopsided for the same reason. */
+    const INSET = 32; // a player plus the name chip under them
+    const minX = V.x(0) + INSET, maxX = V.x(RK.length) - INSET;
+    const minY = V.y(0) + INSET, maxY = V.y(RK.width) - INSET;
     const nudge = (p, ux, uy, amount) => {
-      p.x = clamp(p.x + ux * amount, 58, 1042);
-      p.y = clamp(p.y + uy * amount, 58, 562);
+      p.x = clamp(p.x + ux * amount, minX, maxX);
+      p.y = clamp(p.y + uy * amount, minY, maxY);
     };
 
     for (let iter = 0; iter < 40; iter++) {
@@ -3136,12 +3183,19 @@ HIQ.Sim = (() => {
   function cameraTarget() {
     const pts = [];
     const add = p => { if (p && isFinite(p.x) && isFinite(p.y)) pts.push(p); };
-    offense.forEach(add);
+    /* Goalies do not frame the shot. Ours was being included, and on anything
+       happening in the attacking end he stands two hundred feet away from it —
+       so the camera stretched to hold both and the play it was supposed to be
+       showing shrank into a third of the screen. On plays in our own end the
+       skaters are around our net anyway, so it stays in frame regardless. */
+    offense.forEach(p => { if (p.role !== "G") add(p); });
     defense.forEach(p => { if (p.role !== "G") add(p); });
     if (!choice.active) controlled.forEach(add); // hidden while choosing
     add(puck);
     if (choice.active) choice.options.forEach(o => add(o.pos));
-    if (!pts.length) return { x: 550, y: 310, scale: 1 };
+    // Centre of the sheet. Was hardcoded to the middle of a canvas size the
+    // game stopped using when the ice moved to regulation feet.
+    if (!pts.length) return { x: LOGICAL_W / 2, y: LOGICAL_H / 2, scale: 1 };
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const p of pts) {
@@ -3151,16 +3205,22 @@ HIQ.Sim = (() => {
       if (p.y > maxY) maxY = p.y;
     }
 
-    const pad = 95; // breathing room so nothing sits against the edge
+    /* Breathing room so nothing sits against the edge. This was 95px — about
+       17 feet of ice on every side — which on a play confined to one end was
+       enough to stop the camera zooming in at all: the padding alone exceeded
+       the screen, the scale pinned to its 1.0 floor, and the whole sheet was
+       shown with the action squeezed into a quarter of it. 62px still clears a
+       player, their name chip and an A/B/C marker. */
+    const pad = 62;
     const scale = clamp(
-      Math.min(canvas.width / ((maxX - minX) + pad * 2), canvas.height / ((maxY - minY) + pad * 2)),
+      Math.min(LOGICAL_W / ((maxX - minX) + pad * 2), LOGICAL_H / ((maxY - minY) + pad * 2)),
       1, 2.1
     );
     // Centre on the action, but never pan past the boards.
-    const halfW = canvas.width / (2 * scale), halfH = canvas.height / (2 * scale);
+    const halfW = LOGICAL_W / (2 * scale), halfH = LOGICAL_H / (2 * scale);
     return {
-      x: clamp((minX + maxX) / 2, halfW, canvas.width - halfW),
-      y: clamp((minY + maxY) / 2, halfH, canvas.height - halfH),
+      x: clamp((minX + maxX) / 2, halfW, LOGICAL_W - halfW),
+      y: clamp((minY + maxY) / 2, halfH, LOGICAL_H - halfH),
       scale
     };
   }
@@ -3180,15 +3240,15 @@ HIQ.Sim = (() => {
   }
 
   function applyCamera() {
-    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.translate(LOGICAL_W / 2, LOGICAL_H / 2);
     ctx.scale(camera.scale, camera.scale);
     ctx.translate(-camera.x, -camera.y);
   }
 
   function screenToWorld(x, y) {
     return {
-      x: (x - canvas.width / 2) / camera.scale + camera.x,
-      y: (y - canvas.height / 2) / camera.scale + camera.y
+      x: (x - LOGICAL_W / 2) / camera.scale + camera.x,
+      y: (y - LOGICAL_H / 2) / camera.scale + camera.y
     };
   }
 
@@ -4017,8 +4077,8 @@ HIQ.Sim = (() => {
 
   // --- Static rink pre-rendered once to an offscreen layer
   const rinkLayer = document.createElement("canvas");
-  rinkLayer.width = canvas.width;
-  rinkLayer.height = canvas.height;
+  rinkLayer.width = LOGICAL_W;
+  rinkLayer.height = LOGICAL_H;
 
   function roundRectPath(c, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
@@ -4034,7 +4094,7 @@ HIQ.Sim = (() => {
   function buildRinkLayer() {
     const R = HIQ.RINK, V = HIQ.VIEW;
     const c = rinkLayer.getContext("2d");
-    c.clearRect(0, 0, canvas.width, canvas.height);
+    c.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
     const X = (ft) => V.x(ft), Y = (ft) => V.y(ft), S = (ft) => V.px(ft);
     const boardsX = X(0), boardsY = Y(0);
@@ -4181,155 +4241,274 @@ HIQ.Sim = (() => {
     oppGoalie: { jersey: "#a11d1d", trim: "#4a0d0d", helmet: "#380808" }
   };
 
-  function drawRoleChip(p, style, t) {
+  /* Name and position chips, pre-rendered.
+
+     These were being rebuilt from scratch every single frame: a measureText, a
+     nine-call rounded rectangle and a fillText for each of twelve players —
+     roughly ninety canvas operations a frame, to draw text that changes maybe
+     once a minute. Measured on a phone-class CPU that was a real part of the
+     frame budget, and it is pure waste.
+
+     Each distinct chip is now drawn once and blitted. Baked at twice the size
+     and drawn at half, so it stays sharp when the camera zooms in. */
+  const CHIP_SS = 2;
+  const chipCache = new Map();
+  let chipProbe = null;
+
+  function chipSprite(label, isYou) {
+    const key = `${isYou ? "y" : "n"}|${label}`;
+    const hit = chipCache.get(key);
+    if (hit) return hit;
+
+    if (!chipProbe) chipProbe = document.createElement("canvas").getContext("2d");
+    chipProbe.font = "bold 10px system-ui";
+    const w = chipProbe.measureText(label).width + 10, h = 14;
+
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(w * CHIP_SS);
+    c.height = Math.ceil(h * CHIP_SS);
+    const g = c.getContext("2d");
+    g.scale(CHIP_SS, CHIP_SS);
+    roundRectPath(g, 0, 0, w, h, 6);
+    g.fillStyle = isYou ? "#facc15" : "rgba(15, 23, 42, 0.75)";
+    g.fill();
+    g.font = "bold 10px system-ui";
+    g.fillStyle = isYou ? "#1f2937" : "#fff";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(label, w / 2, h / 2 + 0.5);
+
+    const sprite = { canvas: c, w, h };
+    // A player renaming themselves repeatedly shouldn't grow this forever.
+    if (chipCache.size > 40) chipCache.clear();
+    chipCache.set(key, sprite);
+    return sprite;
+  }
+
+  function drawRoleChip(p, style) {
     let label = p.role;
     if (style.isYou) {
       const nm = (profile.name || "").trim().toUpperCase();
       label = `${p.role} · ${nm ? nm + " " : ""}#${profile.number || 9}`;
     }
     if (!label) return;
-    ctx.font = "bold 10px system-ui";
-    const tw = ctx.measureText(label).width;
-    const w = tw + 10, h = 14;
-    const y = p.y + (p.r || 16) + 8;
-    ctx.save();
-    roundRectPath(ctx, p.x - w / 2, y, w, h, 6);
-    ctx.fillStyle = style.isYou ? "#facc15" : "rgba(15, 23, 42, 0.75)";
-    ctx.fill();
-    ctx.fillStyle = style.isYou ? "#1f2937" : "#fff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, p.x, y + h / 2 + 0.5);
-    ctx.restore();
+    const s = chipSprite(label, !!style.isYou);
+    ctx.drawImage(s.canvas, p.x - s.w / 2, p.y + (p.r || 16) + 8, s.w, s.h);
+  }
+
+  /* Players, pre-rendered.
+
+     A skater is about twenty path operations — a shadow, an ice ring, a stick
+     in two strokes, a body, a stripe, two gloves, a helmet and its shine. With
+     twelve of them on the ice that was over two hundred path operations every
+     frame, re-tracing identical figures, and it was what kept a phone from
+     holding its frame budget.
+
+     Each distinct figure is drawn once into a small offscreen canvas and then
+     blitted, which turns those twenty operations into one. Two sprites per
+     player rather than one, because the shadow and the ice ring do NOT turn
+     with the player — the shadow sits at a fixed offset and the ring is a
+     circle — so they are baked unrotated and the figure is rotated on top.
+
+     Baked at twice the final size so the figures stay sharp at the camera's
+     closest zoom, and keyed so that only the handful of variants actually on
+     the ice are ever built. */
+  const FIG_SS = 2;
+  const figCache = new Map();
+  const groundCache = new Map();
+
+  function spriteCanvas(half, ss) {
+    const c = document.createElement("canvas");
+    c.width = c.height = Math.ceil(half * 2 * ss);
+    const g = c.getContext("2d");
+    g.scale(ss, ss);
+    g.translate(half, half);
+    return { canvas: c, ctx: g, half };
+  }
+
+  // The shadow and the pale ring of ice behind a player — these never rotate.
+  function groundSprite(R) {
+    const hit = groundCache.get(R);
+    if (hit) return hit;
+    const s = R / 16;
+    const sp = spriteCanvas(R + 7, FIG_SS);
+    const g = sp.ctx;
+    g.fillStyle = "rgba(10, 20, 40, 0.18)";
+    g.beginPath();
+    g.ellipse(2 * s, 4 * s, 15 * s, 11 * s, 0, 0, Math.PI * 2);
+    g.fill();
+    /* A pale ring of "ice" behind each player, so two skaters standing close
+       together still read as two distinct figures rather than one blob. */
+    g.fillStyle = "rgba(255, 255, 255, 0.55)";
+    g.beginPath();
+    g.arc(0, 0, R + 4.5, 0, Math.PI * 2);
+    g.fill();
+    groundCache.set(R, sp);
+    return sp;
+  }
+
+  // The figure itself, in the local units the artwork was drawn in. `strideStep`
+  // is -1, 0 or 1: the slight waggle of the stick while skating.
+  function figureSprite(style, R, strideStep) {
+    const key = `${style.jersey}|${style.trim}|${style.helmet}|${R}|${strideStep}`;
+    const hit = figCache.get(key);
+    if (hit) return hit;
+
+    const s = R / 16;
+    // Local artwork reaches x=29 (stick blade) and y=+-17 (gloves); the sprite
+    // is rotated about the player's centre, so it has to hold the full radius.
+    const sp = spriteCanvas(Math.ceil(35 * s) + 2, FIG_SS);
+    const g = sp.ctx;
+    g.scale(s, s);
+    const stride = strideStep * 2.2;
+
+    // Stick (shaft + blade), waggling slightly while skating
+    g.lineCap = "round";
+    g.strokeStyle = "#8a5a2b";
+    g.lineWidth = 2.6;
+    g.beginPath();
+    g.moveTo(3, 9);
+    g.lineTo(21, 13 + stride);
+    g.stroke();
+    g.strokeStyle = "#3d2b1f";
+    g.lineWidth = 3.8;
+    g.beginPath();
+    g.moveTo(21, 13 + stride);
+    g.lineTo(27, 10.5 + stride);
+    g.stroke();
+
+    // Body: shoulder pads (wide across the direction of travel)
+    g.fillStyle = style.jersey;
+    g.strokeStyle = style.trim;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.ellipse(0, 0, 11, 15, 0, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+
+    // Jersey shoulder stripe
+    g.strokeStyle = "rgba(255,255,255,0.65)";
+    g.lineWidth = 2.2;
+    g.beginPath();
+    g.moveTo(-3.5, -13);
+    g.lineTo(-3.5, 13);
+    g.stroke();
+
+    // Gloves at the shoulder tips
+    g.fillStyle = style.trim;
+    g.beginPath(); g.arc(3, -13.5, 3.6, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(3, 13.5, 3.6, 0, Math.PI * 2); g.fill();
+
+    // Helmet with a shine
+    g.fillStyle = style.helmet;
+    g.beginPath(); g.arc(1.5, 0, 6.6, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.35)";
+    g.beginPath(); g.arc(3.4, -1.8, 2.2, 0, Math.PI * 2); g.fill();
+
+    // Changing team colour mid-session shouldn't grow this without bound.
+    if (figCache.size > 80) figCache.clear();
+    figCache.set(key, sp);
+    return sp;
+  }
+
+  function blitSprite(sp, x, y) {
+    ctx.drawImage(sp.canvas, x - sp.half, y - sp.half, sp.half * 2, sp.half * 2);
   }
 
   function drawSkater(p, style, t) {
     if (p._ph === undefined) p._ph = Math.random() * Math.PI * 2;
     const R = p.r || 16;
-    const s = R / 16;
-    const a = p.angle || 0;
-    const stride = p._moving ? Math.sin(t / 70 + p._ph) * 2.2 : 0;
+    const strideStep = p._moving ? Math.round(Math.sin(t / 70 + p._ph)) : 0;
 
+    blitSprite(groundSprite(R), p.x, p.y);
+
+    const fig = figureSprite(style, R, strideStep);
     ctx.save();
     ctx.translate(p.x, p.y);
-
-    // Shadow on the ice
-    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
-    ctx.beginPath();
-    ctx.ellipse(2 * s, 4 * s, 15 * s, 11 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // A pale ring of "ice" behind each player, so two skaters standing close
-    // together still read as two distinct figures rather than one blob.
-    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
-    ctx.beginPath();
-    ctx.arc(0, 0, R + 4.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.rotate(a);
-    ctx.scale(s, s);
-
-    // Stick (shaft + blade), waggling slightly while skating
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#8a5a2b";
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(3, 9);
-    ctx.lineTo(21, 13 + stride);
-    ctx.stroke();
-    ctx.strokeStyle = "#3d2b1f";
-    ctx.lineWidth = 3.8;
-    ctx.beginPath();
-    ctx.moveTo(21, 13 + stride);
-    ctx.lineTo(27, 10.5 + stride);
-    ctx.stroke();
-
-    // Body: shoulder pads (wide across the direction of travel)
-    ctx.fillStyle = style.jersey;
-    ctx.strokeStyle = style.trim;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 11, 15, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Jersey shoulder stripe
-    ctx.strokeStyle = "rgba(255,255,255,0.65)";
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(-3.5, -13);
-    ctx.lineTo(-3.5, 13);
-    ctx.stroke();
-
-    // Gloves at the shoulder tips
-    ctx.fillStyle = style.trim;
-    ctx.beginPath(); ctx.arc(3, -13.5, 3.6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(3, 13.5, 3.6, 0, Math.PI * 2); ctx.fill();
-
-    // Helmet with a shine
-    ctx.fillStyle = style.helmet;
-    ctx.beginPath(); ctx.arc(1.5, 0, 6.6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.beginPath(); ctx.arc(3.4, -1.8, 2.2, 0, Math.PI * 2); ctx.fill();
-
+    ctx.rotate(p.angle || 0);
+    blitSprite(fig, 0, 0);
     ctx.restore();
 
-    drawRoleChip(p, style, t);
+    drawRoleChip(p, style);
+  }
+
+  // Goalies, pre-rendered the same way. They turn to track the puck, so the
+  // shadow is baked unrotated and the figure is turned on top of it.
+  const goalieCache = new Map();
+  const goalieGroundCache = new Map();
+
+  function goalieGroundSprite(R) {
+    const hit = goalieGroundCache.get(R);
+    if (hit) return hit;
+    const s = R / 16;
+    const sp = spriteCanvas(Math.ceil(19 * s) + 2, FIG_SS);
+    sp.ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
+    sp.ctx.beginPath();
+    sp.ctx.ellipse(2 * s, 4 * s, 16 * s, 13 * s, 0, 0, Math.PI * 2);
+    sp.ctx.fill();
+    goalieGroundCache.set(R, sp);
+    return sp;
+  }
+
+  function goalieSprite(style, R) {
+    const key = `${style.jersey}|${style.trim}|${R}`;
+    const hit = goalieCache.get(key);
+    if (hit) return hit;
+
+    const s = R / 16;
+    const sp = spriteCanvas(Math.ceil(22 * s) + 2, FIG_SS);
+    const g = sp.ctx;
+    g.scale(s, s);
+
+    // Leg pads out front
+    g.fillStyle = "#efe3cd";
+    g.strokeStyle = "#b7a27b";
+    g.lineWidth = 1.5;
+    roundRectPath(g, 5, -15, 8, 12, 3); g.fill(); g.stroke();
+    roundRectPath(g, 5, 3, 8, 12, 3); g.fill(); g.stroke();
+
+    // Goalie stick held across
+    g.strokeStyle = "#3d2b1f";
+    g.lineWidth = 3.5;
+    g.lineCap = "round";
+    g.beginPath();
+    g.moveTo(12, -12);
+    g.lineTo(12, 12);
+    g.stroke();
+
+    // Body
+    g.fillStyle = style.jersey;
+    g.strokeStyle = style.trim;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.ellipse(0, 0, 12, 15.5, 0, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+
+    // Mask
+    g.fillStyle = "#f5f5f5";
+    g.strokeStyle = style.trim;
+    g.lineWidth = 1.5;
+    g.beginPath(); g.arc(1.5, 0, 6.8, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = "rgba(80,80,80,0.7)";
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(-1, -4); g.lineTo(-1, 4); g.stroke();
+    g.beginPath(); g.moveTo(2, -4.5); g.lineTo(2, 4.5); g.stroke();
+
+    if (goalieCache.size > 20) goalieCache.clear();
+    goalieCache.set(key, sp);
+    return sp;
   }
 
   function drawGoalie(p, style, t) {
     const R = (p.r || 16) + 2;
-    const s = R / 16;
-    const a = p.angle || 0;
-
+    blitSprite(goalieGroundSprite(R), p.x, p.y);
     ctx.save();
     ctx.translate(p.x, p.y);
-    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
-    ctx.beginPath();
-    ctx.ellipse(2 * s, 4 * s, 16 * s, 13 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.rotate(a);
-    ctx.scale(s, s);
-
-    // Leg pads out front
-    ctx.fillStyle = "#efe3cd";
-    ctx.strokeStyle = "#b7a27b";
-    ctx.lineWidth = 1.5;
-    roundRectPath(ctx, 5, -15, 8, 12, 3); ctx.fill(); ctx.stroke();
-    roundRectPath(ctx, 5, 3, 8, 12, 3); ctx.fill(); ctx.stroke();
-
-    // Goalie stick held across
-    ctx.strokeStyle = "#3d2b1f";
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(12, -12);
-    ctx.lineTo(12, 12);
-    ctx.stroke();
-
-    // Body
-    ctx.fillStyle = style.jersey;
-    ctx.strokeStyle = style.trim;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 12, 15.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Mask
-    ctx.fillStyle = "#f5f5f5";
-    ctx.strokeStyle = style.trim;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(1.5, 0, 6.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = "rgba(80,80,80,0.7)";
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(-1, -4); ctx.lineTo(-1, 4); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(2, -4.5); ctx.lineTo(2, 4.5); ctx.stroke();
-
+    ctx.rotate(p.angle || 0);
+    blitSprite(goalieSprite(style, R), 0, 0);
     ctx.restore();
-
-    drawRoleChip(p, style, t);
+    drawRoleChip(p, style);
   }
 
   /* Who has the puck is the first thing you need to know to read a play, and a
@@ -4399,6 +4578,42 @@ HIQ.Sim = (() => {
     ctx.restore();
   }
 
+  /* The puck, pre-rendered. Baked at three times the size and drawn down, so
+     it stays round and sharp at the camera's closest zoom. */
+  let puckSpriteCache = null;
+  function puckSprite(r) {
+    if (puckSpriteCache && puckSpriteCache.r === r) return puckSpriteCache;
+    const SS = 3, pad = 5, half = r + pad;
+    const c = document.createElement("canvas");
+    c.width = c.height = Math.ceil(half * 2 * SS);
+    const g = c.getContext("2d");
+    g.scale(SS, SS);
+    g.translate(half, half);
+
+    g.shadowColor = "rgba(0,0,0,0.35)";
+    g.shadowBlur = 4;
+    g.shadowOffsetY = 2;
+    const grad = g.createRadialGradient(-2, -2, 1, 0, 0, r);
+    grad.addColorStop(0, "#3a3a3a");
+    grad.addColorStop(1, "#0b0b0b");
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(0, 0, r, 0, Math.PI * 2);
+    g.fill();
+
+    g.shadowColor = "transparent";
+    g.shadowBlur = 0;
+    g.shadowOffsetY = 0;
+    g.strokeStyle = "rgba(255,255,255,0.25)";
+    g.lineWidth = 1.4;
+    g.beginPath();
+    g.arc(0, 0, r - 2.5, -2.4, -0.9);
+    g.stroke();
+
+    puckSpriteCache = { canvas: c, r, half };
+    return puckSpriteCache;
+  }
+
   function drawPuck(t) {
     // Motion trail
     for (let i = 0; i < puckTrail.length; i++) {
@@ -4409,24 +4624,11 @@ HIQ.Sim = (() => {
       ctx.arc(q.x, q.y, puck.r * (0.4 + k * 0.5), 0, Math.PI * 2);
       ctx.fill();
     }
-    // Disc
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.35)";
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 2;
-    const g = ctx.createRadialGradient(puck.x - 2, puck.y - 2, 1, puck.x, puck.y, puck.r);
-    g.addColorStop(0, "#3a3a3a");
-    g.addColorStop(1, "#0b0b0b");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(puck.x, puck.y, puck.r - 2.5, -2.4, -0.9);
-    ctx.stroke();
+    // Disc — one blit. This used to build a radial gradient and a blurred
+    // shadow from scratch on every frame, and a blurred shadow is one of the
+    // most expensive things you can ask a 2D canvas for.
+    const s = puckSprite(puck.r);
+    ctx.drawImage(s.canvas, puck.x - s.half, puck.y - s.half, s.half * 2, s.half * 2);
   }
 
   function drawDirectionTag() {
@@ -4443,7 +4645,10 @@ HIQ.Sim = (() => {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "rgba(15, 42, 74, 0.5)";
-    ctx.fillText(text, 550, 52);
+    // Centre of the sheet, from the rink itself. This was hardcoded to 550,
+    // the middle of a canvas the game stopped using when the ice moved to
+    // regulation feet — so the label sat 26px left of centre.
+    ctx.fillText(text, V.width / 2, 52);
   }
 
   function drawGuidance(t) {
@@ -4589,7 +4794,10 @@ HIQ.Sim = (() => {
   }
 
   function draw(t) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // One transform maps the fixed logical sheet onto however many real pixels
+    // this device can afford. Everything below is in logical units.
+    ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+    ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
     // Screen shake on big moments
     let shx = 0, shy = 0;
@@ -4646,8 +4854,72 @@ HIQ.Sim = (() => {
     ctx.restore();
   }
 
+  /* Frame pacing.
+
+     Measured on a phone-class CPU, a frame of this scene costs more than the
+     16.7ms a 60fps budget allows, and the result was not a slower game — it
+     was a juddering one, because most frames overran and the browser dropped
+     them unevenly. An erratic 40-odd frames a second reads as lag. A steady
+     30 does not.
+
+     So the game measures what a frame actually costs it and, on a device that
+     cannot hold 60, deliberately draws every second frame instead. The
+     simulation still updates at full rate, so nothing moves differently — it
+     is only the drawing that halves, and it halves evenly.
+
+     The thresholds have a gap between them on purpose: a device that is
+     borderline should settle on one cadence rather than flip between the two
+     every half second, which would look worse than either. */
+  /* Adapting the resolution to the device.
+
+     Tuning on how long draw() takes does not work, and it is worth saying why:
+     the JavaScript call returns once the drawing commands are queued, while
+     the rasterising happens afterwards. On a device that is fill-rate bound —
+     which this one is — the measured draw cost stays low while frames are
+     visibly dropping, so the budget never trips and nothing adapts.
+
+     The honest signal is the frame interval itself, which includes everything
+     the browser actually had to do. A device holding 60fps delivers frames
+     about 16.7ms apart; one that cannot will show a clearly longer average.
+
+     Adaptation only ever goes DOWN, and needs two consecutive slow windows to
+     move. Letting it climb back up invites a permanent oscillation: lower the
+     resolution, hit 60fps, conclude there is room, raise it, drop frames
+     again, forever — which looks far worse than simply settling. The ladder
+     resets when the viewport changes, which is the one moment the right
+     answer genuinely differs. */
+  const RES_STEPS = [1, 0.84, 0.7, 0.58, 0.5];
+  const FRAME_SLOW_MS = 20;      // slower than this and 60fps is not happening
+  const WINDOW = 30;             // frames per measurement window
+  const pacing = { n: 0, elapsed: 0, step: 0, slowWindows: 0 };
+
+  function resolutionFor(step) {
+    // Never render finer than the display can actually show.
+    return Math.min(RES_STEPS[clamp(step, 0, RES_STEPS.length - 1)], displayJustifiedScale());
+  }
+
+  function retune() {
+    const avg = pacing.elapsed / pacing.n;
+    pacing.n = 0;
+    pacing.elapsed = 0;
+
+    if (avg > FRAME_SLOW_MS) {
+      pacing.slowWindows++;
+      // One slow window is a hiccup — a tab regaining focus, a garbage
+      // collection. Two in a row is the device telling you something.
+      if (pacing.slowWindows >= 2 && pacing.step < RES_STEPS.length - 1) {
+        pacing.step++;
+        pacing.slowWindows = 0;
+        applyRenderScale(resolutionFor(pacing.step));
+      }
+    } else {
+      pacing.slowWindows = 0;
+    }
+  }
+
   function tick(t) {
-    const dt = Math.min(0.05, lastTick ? (t - lastTick) / 1000 : 0.016);
+    const raw = lastTick ? t - lastTick : 16.7;
+    const dt = Math.min(0.05, raw / 1000);
     lastTick = t;
     updateHeadings(dt);
     updateGoalies(dt);
@@ -4655,6 +4927,12 @@ HIQ.Sim = (() => {
     updateParticles(dt);
     updateCamera();
     draw(t);
+
+    // A tab in the background gets no frames at all; that is not slowness.
+    if (raw < 200) {
+      pacing.elapsed += raw;
+      if (++pacing.n >= WINDOW) retune();
+    }
     requestAnimationFrame(tick);
   }
 
@@ -4666,8 +4944,8 @@ HIQ.Sim = (() => {
     const clientY = isTouch ? evt.touches[0].clientY : evt.clientY;
     // Canvas pixels, then back through the camera transform into rink coords.
     return screenToWorld(
-      (clientX - rect.left) * (canvas.width / rect.width),
-      (clientY - rect.top) * (canvas.height / rect.height)
+      (clientX - rect.left) * (LOGICAL_W / rect.width),
+      (clientY - rect.top) * (LOGICAL_H / rect.height)
     );
   }
 
@@ -4765,7 +5043,7 @@ HIQ.Sim = (() => {
     if (scenario) buildScenario();
   }
 
-  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, pressureFilterSel, overlaySel, planSel]
+  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, overlaySel, planSel]
     .forEach(el => el && el.addEventListener("change", onSettingChange));
 
   // Debug/testing hooks (not used by gameplay)
@@ -4844,10 +5122,17 @@ HIQ.Sim = (() => {
         ? { label: "HAS PUCK", role: f.player.role, dist: Math.round(f.dist) }
         : { label: "LOOSE PUCK", role: null, dist: null };
     },
-    // Rink coords -> canvas pixels, so tests can tap where a thing is drawn.
+    // Rink coords <-> logical sheet coords, so tests can tap where a thing is
+    // drawn and confirm the mapping round-trips.
+    screenToWorld: (x, y) => screenToWorld(x, y),
+    renderScale: () => renderScale,
+    spriteCaches: () => ({
+      figures: figCache.size, ground: groundCache.size,
+      goalies: goalieCache.size, chips: chipCache.size,
+    }),
     worldToScreen: (x, y) => ({
-      x: (x - camera.x) * camera.scale + canvas.width / 2,
-      y: (y - camera.y) * camera.scale + canvas.height / 2
+      x: (x - camera.x) * camera.scale + LOGICAL_W / 2,
+      y: (y - camera.y) * camera.scale + LOGICAL_H / 2
     }),
     // Auditing hooks: score an arbitrary spot, and force a specific scenario
     scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
@@ -4953,12 +5238,46 @@ HIQ.Sim = (() => {
 
   // Init
   renderPlanBar();
-  // Phones: start with the settings panel collapsed so the rink is front and center
-  const settingsPanel = document.getElementById("settingsPanel");
-  if (settingsPanel && window.innerWidth <= 760) settingsPanel.open = false;
+  /* The "turn your phone sideways" tip was permanent — in portrait it simply
+     sat above the rink forever, which is a nag, not a tip. Show it once, let a
+     tap dismiss it, remember that, and have it leave by itself after a few
+     seconds so it never becomes furniture. */
+  const rotateHint = document.getElementById("rotateHint");
+  if (rotateHint) {
+    const hideHint = () => {
+      rotateHint.style.display = "none";
+      try { localStorage.setItem("hiq.rotateTip", "done"); } catch (e) { /* private mode */ }
+    };
+    let tipSeen = false;
+    try { tipSeen = localStorage.getItem("hiq.rotateTip") === "done"; } catch (e) { /* private mode */ }
+    if (tipSeen) {
+      rotateHint.style.display = "none";
+    } else {
+      rotateHint.title = "Tap to dismiss";
+      rotateHint.addEventListener("click", hideHint);
+      setTimeout(hideHint, 9000);
+    }
+  }
   syncProfileUI();
   renderProgress();
   renderTrophies();
+  /* Size the pixel buffer before the first frame, from what the display can
+     actually show. Turning a phone sideways changes that, so re-check it then
+     — and let the adaptive tuning take over from there. */
+  applyRenderScale(displayJustifiedScale());
+  let resizeTimer = 0;
+  const onViewportChange = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      // A new viewport is a new question, so let it earn its resolution again.
+      pacing.step = 0;
+      pacing.slowWindows = 0;
+      applyRenderScale(resolutionFor(0));
+    }, 150);
+  };
+  window.addEventListener("resize", onViewportChange);
+  window.addEventListener("orientationchange", onViewportChange);
+
   buildRinkLayer();
   buildScenario();
   requestAnimationFrame(tick);

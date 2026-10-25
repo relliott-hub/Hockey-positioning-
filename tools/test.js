@@ -60,7 +60,8 @@ const section = (t) => console.log(`\n${t}`);
     await page.evaluate(() => document.getElementById("rink").scrollIntoView({ block: "center" }));
     const box = await page.locator("#rink").boundingBox();
     const c = await page.evaluate(({ x, y }) => HIQ.debug.worldToScreen(x, y), { x, y });
-    const cw = await page.evaluate(() => [rink.width, rink.height]);
+    // Logical sheet size, not the pixel buffer: the buffer adapts to the device.
+    const cw = await page.evaluate(() => [HIQ.VIEW.width, HIQ.VIEW.height]);
     await page.mouse.click(box.x + c.x * (box.width / cw[0]), box.y + c.y * (box.height / cw[1]));
   };
   const settle = () => page.waitForFunction(() => !HIQ.debug.simRunning(), null, { timeout: 15000 });
@@ -84,6 +85,13 @@ const section = (t) => console.log(`\n${t}`);
   check(!(await page.locator("#tutorial").isVisible()), "stays dismissed after reload");
 
   // ------------------------------------------------------------- core loop
+  /* The settings panel ships collapsed, so a player meets the rink rather than
+     ten dropdowns. The suite drives those dropdowns, so open it first. */
+  const openSettings = () =>
+    page.evaluate(() => { document.getElementById("settingsPanel").open = true; });
+  await openSettings();
+  await page.waitForTimeout(150);
+
   /* The game ships in season-plan mode, which deliberately serves only the
      current unit's scenarios. Everything below this line is about the whole
      library, so switch to free play; the plan gets its own section at the end. */
@@ -544,11 +552,19 @@ const section = (t) => console.log(`\n${t}`);
     await page.selectOption("#role", role);
     await page.waitForTimeout(80);
     const v = await page.evaluate((role) => {
+      /* Count the scenarios actually served, by id and which side of the ice.
+
+         This used to bucket the coaching marker's screen position instead, as
+         a proxy. That proxy breaks: a play whose two defencemen sit roughly
+         symmetrically about centre ice puts LD in nearly the same spot whether
+         you arrive at it directly or by mirroring the play and swapping D — so
+         two genuinely different runs collided in one bucket and the game was
+         marked down for coverage it actually had. */
       const spots = new Set();
-      for (let i = 0; i < 120; i++) {
+      for (let i = 0; i < 160; i++) {
         HIQ.debug.newPlay();
-        const gg = HIQ.debug.getPieces().guidance;
-        spots.add(`${Math.round(gg.x / 12)},${Math.round(gg.y / 12)}`);
+        const s = HIQ.debug.getScenario();
+        spots.add(`${s.id}|${s.mirrored ? "m" : "o"}`);
       }
       /* A role can only be coached in a play that has a read for it AND where
          it isn't the one carrying the puck. Mirroring doubles that. */
@@ -698,19 +714,158 @@ const section = (t) => console.log(`\n${t}`);
     `closest marker-to-player ${vis.minMarker}px`);
   check(vis.unlabelled === 0, "the puck situation is always spelled out (carried or loose)",
     `${vis.carrierFound}/${vis.plays} carried, ${vis.plays - vis.carrierFound} loose`);
+  /* Spreading players apart for legibility must never push one off the ice.
+     The clamp that bounds those nudges was written for an older canvas size
+     and allowed a player to be shoved past the boards and off the bottom of
+     the picture entirely. */
+  const onSheet = await page.evaluate(() => {
+    const V = HIQ.VIEW, R = HIQ.RINK;
+    let worst = null, off = 0, checked = 0;
+    for (let i = 0; i < 120; i++) {
+      HIQ.debug.newPlay();
+      const p = HIQ.debug.getPieces();
+      for (const q of [...p.controlled, ...p.offense, ...p.defense, p.puck]) {
+        checked++;
+        const ft = V.ftPt(q);
+        if (ft.x < 0 || ft.x > R.length || ft.y < 0 || ft.y > R.width) {
+          off++;
+          if (!worst) worst = `${q.role || "puck"} at ${ft.x.toFixed(1)},${ft.y.toFixed(1)} ft`;
+        }
+      }
+    }
+    return { off, checked, worst };
+  });
+  check(onSheet.off === 0, "nobody is ever pushed off the ice to make room",
+    onSheet.worst || `${onSheet.checked} positions checked`);
+
   check(vis.carrierFound / vis.plays > 0.7, "most plays show a clear puck carrier",
     `${Math.round(vis.carrierFound / vis.plays * 100)}% carried`);
   check(vis.youHadPuck === 0, "you are never assigned the position that is carrying the puck",
     `${vis.youHadPuck} such plays`);
 
-  // Taps must land through the camera transform, not just at 1:1
-  const camOk = await page.evaluate(() => {
+  /* Taps must land through the camera transform, not just at 1:1.
+
+     Note what this is measured against: the LOGICAL sheet, not the pixel
+     buffer. The buffer is now sized to whatever the device can afford to
+     rasterise, so it is no longer the coordinate system — and this check used
+     to compare against it, which only worked while the two happened to be the
+     same size. */
+  const cam = await page.evaluate(() => {
     const c = HIQ.debug.getCamera();
-    const p = HIQ.debug.worldToScreen(c.x, c.y);
-    const cv = document.getElementById("rink");
-    return c.scale >= 1 && Math.abs(p.x - cv.width / 2) < 1 && Math.abs(p.y - cv.height / 2) < 1;
+    const mid = HIQ.debug.worldToScreen(c.x, c.y);
+    const V = HIQ.VIEW;
+    // Round-trip a handful of points: world -> screen -> world.
+    let worst = 0;
+    for (const p of [{ x: 200, y: 150 }, { x: 576, y: 260 }, { x: 900, y: 400 }]) {
+      const s = HIQ.debug.worldToScreen(p.x, p.y);
+      const back = HIQ.debug.screenToWorld(s.x, s.y);
+      worst = Math.max(worst, Math.hypot(back.x - p.x, back.y - p.y));
+    }
+    return {
+      centred: Math.abs(mid.x - V.width / 2) < 1 && Math.abs(mid.y - V.height / 2) < 1,
+      scale: c.scale,
+      worst,
+      buffer: [document.getElementById("rink").width, document.getElementById("rink").height],
+      logical: [V.width, V.height],
+    };
   });
-  check(camOk, "camera transform is self-consistent (taps map back correctly)");
+  check(cam.centred && cam.scale >= 1,
+    "the camera centre maps to the middle of the sheet",
+    `scale ${cam.scale.toFixed(2)}`);
+  check(cam.worst < 0.01,
+    "a tap maps back to the exact spot on the ice it came from",
+    `worst round-trip error ${cam.worst.toFixed(4)} px`);
+  check(cam.buffer[0] > 0 && cam.buffer[0] <= cam.logical[0],
+    "the pixel buffer is sized for the device without changing the coordinate system",
+    `buffer ${cam.buffer.join("x")}, sheet ${cam.logical.join("x")}`);
+
+  /* ------------------------------------------------------- rendering cost
+
+     Ryan's report: the graphics lag. Measured, and true — on a phone-class CPU
+     the simulation ran at 30fps with most frames overrunning their budget,
+     which is what reads as lag.
+
+     Two things are checked here, and the first matters more. Counting canvas
+     operations per frame is deterministic: it does not care how loaded the
+     machine running the tests is, and it is what actually regressed — players
+     and their name chips were being re-traced from scratch every frame, about
+     650 operations a frame to draw figures that had not changed. The frame
+     interval is also checked, with a generous bound, because a number that
+     depends on the host's spare capacity should not fail a build on its own. */
+  section("Rendering cost");
+
+  const frameOps = await page.evaluate(() => new Promise(resolve => {
+    const c = document.getElementById("rink").getContext("2d");
+    const METHODS = ["beginPath", "arc", "ellipse", "moveTo", "lineTo", "fill", "stroke",
+      "fillText", "measureText", "drawImage", "save", "restore", "createRadialGradient",
+      "createLinearGradient", "clearRect", "fillRect", "translate", "rotate", "scale",
+      "setLineDash", "closePath", "quadraticCurveTo", "bezierCurveTo", "rect", "roundRect", "arcTo"];
+    const orig = {}, count = {};
+    for (const m of METHODS) {
+      if (typeof c[m] !== "function") continue;
+      orig[m] = c[m];
+      c[m] = function (...a) { count[m] = (count[m] || 0) + 1; return orig[m].apply(this, a); };
+    }
+    let frames = 0;
+    function sample() {
+      if (++frames < 60) { requestAnimationFrame(sample); return; }
+      for (const m in orig) c[m] = orig[m];
+      const total = Object.values(count).reduce((a, b) => a + b, 0) / frames;
+      const gradients = ((count.createRadialGradient || 0) + (count.createLinearGradient || 0)) / frames;
+      resolve({
+        total: +total.toFixed(0),
+        measureText: +((count.measureText || 0) / frames).toFixed(1),
+        gradients: +gradients.toFixed(2),
+        paths: +((count.beginPath || 0) / frames).toFixed(0),
+      });
+    }
+    requestAnimationFrame(sample);
+  }));
+  check(frameOps.total < 300, "a frame costs a sane number of canvas operations",
+    `${frameOps.total} per frame (was ~650 before players were pre-rendered)`);
+  check(frameOps.paths < 40, "players are not re-traced from scratch every frame",
+    `${frameOps.paths} path builds per frame`);
+  check(frameOps.measureText <= 3, "text is not re-measured every frame",
+    `${frameOps.measureText} measureText per frame`);
+  check(frameOps.gradients < 0.1, "no gradient is rebuilt every frame",
+    `${frameOps.gradients} per frame`);
+
+  const fps = await page.evaluate(() => new Promise(resolve => {
+    const gaps = [];
+    let last = performance.now();
+    function f(t) {
+      gaps.push(t - last); last = t;
+      if (gaps.length < 90) requestAnimationFrame(f);
+      else {
+        const s = gaps.slice(5).sort((a, b) => a - b);
+        resolve({ median: +s[Math.floor(s.length / 2)].toFixed(1), scale: HIQ.debug.renderScale() });
+      }
+    }
+    requestAnimationFrame(f);
+  }));
+  check(fps.median < 25, "frames are delivered without stalling",
+    `median ${fps.median}ms (${Math.round(1000 / fps.median)}fps), render scale ${fps.scale.toFixed(2)}`);
+
+  /* Pre-rendering trades memory for speed, so the caches have to stay bounded.
+     Every distinct team colour, player size and stick position is a separate
+     sprite, so a player cycling through colours is the way to make them grow. */
+  const caches = await page.evaluate(() => {
+    for (let i = 0; i < 20; i++) HIQ.debug.newPlay();
+    for (let pass = 0; pass < 3; pass++) {
+      for (const c of ["blue", "green", "purple", "teal", "gold"]) {
+        const sel = document.getElementById("pColor");
+        sel.value = c;
+        sel.dispatchEvent(new Event("change"));
+        HIQ.debug.newPlay();
+      }
+    }
+    return HIQ.debug.spriteCaches();
+  });
+  check(caches.figures <= 80 && caches.chips <= 40 && caches.goalies <= 20 && caches.ground <= 8,
+    "pre-rendered sprite caches stay bounded as colours and plays change",
+    JSON.stringify(caches));
+  check(errors.length === 0, "no errors raised while stressing the renderer",
+    errors.slice(0, 2).join(" | ") || "clean");
 
   // ------------------------------------------------------------ persistence
   section("Progress and profile persistence");
@@ -737,6 +892,9 @@ const section = (t) => console.log(`\n${t}`);
      the current one are actually landing, and every scenario in the game is
      reachable by working through it. */
   section("Season plan");
+  // The reload above re-collapsed the settings panel.
+  await openSettings();
+  await page.waitForTimeout(150);
   await page.evaluate(() => HIQ.debug.resetPlan());
   await page.selectOption("#plan", "season");
   await page.waitForTimeout(250);

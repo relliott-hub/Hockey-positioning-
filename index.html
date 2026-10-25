@@ -26,9 +26,12 @@
     <span class="pill">🔥 Streak: <b id="streak">0</b></span>
     <span class="pill">⭐ Level <b id="level">1</b></span>
     <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
+    <!-- "Pressure" and "Structure" used to sit here. Pressure was a pill that
+         always read "Med" because nothing ever set it, alongside a filter that
+         was wired up but never actually filtered anything — a control that
+         implied the game had low/high-pressure variants it does not have.
+         Structure repeated the play name already in the question below. -->
     <span class="pill">Phase: <b id="phase">—</b></span>
-    <span class="pill">Pressure: <b id="pressure">—</b></span>
-    <span class="pill">Structure: <b id="structure">—</b></span>
     <span class="pill">Last score: <b id="score">—</b></span>
   </div>
 
@@ -56,7 +59,10 @@
     </div>
   </div>
 
-  <details id="settingsPanel" class="card" open>
+  <!-- Closed by default. This used to open on load on anything wider than a
+       phone, so the first thing a player met was ten dropdowns instead of the
+       rink and a question. The defaults are the ones we want them to start on. -->
+  <details id="settingsPanel" class="card">
     <summary><b>⚙️ Game settings &amp; my player</b></summary>
 
     <div class="row" style="margin-top:10px;">
@@ -129,15 +135,6 @@
           <option value="Faceoff">Faceoff</option>
           <option value="Power play">Power play</option>
           <option value="Penalty kill">Penalty kill</option>
-        </select>
-      </label>
-
-      <label>Pressure
-        <select id="pressureFilter">
-          <option value="any" selected>Any</option>
-          <option value="Low">Low</option>
-          <option value="Med">Med</option>
-          <option value="High">High</option>
         </select>
       </label>
 
