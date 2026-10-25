@@ -662,10 +662,16 @@ HIQ.RINK = {
     leftBottom:  { x: R.goalLineLeft + R.endDotFromGoalLine,  y: midY + R.dotFromCentreY },
     rightTop:    { x: R.goalLineRight - R.endDotFromGoalLine, y: midY - R.dotFromCentreY },
     rightBottom: { x: R.goalLineRight - R.endDotFromGoalLine, y: midY + R.dotFromCentreY },
-    nzLeftTop:     { x: R.blueLineLeft - R.nzDotFromBlueLine,  y: midY - R.dotFromCentreY },
-    nzLeftBottom:  { x: R.blueLineLeft - R.nzDotFromBlueLine,  y: midY + R.dotFromCentreY },
-    nzRightTop:    { x: R.blueLineRight + R.nzDotFromBlueLine, y: midY - R.dotFromCentreY },
-    nzRightBottom: { x: R.blueLineRight + R.nzDotFromBlueLine, y: midY + R.dotFromCentreY },
+    /* The neutral-zone dots sit 5 ft from each blue line ON THE NEUTRAL-ZONE
+       SIDE — which is what makes them neutral-zone dots. They were placed on
+       the wrong side of both lines, putting them inside the end zones: the
+       left pair 5 ft deep in the defending zone and the right pair 5 ft
+       inside the attacking zone. The rink drew them there, so the picture
+       was wrong as well as the geometry. */
+    nzLeftTop:     { x: R.blueLineLeft + R.nzDotFromBlueLine,  y: midY - R.dotFromCentreY },
+    nzLeftBottom:  { x: R.blueLineLeft + R.nzDotFromBlueLine,  y: midY + R.dotFromCentreY },
+    nzRightTop:    { x: R.blueLineRight - R.nzDotFromBlueLine, y: midY - R.dotFromCentreY },
+    nzRightBottom: { x: R.blueLineRight - R.nzDotFromBlueLine, y: midY + R.dotFromCentreY },
   };
 
   R.centre = { x: R.centreLine, y: midY };
@@ -1667,6 +1673,8 @@ HIQ.PLAYS = [
   {
     id: "dzone_faceoff",
     phase: "Faceoff",
+    // Nobody has the puck on a draw; the possession marker must not claim otherwise.
+    faceoff: true,
     name: "Faceoff in your own end",
     situation:
       "A draw in your own end, at the dot nearest the boards. Everybody needs " +
@@ -1741,6 +1749,8 @@ HIQ.PLAYS = [
   {
     id: "ozone_faceoff",
     phase: "Faceoff",
+    // Nobody has the puck on a draw; the possession marker must not claim otherwise.
+    faceoff: true,
     name: "Faceoff in their end",
     situation:
       "A draw in their end, at the dot nearest the boards. A won draw here is " +
@@ -1970,6 +1980,423 @@ HIQ.PLAYS = [
       },
     },
   },
+
+  /* ================================================================== */
+  /* THE NEUTRAL ZONE.
+
+     More of a hockey game happens between the blue lines than anywhere
+     else, and almost none of a young player's instruction does. The five
+     scenarios below are the neutral zone from every side of it: trapping,
+     beating a trap, carrying over the far blue line, defending a rush with
+     the numbers against you, and a draw at a neutral-zone dot.             */
+  /* ================================================================== */
+
+  /* The 1-3-1 trap. One forward pressures from up ice "staying in the middle
+     of the ice" to cut off passing lanes; three stand across the red line,
+     the wingers "positioned by the boards"; one defenceman holds the
+     defensive blue line as the last man.
+
+     Sources call it the best default for most teams and a sound starting
+     point for youth hockey, with one caveat worth teaching: a trap has
+     "defenders standing still or on their heels", so a breakout with speed
+     can get behind it. Every wrong read here is a player who went chasing
+     and left a hole in a structure that only works whole. */
+  {
+    id: "nz_trap_1_3_1",
+    phase: "Forecheck",
+    name: "The neutral-zone trap",
+    situation:
+      "They're carrying the puck up into the neutral zone. Your team is in a " +
+      "1-3-1 trap — take the middle away and make them play into a wall.",
+    claims: { puck: ["inNeutralZone"] },
+    attackDir: "right",
+    ourNet: "left",
+    forecheck: true,
+    puck: { x: 120, y: 56 },
+    carrier: "opp",
+    players: {
+      C:  { x: 128, y: 52 },
+      LW: { x: 100, y: 70 },
+      RW: { x: 100, y: 16 },
+      RD: { x: 100, y: 44 },
+      LD: { x: 78, y: 40 },
+    },
+    opponents: [
+      { x: 120, y: 56, label: "O1" },
+      { x: 134, y: 30, label: "O2" },
+      { x: 112, y: 72, label: "O3" },
+      { x: 114, y: 20, label: "O4" },
+      { x: 126, y: 44, label: "O5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 128, y: 52, why: "Pressure from the inside and steer him toward the boards. In a trap you never try to win it at the top — you take the middle away so the only way forward is the wall, where three teammates are already standing." },
+        acceptable: [
+          { x: 108, y: 48, why: "Dropping back into the middle makes the trap even tighter and gives up nothing — but with nobody pressuring, their defenceman gets to stand there and pick exactly the pass he wants." },
+        ],
+        wrong: [
+          { x: 120, y: 74, why: "You went to the wall to chase him. That's your winger's man, and the middle you just left is the fastest way through a trap." },
+          { x: 148, y: 44, why: "You chased deep into their end alone. A trap holds the neutral zone — once you're past their line, the three behind you have nothing to funnel anyone into." },
+        ],
+      },
+      LW: {
+        best: { x: 100, y: 70, why: "On the red line, out by the boards. Stand still and hold it — a trap works by making him carry the puck into you, not by you skating at him." },
+        acceptable: [
+          { x: 120, y: 74, why: "Stepping up early can force a bad pass — but a trap that steps up is just a forecheck, and if he gets past you the line behind you is a man short." },
+        ],
+        wrong: [
+          { x: 98, y: 48, why: "You slid into the middle. Your teammate already has the middle of the red line — the boards you left are where a trapped team always goes." },
+          { x: 78, y: 72, why: "You retreated to your own blue line. That's your defenceman's line, and the trap has lost one of its three." },
+        ],
+      },
+      RW: {
+        best: { x: 100, y: 16, why: "Far side of the red line, holding your lane. If they swing it all the way across to escape, you're the one standing in it." },
+        acceptable: [
+          { x: 98, y: 38, why: "Pinching toward the middle tightens the three — but it opens the far boards, and that is exactly where a team beats a trap." },
+        ],
+        wrong: [
+          { x: 120, y: 20, why: "You went up the ice to chase. Two of you above the puck now, and their breakout goes straight through the middle." },
+          { x: 78, y: 18, why: "You dropped level with your defenceman. Two players on one line, and a hole where the trap used to be." },
+        ],
+      },
+      RD: {
+        best: { x: 100, y: 44, why: "The middle of the red line — the heart of the trap. Everything funnelled off the boards has to come through you, and nothing goes up the middle while you're standing there." },
+        acceptable: [
+          { x: 80, y: 50, why: "Sitting deeper is safer and you'll never be beaten — but the gap you leave in the middle of the red line is the one pass that breaks a trap wide open." },
+        ],
+        wrong: [
+          { x: 104, y: 68, why: "You drifted to the puck side. Your winger already has that wall, and the middle is now wide open." },
+          { x: 126, y: 44, why: "You stepped up to the puck. A defenceman beaten at the red line is an odd-man rush going the other way." },
+        ],
+      },
+      LD: {
+        best: { x: 78, y: 40, why: "Alone at your own blue line — and that is the job. Everyone ahead of you is taking space away; you're the one who cleans up whatever gets through." },
+        acceptable: [
+          { x: 96, y: 30, why: "Stepping up makes four in the wall and squeezes them harder — but a trap with nobody behind it is a breakaway waiting to happen." },
+        ],
+        wrong: [
+          { x: 58, y: 44, why: "You backed into your own zone. You've given them the whole neutral zone to build speed in, which is the one thing a trap must never do." },
+          { x: 100, y: 64, why: "You went up to the puck side. The trap's last line is gone and the entire far side is open." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Beating a trap. The mirror of the scenario above, and the reason it is
+     worth having both: a child who has stood in a trap understands why the
+     boards and a quick D-to-D beat one, and why carrying it into the middle
+     never does. */
+  {
+    id: "nz_beat_the_trap",
+    phase: "Rush",
+    name: "Beating the trap",
+    situation:
+      "Your defenceman has the puck in the neutral zone and they've set up a " +
+      "trap in front of you. Find a way through without losing it in the middle.",
+    claims: { puck: ["inNeutralZone"] },
+    attackDir: "right",
+    ourNet: "left",
+    puck: { x: 80, y: 48 },
+    carrier: "LD",
+    players: {
+      LD: { x: 80, y: 48 },
+      RD: { x: 76, y: 28 },
+      C:  { x: 92, y: 56 },
+      LW: { x: 96, y: 74 },
+      RW: { x: 94, y: 18 },
+    },
+    opponents: [
+      { x: 92, y: 44, label: "O1" },
+      { x: 104, y: 68, label: "O2" },
+      { x: 104, y: 42, label: "O3" },
+      { x: 104, y: 20, label: "O4" },
+      { x: 126, y: 44, label: "O5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 92, y: 56, why: "Come back toward the puck and give a short, safe option on the wall side. You beat a trap with quick passes to someone standing still — not by trying to split three players in the middle." },
+        acceptable: [
+          { x: 114, y: 62, why: "Stretching out ahead of the trap really hurts it when it works — one pass and you're behind all three — but it's a long way through traffic, and losing it there sends them the other way." },
+        ],
+        wrong: [
+          { x: 94, y: 34, why: "You came into the middle. That is exactly where a trap wants the puck — three of them are standing in that lane waiting for it." },
+          { x: 70, y: 60, why: "You dropped back behind the puck into your own zone. Nobody is ahead of it now, and the trap has done its job without having to do anything." },
+        ],
+      },
+      LW: {
+        best: { x: 96, y: 74, why: "Wide on the wall and moving. The boards are the one lane a 1-3-1 cannot fill with three players — get there before their winger can close on you." },
+        acceptable: [
+          { x: 118, y: 76, why: "Going long up the wall beats the whole trap in a single pass when it connects — but it's a long way, and their winger on the red line is sitting between you and it." },
+        ],
+        wrong: [
+          { x: 92, y: 52, why: "You came inside into the middle. Three of them are standing there — that is the entire point of a trap." },
+          { x: 74, y: 72, why: "You came back level with the puck. Your defenceman has nobody ahead of him now, so he has to throw it away." },
+        ],
+      },
+      RW: {
+        best: { x: 94, y: 18, why: "Wide on the far side. If they overload the puck side to trap it, the far wall is empty — and one quick pass across makes it yours." },
+        acceptable: [
+          { x: 92, y: 40, why: "Coming into the middle gives a shorter option — but the middle is where a 1-3-1 is strongest, and your centre is already there." },
+        ],
+        wrong: [
+          { x: 116, y: 20, why: "You went long, past their wall. The pass cannot get through three players, and you've taken yourself out of the play." },
+          { x: 72, y: 22, why: "You came back to the puck. Everybody is behind it now and the trap doesn't even have to work for it." },
+        ],
+      },
+      RD: {
+        best: { x: 76, y: 28, why: "Open on the far side for the D-to-D. The quickest way through a trap is to change which side of the ice it's on — one pass across and their whole wall has to slide." },
+        acceptable: [
+          { x: 56, y: 34, why: "Dropping deeper makes the pass completely safe — but you're back in your own zone, and now they have time to set the trap all over again." },
+        ],
+        wrong: [
+          { x: 84, y: 50, why: "You came right alongside your partner. One forechecker takes you both, which is precisely what a trap is for." },
+          { x: 104, y: 30, why: "You went up the ice ahead of the puck. Lose it to the trap now and there is nobody back at all." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* The zone entry. Controlled entries are worth roughly twice the offence
+     of a dump-in, and a failed carry costs less than people assume. What
+     the supporting players do decides whether a carry is even available:
+     width holds the defence apart, and a trailing late man is the answer to
+     a tight gap. Going offside is the mistake that wastes the whole rush. */
+  {
+    id: "nz_entry",
+    phase: "Rush",
+    name: "Attacking the blue line",
+    situation:
+      "Your centre is carrying the puck through the neutral zone at their " +
+      "blue line. Give him a way in with the puck instead of throwing it away.",
+    claims: { puck: ["inNeutralZone"] },
+    attackDir: "right",
+    ourNet: "left",
+    puck: { x: 112, y: 50 },
+    carrier: "C",
+    players: {
+      C:  { x: 112, y: 50 },
+      RW: { x: 116, y: 70 },
+      LW: { x: 114, y: 22 },
+      RD: { x: 96, y: 58 },
+      LD: { x: 90, y: 36 },
+    },
+    opponents: [
+      { x: 130, y: 56, label: "D1" },
+      { x: 130, y: 32, label: "D2" },
+      { x: 104, y: 44, label: "F1" },
+      { x: 98, y: 66, label: "F2" },
+      { x: 100, y: 24, label: "F3" },
+    ],
+    reads: {
+      RW: {
+        best: { x: 116, y: 70, why: "Drive wide and hit the line with speed. Staying wide holds their defenceman out there and opens the middle for your centre — and timed with the puck, you can't be offside." },
+        acceptable: [
+          { x: 120, y: 48, why: "Cutting into the middle late gives your centre a drop-pass option and it's a real play — but you've stopped stretching their defence, so both their D can collapse on the puck." },
+        ],
+        wrong: [
+          { x: 138, y: 72, why: "You crossed their blue line ahead of the puck. Offside, and a rush that had numbers is wasted." },
+          { x: 92, y: 66, why: "You're behind the puck. The rush is happening without you, and you can't help from back there." },
+        ],
+      },
+      LW: {
+        best: { x: 114, y: 22, why: "Wide on the far side, staying onside. Two wingers driving wide means their two defencemen can't both look at the puck." },
+        acceptable: [
+          { x: 118, y: 44, why: "Coming to the middle makes you an option through the seam — but your centre is already there, and you've let their defencemen pinch together." },
+        ],
+        wrong: [
+          { x: 136, y: 20, why: "Past their line before the puck. Offside, and you've killed a rush that had the numbers." },
+          { x: 92, y: 26, why: "You drifted back behind the puck. Your centre is carrying into two defencemen on his own." },
+        ],
+      },
+      RD: {
+        best: { x: 96, y: 58, why: "Trail the rush as the late man. When their gap is tight, the delay back to a trailer is the play that beats it — and if it's turned over at the line, you're the one who's home." },
+        acceptable: [
+          { x: 118, y: 64, why: "Joining the rush as a fourth attacker absolutely creates chances — but if they stand you up at the line, you're the one caught up the ice." },
+        ],
+        wrong: [
+          { x: 96, y: 34, why: "You drifted onto your partner's side. Both defencemen in one lane, and the boards you left are wide open." },
+          { x: 70, y: 60, why: "You stopped at your own blue line. You're not supporting the rush and you're not needed back yet — you're just out of the play." },
+        ],
+      },
+      LD: {
+        best: { x: 90, y: 36, why: "Stay back and in the middle. Somebody has to be home when a zone entry gets turned over at the line, and on this rush that is you." },
+        acceptable: [
+          { x: 110, y: 28, why: "Stepping up gives another option and keeps them pinned in — but you're the last man, and a turnover at their line goes the other way very fast." },
+        ],
+        wrong: [
+          { x: 90, y: 60, why: "Both defencemen on one side. The whole middle of the ice behind the rush is unguarded." },
+          { x: 132, y: 38, why: "You charged in with the forwards. If they turn it over at the blue line, nobody at all is back." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Defending a rush with the numbers against you. The coaching is the same
+     shape as the two-on-one but the assignments differ: the strong-side
+     defenceman engages the carrier while the weak-side defenceman takes the
+     passing option, and a backchecking forward is what turns three-on-two
+     back into an even fight. Close the gap early, steer to the outside. */
+  {
+    id: "defend_three_on_two",
+    phase: "Defend",
+    name: "Three on two against you",
+    situation:
+      "Three of them are coming at you through the neutral zone and only two " +
+      "of you are back. Your forwards are chasing. Don't let this be a goal.",
+    claims: { puck: ["inNeutralZone"] },
+    attackDir: "left",
+    ourNet: "left",
+    isDefense: true,
+    puck: { x: 78, y: 44 },
+    carrier: "opp",
+    players: {
+      LD: { x: 60, y: 50 },
+      RD: { x: 56, y: 34 },
+      C:  { x: 90, y: 44 },
+      LW: { x: 94, y: 66 },
+      RW: { x: 92, y: 24 },
+    },
+    opponents: [
+      { x: 78, y: 44, label: "O1" },
+      { x: 76, y: 66, label: "O2" },
+      { x: 76, y: 22, label: "O3" },
+      { x: 102, y: 56, label: "O4" },
+      { x: 104, y: 32, label: "O5" },
+    ],
+    reads: {
+      LD: {
+        best: { x: 60, y: 50, why: "Close the gap on the puck carrier and steer him to the outside. Take the middle away and make him go around you — on a three-on-two the one thing you cannot allow is a shot from the slot." },
+        acceptable: [
+          { x: 40, y: 46, why: "Backing off keeps all three in front of you and nobody gets behind — but you've let him carry to the top of the circle and shoot through traffic." },
+        ],
+        wrong: [
+          { x: 82, y: 50, why: "You lunged at him near the blue line. Miss on a three-on-two and it becomes a two-on-one behind you." },
+          { x: 58, y: 28, why: "You slid over to your partner's side. Both defencemen covering one attacker, and the other two are free." },
+        ],
+      },
+      RD: {
+        best: { x: 56, y: 34, why: "Stay inside your partner and take the pass away. He has the puck carrier; you have the two who don't — and the moment one of them gets it, he's yours." },
+        acceptable: [
+          { x: 36, y: 28, why: "Dropping to the net front covers the backdoor tap-in — but you've given the far winger the whole slot to shoot from first." },
+        ],
+        wrong: [
+          { x: 76, y: 30, why: "You stepped up at the far winger. Beaten there, and your partner is defending two players on his own." },
+          { x: 58, y: 56, why: "You went to the puck. Your partner already has him, and the two you left are the ones who score." },
+        ],
+      },
+      C: {
+        best: { x: 74, y: 44, why: "Back through the middle and pick up the trailer. A three-on-two becomes a three-on-three the moment a forward gets back — and the middle is the lane that has to be filled." },
+        acceptable: [
+          { x: 52, y: 44, why: "Skating all the way back into the slot means you're definitely home — but you've gone straight past the man you were supposed to pick up." },
+        ],
+        wrong: [
+          { x: 76, y: 66, why: "You went to the puck carrier. Your defenceman has him — it's the middle that's open." },
+          { x: 98, y: 32, why: "You gave up and turned up ice. Your two defencemen are left to handle three players alone." },
+        ],
+      },
+      LW: {
+        best: { x: 76, y: 68, why: "Take the man in your lane and get to the inside of him. Backchecking is only worth something if you finish up between your man and your net." },
+        acceptable: [
+          { x: 56, y: 72, why: "Racing all the way back to the corner gets you home first — but you went past your man on the way, so he's the one with the puck." },
+        ],
+        wrong: [
+          { x: 78, y: 46, why: "You cut into the middle. That's your centre's lane, and the wall you left is where they'll go." },
+          { x: 100, y: 72, why: "You stopped chasing. It's only three against two because you aren't back yet." },
+        ],
+      },
+      RW: {
+        best: { x: 74, y: 24, why: "Get back to the far man and take his inside. He's the one who ends up alone at the back post if nobody picks him up." },
+        acceptable: [
+          { x: 54, y: 18, why: "All the way back to the far post stops the tap-in — but he can shoot from the circle long before you get there." },
+        ],
+        wrong: [
+          { x: 76, y: 46, why: "You came into the middle. Your centre has that lane; the far man you left is the dangerous one." },
+          { x: 98, y: 22, why: "You stayed high waiting for the counter-attack. There is no counter while they're attacking three on two." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* A draw at a neutral-zone dot. The centre on the dot, the wingers either
+     side of it, the defencemen behind them — and, unlike an end-zone draw,
+     both a won and a lost draw immediately become a rush one way or the
+     other. That is what makes the neutral-zone faceoff worth coaching: your
+     spot has to answer both outcomes at once. */
+  {
+    id: "nz_faceoff",
+    phase: "Faceoff",
+    // Nobody has the puck on a draw; the possession marker must not claim otherwise.
+    faceoff: true,
+    name: "Faceoff in the neutral zone",
+    situation:
+      "A draw at the neutral-zone dot just outside your own blue line. " +
+      "Win it and you're attacking; lose it and they're coming straight at you.",
+    claims: { puck: ["atFaceoffDot", "inNeutralZone"] },
+    attackDir: "right",
+    ourNet: "left",
+    puck: { x: 80, y: 64.5 },
+    carrier: "opp",
+    players: {
+      C:  { x: 78, y: 62 },
+      RW: { x: 76, y: 76 },
+      LW: { x: 82, y: 48 },
+      RD: { x: 68, y: 70 },
+      LD: { x: 66, y: 44 },
+    },
+    opponents: [
+      { x: 82, y: 67, label: "O1" },
+      { x: 84, y: 78, label: "O2" },
+      { x: 88, y: 50, label: "O3" },
+      { x: 96, y: 70, label: "O4" },
+      { x: 98, y: 40, label: "O5" },
+    ],
+    reads: {
+      RW: {
+        best: { x: 76, y: 76, why: "Tight to the boards on your side of the dot. A neutral-zone draw gets won to the wall more often than anywhere else — be there, and be facing the right way when it arrives." },
+        acceptable: [
+          { x: 98, y: 74, why: "Lining up ahead of the dot lets you take off the instant it's won — but if it's lost, their winger is behind you and heading for your end with a free run." },
+        ],
+        wrong: [
+          { x: 78, y: 50, why: "You lined up in the middle where your other winger already is. Two of you in one lane and the boards wide open." },
+          { x: 54, y: 74, why: "You lined up behind your own defencemen. On a draw this close to your own blue line, that's a player wasted." },
+        ],
+      },
+      LW: {
+        best: { x: 82, y: 48, why: "Inside, between the dot and the middle of the ice. Lose the draw and you take the pass through the middle away; win it and you're the quick option going forward." },
+        acceptable: [
+          { x: 104, y: 44, why: "Lining up higher lets you go the moment it's won — but lose it and they have the middle of the ice with you already behind them." },
+        ],
+        wrong: [
+          { x: 80, y: 70, why: "You crossed to the boards where your winger already is. The middle is the one place you cannot leave open on a neutral-zone draw." },
+          { x: 60, y: 40, why: "You lined up back in your own zone. The puck hasn't dropped and you've already given up the neutral zone." },
+        ],
+      },
+      RD: {
+        best: { x: 68, y: 70, why: "Behind your winger on the board side. If the draw is lost, their winger comes down that wall — and you're already between him and your net." },
+        acceptable: [
+          { x: 66, y: 48, why: "Starting in the middle covers the most dangerous ice — but the boards on the draw side are where a lost draw actually goes." },
+        ],
+        wrong: [
+          { x: 90, y: 72, why: "You lined up level with the dot. That's a forward's spot, and you've no room to turn if they win it clean." },
+          { x: 46, y: 66, why: "You backed deep into your own end. A neutral-zone draw is a chance to attack, and you conceded your blue line before the puck dropped." },
+        ],
+      },
+      LD: {
+        best: { x: 66, y: 44, why: "Behind the play in the middle. You're the safety on a neutral-zone draw — if it goes wrong, it comes through the middle, and you're standing in it." },
+        acceptable: [
+          { x: 64, y: 22, why: "Covering the far side takes the long pass away — but it leaves the middle, and that's where a lost draw hurts you." },
+        ],
+        wrong: [
+          { x: 86, y: 38, why: "You lined up level with the dot. If they win it clean, you're beaten before you've even turned around." },
+          { x: 68, y: 68, why: "Both defencemen on the draw side. The entire far half of the ice is open." },
+        ],
+      },
+    },
+  },
 ];
 
 /* The principles.
@@ -2088,6 +2515,38 @@ const PRINCIPLE_MAP = {
     LD: ["middle", "middle", "yourjob", "above"],
     RD: ["weakside", "middle", "weakside", "yourjob"],
   },
+  nz_trap_1_3_1: {
+    C:  ["middle", "middle", "yourjob", "dontchase"],
+    LW: ["lanes", "above", "yourjob", "above"],
+    RW: ["weakside", "weakside", "dontchase", "lanes"],
+    RD: ["middle", "middle", "yourjob", "above"],
+    LD: ["above", "above", "above", "weakside"],
+  },
+  nz_beat_the_trap: {
+    C:  ["support", "support", "lanes", "above"],
+    LW: ["lanes", "support", "lanes", "support"],
+    RW: ["weakside", "lanes", "support", "above"],
+    RD: ["weakside", "support", "lanes", "above"],
+  },
+  nz_entry: {
+    RW: ["lanes", "support", "above", "above"],
+    LW: ["lanes", "lanes", "above", "above"],
+    RD: ["above", "above", "weakside", "support"],
+    LD: ["above", "above", "weakside", "above"],
+  },
+  defend_three_on_two: {
+    LD: ["middle", "above", "dontchase", "weakside"],
+    RD: ["weakside", "middle", "yourjob", "dontchase"],
+    C:  ["middle", "middle", "dontchase", "above"],
+    LW: ["above", "above", "yourjob", "above"],
+    RW: ["weakside", "weakside", "yourjob", "above"],
+  },
+  nz_faceoff: {
+    RW: ["yourjob", "above", "lanes", "above"],
+    LW: ["middle", "above", "lanes", "above"],
+    RD: ["yourjob", "middle", "above", "above"],
+    LD: ["middle", "weakside", "above", "weakside"],
+  },
 };
 
 // Attach the principle to every read, in the order the map lists them.
@@ -2146,11 +2605,21 @@ HIQ.CURRICULUM = [
     need: 6,
   },
   {
+    /* More of a game happens between the blue lines than anywhere else, and
+       almost none of a young player's instruction does. This unit is the
+       middle of the ice from both sides of it. */
+    id: "neutral",
+    name: "Own the neutral zone",
+    goal: "Move through the middle of the ice, and take it away from them.",
+    plays: ["nz_faceoff", "nz_beat_the_trap", "nz_entry"],
+    need: 7,
+  },
+  {
     id: "forecheck",
     name: "Take it back",
     goal: "Win the puck with angles and layers, not by chasing it.",
-    plays: ["forecheck_1_2_2", "nz_forecheck_1_2_2"],
-    need: 6,
+    plays: ["forecheck_1_2_2", "nz_forecheck_1_2_2", "nz_trap_1_3_1"],
+    need: 7,
   },
   {
     id: "offence",
@@ -2163,8 +2632,8 @@ HIQ.CURRICULUM = [
     id: "recover",
     name: "Get back",
     goal: "When it goes wrong, get to the defensive side of your man.",
-    plays: ["backcheck_rush", "defend_two_on_one"],
-    need: 6,
+    plays: ["backcheck_rush", "defend_two_on_one", "defend_three_on_two"],
+    need: 7,
   },
   {
     id: "special",
@@ -2258,6 +2727,7 @@ HIQ.playToPixels = function (play) {
     attackDir: play.attackDir,
     isDefense: !!play.isDefense,
     forecheck: !!play.forecheck,
+    faceoff: !!play.faceoff,
     fmt: play.fmt || "5v5",
     jobs: play.jobs || null,
     carrier: play.carrier,
@@ -2955,6 +3425,7 @@ HIQ.Sim = (() => {
       mirrored: !!play.mirrored,
       isDefense: !!play.isDefense,
       forecheck: !!play.forecheck,
+      faceoff: !!play.faceoff,
       carrier: play.carrier,
       reads: px.reads,
       prompt: "",
@@ -4516,6 +4987,15 @@ HIQ.Sim = (() => {
      carrier, and spell it out in words while the player is still deciding. */
   // Single source of truth for possession, shared by the renderer and the tests.
   function findPuckCarrier() {
+    /* On a draw, nobody has the puck — it hasn't been dropped yet.
+
+       Possession is worked out by proximity, and a centre lined up on the dot
+       is naturally the closest skater to it, so every faceoff scenario put a
+       bright "HAS PUCK" ring on a player who does not have it and cannot have
+       it. That is the one thing this game is most careful to state plainly,
+       so stating it wrongly is worse than not stating it at all. */
+    if (scenario && scenario.faceoff) return null;
+
     const skaters = [...offense, ...defense, ...(choice.active ? [] : controlled)]
       .filter(p => p.role !== "G");
     let carrier = null, best = Infinity;
@@ -4526,12 +5006,19 @@ HIQ.Sim = (() => {
     return (carrier && best <= 60) ? { player: carrier, dist: best } : null;
   }
 
+  /* What to call the puck when nobody is holding it. A puck about to be
+     dropped is a different thing from a loose one, and the answer to "where
+     should I go" depends on which it is. */
+  function puckSituationLabel() {
+    return (scenario && scenario.faceoff) ? "FACEOFF — NOBODY HAS IT YET" : "LOOSE PUCK";
+  }
+
   function drawPuckCarrier(t) {
     const found = findPuckCarrier();
     const carrier = found && found.player;
     if (!carrier) {
       // Nobody has it. Say so rather than leaving the player to wonder.
-      if (choice.active) drawPuckTag("LOOSE PUCK", puck.x, puck.y - 20);
+      if (choice.active) drawPuckTag(puckSituationLabel(), puck.x, puck.y - 20);
       return;
     }
 
@@ -5116,11 +5603,14 @@ HIQ.Sim = (() => {
       return out;
     },
     // What the player is told about possession on this play.
+    // Reports the label the player is actually shown. It used to work the
+    // answer out a second time with its own copy of the rule, which meant the
+    // tests could pass while the screen said something else.
     puckState: () => {
       const f = findPuckCarrier();
       return f
         ? { label: "HAS PUCK", role: f.player.role, dist: Math.round(f.dist) }
-        : { label: "LOOSE PUCK", role: null, dist: null };
+        : { label: puckSituationLabel(), role: null, dist: null };
     },
     // Rink coords <-> logical sheet coords, so tests can tap where a thing is
     // drawn and confirm the mapping round-trips.

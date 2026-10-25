@@ -69,10 +69,11 @@ your own net.
 | 1 | **Protect the house** | Learn the most dangerous ice on the sheet — and who guards it. | dzone_corner_battle, dzone_halfwall_coverage | 6 of 10 |
 | 2 | **Get out of your end** | Give your defence somewhere safe to pass, and never through the middle. | breakout_corner_pressure, dzone_faceoff | 6 of 8 |
 | 3 | **Move it up the ice** | Attack with speed and width instead of all skating to the puck. | nz_regroup, rush_three_on_two | 6 of 8 |
-| 4 | **Take it back** | Win the puck with angles and layers, not by chasing it. | forecheck_1_2_2, nz_forecheck_1_2_2 | 6 of 10 |
-| 5 | **Keep it in their end** | Hold possession, and have somebody at the net when the chance comes. | ozone_cycle_support, ozone_faceoff | 6 of 8 |
-| 6 | **Get back** | When it goes wrong, get to the defensive side of your man. | backcheck_rush, defend_two_on_one | 6 of 10 |
-| 7 | **Special teams** | A man up and a man down — the jobs change, and so do their names. | pp_one_three_one, pk_box | 5 of 8 |
+| 4 | **Own the neutral zone** | Move through the middle of the ice, and take it away from them. | nz_faceoff, nz_beat_the_trap, nz_entry | 7 of 12 |
+| 5 | **Take it back** | Win the puck with angles and layers, not by chasing it. | forecheck_1_2_2, nz_forecheck_1_2_2, nz_trap_1_3_1 | 7 of 15 |
+| 6 | **Keep it in their end** | Hold possession, and have somebody at the net when the chance comes. | ozone_cycle_support, ozone_faceoff | 6 of 8 |
+| 7 | **Get back** | When it goes wrong, get to the defensive side of your man. | backcheck_rush, defend_two_on_one, defend_three_on_two | 7 of 15 |
+| 8 | **Special teams** | A man up and a man down — the jobs change, and so do their names. | pp_one_three_one, pk_box | 5 of 8 |
 
 Free play ignores the plan and serves anything, which is the right mode for
 someone who already knows the game.
@@ -81,7 +82,7 @@ someone who already knows the game.
 
 ## Plays
 
-14 scenarios — 12 at 5v5, 1 at 5v4, 1 at 4v5.
+19 scenarios — 17 at 5v5, 1 at 5v4, 1 at 4v5.
 
 ### Breakout under pressure
 
@@ -1487,6 +1488,512 @@ game names it, because that is the vocabulary a coach uses at a whiteboard.
   > Both defencemen on the puck side. Nobody is at the back post, and that's a tap-in.
 - in your defensive zone, in the middle of the ice (44 ft from the nearest end boards, 7 ft far of centre)  *(Do your own job)*
   > You stepped up into the high slot. Their man in the middle is your forwards' job — your net is not.
+
+---
+
+### The neutral-zone trap
+
+*Forecheck · 5v5 · `nz_trap_1_3_1`*
+
+They're carrying the puck up into the neutral zone. Your team is in a 1-3-1 trap — take the middle away and make them play into a wall.
+
+**Puck:** in the neutral zone, toward the near side (80 ft from the nearest end boards, 14 ft near of centre)  
+**Carried by:** an opponent  
+**Attacking:** left to right
+
+**Starting positions**
+
+| Player | Where |
+|---|---|
+| C | in the offensive zone, toward the near side (72 ft from the nearest end boards, 10 ft near of centre) |
+| LW | in the neutral zone, toward the near side (100 ft from the nearest end boards, 28 ft near of centre) |
+| RW | in the neutral zone, toward the far side (100 ft from the nearest end boards, 27 ft far of centre) |
+| RD | in the neutral zone, in the middle of the ice (100 ft from the nearest end boards, 2 ft near of centre) |
+| LD | in the neutral zone, in the middle of the ice (78 ft from the nearest end boards, 3 ft far of centre) |
+
+#### Playing C
+
+**Best read** — in the offensive zone, toward the near side (72 ft from the nearest end boards, 10 ft near of centre)  *(Protect the middle)*
+
+> Pressure from the inside and steer him toward the boards. In a trap you never try to win it at the top — you take the middle away so the only way forward is the wall, where three teammates are already standing.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, in the middle of the ice (92 ft from the nearest end boards, 6 ft near of centre)  *(Protect the middle)*
+  > Dropping back into the middle makes the trap even tighter and gives up nothing — but with nobody pressuring, their defenceman gets to stand there and pick exactly the pass he wants.
+
+**Mistakes**
+
+- in the neutral zone, tight to the near boards (80 ft from the nearest end boards, 32 ft near of centre)  *(Do your own job)*
+  > You went to the wall to chase him. That's your winger's man, and the middle you just left is the fastest way through a trap.
+- in the offensive zone, in the middle of the ice (52 ft from the nearest end boards, 2 ft near of centre)  *(Don't chase the puck)*
+  > You chased deep into their end alone. A trap holds the neutral zone — once you're past their line, the three behind you have nothing to funnel anyone into.
+
+#### Playing LW
+
+**Best read** — in the neutral zone, toward the near side (100 ft from the nearest end boards, 28 ft near of centre)  *(Keep your lanes apart)*
+
+> On the red line, out by the boards. Stand still and hold it — a trap works by making him carry the puck into you, not by you skating at him.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, tight to the near boards (80 ft from the nearest end boards, 32 ft near of centre)  *(Stay above the puck)*
+  > Stepping up early can force a bad pass — but a trap that steps up is just a forecheck, and if he gets past you the line behind you is a man short.
+
+**Mistakes**
+
+- in the neutral zone, in the middle of the ice (98 ft from the nearest end boards, 6 ft near of centre)  *(Do your own job)*
+  > You slid into the middle. Your teammate already has the middle of the red line — the boards you left are where a trapped team always goes.
+- in the neutral zone, toward the near side (78 ft from the nearest end boards, 30 ft near of centre)  *(Stay above the puck)*
+  > You retreated to your own blue line. That's your defenceman's line, and the trap has lost one of its three.
+
+#### Playing RW
+
+**Best read** — in the neutral zone, toward the far side (100 ft from the nearest end boards, 27 ft far of centre)  *(Cover the weak side)*
+
+> Far side of the red line, holding your lane. If they swing it all the way across to escape, you're the one standing in it.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, in the middle of the ice (98 ft from the nearest end boards, 5 ft far of centre)  *(Cover the weak side)*
+  > Pinching toward the middle tightens the three — but it opens the far boards, and that is exactly where a team beats a trap.
+
+**Mistakes**
+
+- in the neutral zone, toward the far side (80 ft from the nearest end boards, 23 ft far of centre)  *(Don't chase the puck)*
+  > You went up the ice to chase. Two of you above the puck now, and their breakout goes straight through the middle.
+- in the neutral zone, toward the far side (78 ft from the nearest end boards, 25 ft far of centre)  *(Keep your lanes apart)*
+  > You dropped level with your defenceman. Two players on one line, and a hole where the trap used to be.
+
+#### Playing RD
+
+**Best read** — in the neutral zone, in the middle of the ice (100 ft from the nearest end boards, 2 ft near of centre)  *(Protect the middle)*
+
+> The middle of the red line — the heart of the trap. Everything funnelled off the boards has to come through you, and nothing goes up the middle while you're standing there.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, toward the near side (80 ft from the nearest end boards, 8 ft near of centre)  *(Protect the middle)*
+  > Sitting deeper is safer and you'll never be beaten — but the gap you leave in the middle of the red line is the one pass that breaks a trap wide open.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (96 ft from the nearest end boards, 26 ft near of centre)  *(Do your own job)*
+  > You drifted to the puck side. Your winger already has that wall, and the middle is now wide open.
+- in the offensive zone, in the middle of the ice (74 ft from the nearest end boards, 2 ft near of centre)  *(Stay above the puck)*
+  > You stepped up to the puck. A defenceman beaten at the red line is an odd-man rush going the other way.
+
+#### Playing LD
+
+**Best read** — in the neutral zone, in the middle of the ice (78 ft from the nearest end boards, 3 ft far of centre)  *(Stay above the puck)*
+
+> Alone at your own blue line — and that is the job. Everyone ahead of you is taking space away; you're the one who cleans up whatever gets through.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, toward the far side (96 ft from the nearest end boards, 13 ft far of centre)  *(Stay above the puck)*
+  > Stepping up makes four in the wall and squeezes them harder — but a trap with nobody behind it is a breakaway waiting to happen.
+
+**Mistakes**
+
+- in your defensive zone, in the middle of the ice (58 ft from the nearest end boards, 2 ft near of centre)  *(Stay above the puck)*
+  > You backed into your own zone. You've given them the whole neutral zone to build speed in, which is the one thing a trap must never do.
+- in the neutral zone, toward the near side (100 ft from the nearest end boards, 22 ft near of centre)  *(Cover the weak side)*
+  > You went up to the puck side. The trap's last line is gone and the entire far side is open.
+
+---
+
+### Beating the trap
+
+*Rush · 5v5 · `nz_beat_the_trap`*
+
+Your defenceman has the puck in the neutral zone and they've set up a trap in front of you. Find a way through without losing it in the middle.
+
+**Puck:** in the neutral zone, in the middle of the ice (80 ft from the nearest end boards, 6 ft near of centre)  
+**Carried by:** LD  
+**Attacking:** left to right
+
+**Starting positions**
+
+| Player | Where |
+|---|---|
+| LD *(has the puck)* | in the neutral zone, in the middle of the ice (80 ft from the nearest end boards, 6 ft near of centre) |
+| RD | in the neutral zone, toward the far side (76 ft from the nearest end boards, 15 ft far of centre) |
+| C | in the neutral zone, toward the near side (92 ft from the nearest end boards, 14 ft near of centre) |
+| LW | in the neutral zone, tight to the near boards (96 ft from the nearest end boards, 32 ft near of centre) |
+| RW | in the neutral zone, toward the far side (94 ft from the nearest end boards, 25 ft far of centre) |
+
+#### Playing C
+
+**Best read** — in the neutral zone, toward the near side (92 ft from the nearest end boards, 14 ft near of centre)  *(Support the puck)*
+
+> Come back toward the puck and give a short, safe option on the wall side. You beat a trap with quick passes to someone standing still — not by trying to split three players in the middle.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, toward the near side (86 ft from the nearest end boards, 20 ft near of centre)  *(Support the puck)*
+  > Stretching out ahead of the trap really hurts it when it works — one pass and you're behind all three — but it's a long way through traffic, and losing it there sends them the other way.
+
+**Mistakes**
+
+- in the neutral zone, toward the far side (94 ft from the nearest end boards, 9 ft far of centre)  *(Keep your lanes apart)*
+  > You came into the middle. That is exactly where a trap wants the puck — three of them are standing in that lane waiting for it.
+- in your defensive zone, toward the near side (70 ft from the nearest end boards, 18 ft near of centre)  *(Stay above the puck)*
+  > You dropped back behind the puck into your own zone. Nobody is ahead of it now, and the trap has done its job without having to do anything.
+
+#### Playing LW
+
+**Best read** — in the neutral zone, tight to the near boards (96 ft from the nearest end boards, 32 ft near of centre)  *(Keep your lanes apart)*
+
+> Wide on the wall and moving. The boards are the one lane a 1-3-1 cannot fill with three players — get there before their winger can close on you.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, tight to the near boards (82 ft from the nearest end boards, 34 ft near of centre)  *(Support the puck)*
+  > Going long up the wall beats the whole trap in a single pass when it connects — but it's a long way, and their winger on the red line is sitting between you and it.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (92 ft from the nearest end boards, 10 ft near of centre)  *(Keep your lanes apart)*
+  > You came inside into the middle. Three of them are standing there — that is the entire point of a trap.
+- in your defensive zone, toward the near side (74 ft from the nearest end boards, 30 ft near of centre)  *(Support the puck)*
+  > You came back level with the puck. Your defenceman has nobody ahead of him now, so he has to throw it away.
+
+#### Playing RW
+
+**Best read** — in the neutral zone, toward the far side (94 ft from the nearest end boards, 25 ft far of centre)  *(Cover the weak side)*
+
+> Wide on the far side. If they overload the puck side to trap it, the far wall is empty — and one quick pass across makes it yours.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, in the middle of the ice (92 ft from the nearest end boards, 3 ft far of centre)  *(Keep your lanes apart)*
+  > Coming into the middle gives a shorter option — but the middle is where a 1-3-1 is strongest, and your centre is already there.
+
+**Mistakes**
+
+- in the neutral zone, toward the far side (84 ft from the nearest end boards, 23 ft far of centre)  *(Support the puck)*
+  > You went long, past their wall. The pass cannot get through three players, and you've taken yourself out of the play.
+- in your defensive zone, toward the far side (72 ft from the nearest end boards, 21 ft far of centre)  *(Stay above the puck)*
+  > You came back to the puck. Everybody is behind it now and the trap doesn't even have to work for it.
+
+#### Playing RD
+
+**Best read** — in the neutral zone, toward the far side (76 ft from the nearest end boards, 15 ft far of centre)  *(Cover the weak side)*
+
+> Open on the far side for the D-to-D. The quickest way through a trap is to change which side of the ice it's on — one pass across and their whole wall has to slide.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, toward the far side (56 ft from the nearest end boards, 9 ft far of centre)  *(Support the puck)*
+  > Dropping deeper makes the pass completely safe — but you're back in your own zone, and now they have time to set the trap all over again.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (84 ft from the nearest end boards, 8 ft near of centre)  *(Keep your lanes apart)*
+  > You came right alongside your partner. One forechecker takes you both, which is precisely what a trap is for.
+- in the neutral zone, toward the far side (96 ft from the nearest end boards, 13 ft far of centre)  *(Stay above the puck)*
+  > You went up the ice ahead of the puck. Lose it to the trap now and there is nobody back at all.
+
+---
+
+### Attacking the blue line
+
+*Rush · 5v5 · `nz_entry`*
+
+Your centre is carrying the puck through the neutral zone at their blue line. Give him a way in with the puck instead of throwing it away.
+
+**Puck:** in the neutral zone, toward the near side (88 ft from the nearest end boards, 8 ft near of centre)  
+**Carried by:** C  
+**Attacking:** left to right
+
+**Starting positions**
+
+| Player | Where |
+|---|---|
+| C *(has the puck)* | in the neutral zone, toward the near side (88 ft from the nearest end boards, 8 ft near of centre) |
+| RW | in the neutral zone, toward the near side (84 ft from the nearest end boards, 28 ft near of centre) |
+| LW | in the neutral zone, toward the far side (86 ft from the nearest end boards, 21 ft far of centre) |
+| RD | in the neutral zone, toward the near side (96 ft from the nearest end boards, 16 ft near of centre) |
+| LD | in the neutral zone, in the middle of the ice (90 ft from the nearest end boards, 7 ft far of centre) |
+
+#### Playing RW
+
+**Best read** — in the neutral zone, toward the near side (84 ft from the nearest end boards, 28 ft near of centre)  *(Keep your lanes apart)*
+
+> Drive wide and hit the line with speed. Staying wide holds their defenceman out there and opens the middle for your centre — and timed with the puck, you can't be offside.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, in the middle of the ice (80 ft from the nearest end boards, 6 ft near of centre)  *(Support the puck)*
+  > Cutting into the middle late gives your centre a drop-pass option and it's a real play — but you've stopped stretching their defence, so both their D can collapse on the puck.
+
+**Mistakes**
+
+- in the offensive zone, toward the near side (62 ft from the nearest end boards, 30 ft near of centre)  *(Stay above the puck)*
+  > You crossed their blue line ahead of the puck. Offside, and a rush that had numbers is wasted.
+- in the neutral zone, toward the near side (92 ft from the nearest end boards, 24 ft near of centre)  *(Stay above the puck)*
+  > You're behind the puck. The rush is happening without you, and you can't help from back there.
+
+#### Playing LW
+
+**Best read** — in the neutral zone, toward the far side (86 ft from the nearest end boards, 21 ft far of centre)  *(Keep your lanes apart)*
+
+> Wide on the far side, staying onside. Two wingers driving wide means their two defencemen can't both look at the puck.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, in the middle of the ice (82 ft from the nearest end boards, 2 ft near of centre)  *(Keep your lanes apart)*
+  > Coming to the middle makes you an option through the seam — but your centre is already there, and you've let their defencemen pinch together.
+
+**Mistakes**
+
+- in the offensive zone, toward the far side (64 ft from the nearest end boards, 23 ft far of centre)  *(Stay above the puck)*
+  > Past their line before the puck. Offside, and you've killed a rush that had the numbers.
+- in the neutral zone, toward the far side (92 ft from the nearest end boards, 17 ft far of centre)  *(Stay above the puck)*
+  > You drifted back behind the puck. Your centre is carrying into two defencemen on his own.
+
+#### Playing RD
+
+**Best read** — in the neutral zone, toward the near side (96 ft from the nearest end boards, 16 ft near of centre)  *(Stay above the puck)*
+
+> Trail the rush as the late man. When their gap is tight, the delay back to a trailer is the play that beats it — and if it's turned over at the line, you're the one who's home.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, toward the near side (82 ft from the nearest end boards, 22 ft near of centre)  *(Stay above the puck)*
+  > Joining the rush as a fourth attacker absolutely creates chances — but if they stand you up at the line, you're the one caught up the ice.
+
+**Mistakes**
+
+- in the neutral zone, toward the far side (96 ft from the nearest end boards, 9 ft far of centre)  *(Cover the weak side)*
+  > You drifted onto your partner's side. Both defencemen in one lane, and the boards you left are wide open.
+- in your defensive zone, toward the near side (70 ft from the nearest end boards, 18 ft near of centre)  *(Support the puck)*
+  > You stopped at your own blue line. You're not supporting the rush and you're not needed back yet — you're just out of the play.
+
+#### Playing LD
+
+**Best read** — in the neutral zone, in the middle of the ice (90 ft from the nearest end boards, 7 ft far of centre)  *(Stay above the puck)*
+
+> Stay back and in the middle. Somebody has to be home when a zone entry gets turned over at the line, and on this rush that is you.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, toward the far side (90 ft from the nearest end boards, 15 ft far of centre)  *(Stay above the puck)*
+  > Stepping up gives another option and keeps them pinned in — but you're the last man, and a turnover at their line goes the other way very fast.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (90 ft from the nearest end boards, 18 ft near of centre)  *(Cover the weak side)*
+  > Both defencemen on one side. The whole middle of the ice behind the rush is unguarded.
+- in the offensive zone, in the middle of the ice (68 ft from the nearest end boards, 5 ft far of centre)  *(Stay above the puck)*
+  > You charged in with the forwards. If they turn it over at the blue line, nobody at all is back.
+
+---
+
+### Three on two against you
+
+*Defend · 5v5 · `defend_three_on_two`*
+
+Three of them are coming at you through the neutral zone and only two of you are back. Your forwards are chasing. Don't let this be a goal.
+
+**Puck:** in the neutral zone, in the middle of the ice (78 ft from the nearest end boards, 2 ft near of centre)  
+**Carried by:** an opponent  
+**Attacking:** right to left
+
+**Starting positions**
+
+| Player | Where |
+|---|---|
+| LD | in your defensive zone, toward the near side (60 ft from the nearest end boards, 8 ft near of centre) |
+| RD | in your defensive zone, toward the far side (56 ft from the nearest end boards, 9 ft far of centre) |
+| C | in the neutral zone, in the middle of the ice (90 ft from the nearest end boards, 2 ft near of centre) |
+| LW | in the neutral zone, toward the near side (94 ft from the nearest end boards, 24 ft near of centre) |
+| RW | in the neutral zone, toward the far side (92 ft from the nearest end boards, 19 ft far of centre) |
+
+#### Playing LD
+
+**Best read** — in your defensive zone, toward the near side (60 ft from the nearest end boards, 8 ft near of centre)  *(Protect the middle)*
+
+> Close the gap on the puck carrier and steer him to the outside. Take the middle away and make him go around you — on a three-on-two the one thing you cannot allow is a shot from the slot.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, in the middle of the ice (40 ft from the nearest end boards, 4 ft near of centre)  *(Stay above the puck)*
+  > Backing off keeps all three in front of you and nobody gets behind — but you've let him carry to the top of the circle and shoot through traffic.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (82 ft from the nearest end boards, 8 ft near of centre)  *(Don't chase the puck)*
+  > You lunged at him near the blue line. Miss on a three-on-two and it becomes a two-on-one behind you.
+- in your defensive zone, toward the far side (58 ft from the nearest end boards, 15 ft far of centre)  *(Cover the weak side)*
+  > You slid over to your partner's side. Both defencemen covering one attacker, and the other two are free.
+
+#### Playing RD
+
+**Best read** — in your defensive zone, toward the far side (56 ft from the nearest end boards, 9 ft far of centre)  *(Cover the weak side)*
+
+> Stay inside your partner and take the pass away. He has the puck carrier; you have the two who don't — and the moment one of them gets it, he's yours.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, toward the far side (36 ft from the nearest end boards, 15 ft far of centre)  *(Protect the middle)*
+  > Dropping to the net front covers the backdoor tap-in — but you've given the far winger the whole slot to shoot from first.
+
+**Mistakes**
+
+- in the neutral zone, toward the far side (76 ft from the nearest end boards, 13 ft far of centre)  *(Do your own job)*
+  > You stepped up at the far winger. Beaten there, and your partner is defending two players on his own.
+- in your defensive zone, toward the near side (58 ft from the nearest end boards, 14 ft near of centre)  *(Don't chase the puck)*
+  > You went to the puck. Your partner already has him, and the two you left are the ones who score.
+
+#### Playing C
+
+**Best read** — in your defensive zone, in the middle of the ice (74 ft from the nearest end boards, 2 ft near of centre)  *(Protect the middle)*
+
+> Back through the middle and pick up the trailer. A three-on-two becomes a three-on-three the moment a forward gets back — and the middle is the lane that has to be filled.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, in the middle of the ice (52 ft from the nearest end boards, 2 ft near of centre)  *(Protect the middle)*
+  > Skating all the way back into the slot means you're definitely home — but you've gone straight past the man you were supposed to pick up.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (76 ft from the nearest end boards, 24 ft near of centre)  *(Don't chase the puck)*
+  > You went to the puck carrier. Your defenceman has him — it's the middle that's open.
+- in the neutral zone, toward the far side (98 ft from the nearest end boards, 11 ft far of centre)  *(Stay above the puck)*
+  > You gave up and turned up ice. Your two defencemen are left to handle three players alone.
+
+#### Playing LW
+
+**Best read** — in the neutral zone, toward the near side (76 ft from the nearest end boards, 26 ft near of centre)  *(Stay above the puck)*
+
+> Take the man in your lane and get to the inside of him. Backchecking is only worth something if you finish up between your man and your net.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, toward the near side (56 ft from the nearest end boards, 30 ft near of centre)  *(Stay above the puck)*
+  > Racing all the way back to the corner gets you home first — but you went past your man on the way, so he's the one with the puck.
+
+**Mistakes**
+
+- in the neutral zone, in the middle of the ice (78 ft from the nearest end boards, 4 ft near of centre)  *(Do your own job)*
+  > You cut into the middle. That's your centre's lane, and the wall you left is where they'll go.
+- in the neutral zone, toward the near side (100 ft from the nearest end boards, 30 ft near of centre)  *(Stay above the puck)*
+  > You stopped chasing. It's only three against two because you aren't back yet.
+
+#### Playing RW
+
+**Best read** — in your defensive zone, toward the far side (74 ft from the nearest end boards, 19 ft far of centre)  *(Cover the weak side)*
+
+> Get back to the far man and take his inside. He's the one who ends up alone at the back post if nobody picks him up.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, toward the far side (54 ft from the nearest end boards, 25 ft far of centre)  *(Cover the weak side)*
+  > All the way back to the far post stops the tap-in — but he can shoot from the circle long before you get there.
+
+**Mistakes**
+
+- in the neutral zone, in the middle of the ice (76 ft from the nearest end boards, 4 ft near of centre)  *(Do your own job)*
+  > You came into the middle. Your centre has that lane; the far man you left is the dangerous one.
+- in the neutral zone, toward the far side (98 ft from the nearest end boards, 21 ft far of centre)  *(Stay above the puck)*
+  > You stayed high waiting for the counter-attack. There is no counter while they're attacking three on two.
+
+---
+
+### Faceoff in the neutral zone
+
+*Faceoff · 5v5 · `nz_faceoff`*
+
+A draw at the neutral-zone dot just outside your own blue line. Win it and you're attacking; lose it and they're coming straight at you.
+
+**Puck:** in the neutral zone, toward the near side (80 ft from the nearest end boards, 22 ft near of centre)  
+**Carried by:** an opponent  
+**Attacking:** left to right
+
+**Starting positions**
+
+| Player | Where |
+|---|---|
+| C | in the neutral zone, toward the near side (78 ft from the nearest end boards, 20 ft near of centre) |
+| RW | in the neutral zone, tight to the near boards (76 ft from the nearest end boards, 34 ft near of centre) |
+| LW | in the neutral zone, in the middle of the ice (82 ft from the nearest end boards, 6 ft near of centre) |
+| RD | in your defensive zone, toward the near side (68 ft from the nearest end boards, 28 ft near of centre) |
+| LD | in your defensive zone, in the middle of the ice (66 ft from the nearest end boards, 2 ft near of centre) |
+
+#### Playing RW
+
+**Best read** — in the neutral zone, tight to the near boards (76 ft from the nearest end boards, 34 ft near of centre)  *(Do your own job)*
+
+> Tight to the boards on your side of the dot. A neutral-zone draw gets won to the wall more often than anywhere else — be there, and be facing the right way when it arrives.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, tight to the near boards (98 ft from the nearest end boards, 32 ft near of centre)  *(Stay above the puck)*
+  > Lining up ahead of the dot lets you take off the instant it's won — but if it's lost, their winger is behind you and heading for your end with a free run.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (78 ft from the nearest end boards, 8 ft near of centre)  *(Keep your lanes apart)*
+  > You lined up in the middle where your other winger already is. Two of you in one lane and the boards wide open.
+- in your defensive zone, tight to the near boards (54 ft from the nearest end boards, 32 ft near of centre)  *(Stay above the puck)*
+  > You lined up behind your own defencemen. On a draw this close to your own blue line, that's a player wasted.
+
+#### Playing LW
+
+**Best read** — in the neutral zone, in the middle of the ice (82 ft from the nearest end boards, 6 ft near of centre)  *(Protect the middle)*
+
+> Inside, between the dot and the middle of the ice. Lose the draw and you take the pass through the middle away; win it and you're the quick option going forward.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in the neutral zone, in the middle of the ice (96 ft from the nearest end boards, 2 ft near of centre)  *(Stay above the puck)*
+  > Lining up higher lets you go the moment it's won — but lose it and they have the middle of the ice with you already behind them.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (80 ft from the nearest end boards, 28 ft near of centre)  *(Keep your lanes apart)*
+  > You crossed to the boards where your winger already is. The middle is the one place you cannot leave open on a neutral-zone draw.
+- in your defensive zone, in the middle of the ice (60 ft from the nearest end boards, 3 ft far of centre)  *(Stay above the puck)*
+  > You lined up back in your own zone. The puck hasn't dropped and you've already given up the neutral zone.
+
+#### Playing RD
+
+**Best read** — in your defensive zone, toward the near side (68 ft from the nearest end boards, 28 ft near of centre)  *(Do your own job)*
+
+> Behind your winger on the board side. If the draw is lost, their winger comes down that wall — and you're already between him and your net.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, in the middle of the ice (66 ft from the nearest end boards, 6 ft near of centre)  *(Protect the middle)*
+  > Starting in the middle covers the most dangerous ice — but the boards on the draw side are where a lost draw actually goes.
+
+**Mistakes**
+
+- in the neutral zone, toward the near side (90 ft from the nearest end boards, 30 ft near of centre)  *(Stay above the puck)*
+  > You lined up level with the dot. That's a forward's spot, and you've no room to turn if they win it clean.
+- in your defensive zone, toward the near side (46 ft from the nearest end boards, 24 ft near of centre)  *(Stay above the puck)*
+  > You backed deep into your own end. A neutral-zone draw is a chance to attack, and you conceded your blue line before the puck dropped.
+
+#### Playing LD
+
+**Best read** — in your defensive zone, in the middle of the ice (66 ft from the nearest end boards, 2 ft near of centre)  *(Protect the middle)*
+
+> Behind the play in the middle. You're the safety on a neutral-zone draw — if it goes wrong, it comes through the middle, and you're standing in it.
+
+**Also acceptable** *(partial credit — works, but not first choice)*
+
+- in your defensive zone, toward the far side (64 ft from the nearest end boards, 21 ft far of centre)  *(Cover the weak side)*
+  > Covering the far side takes the long pass away — but it leaves the middle, and that's where a lost draw hurts you.
+
+**Mistakes**
+
+- in the neutral zone, in the middle of the ice (86 ft from the nearest end boards, 5 ft far of centre)  *(Stay above the puck)*
+  > You lined up level with the dot. If they win it clean, you're beaten before you've even turned around.
+- in your defensive zone, toward the near side (68 ft from the nearest end boards, 26 ft near of centre)  *(Cover the weak side)*
+  > Both defencemen on the draw side. The entire far half of the ice is open.
 
 ---
 

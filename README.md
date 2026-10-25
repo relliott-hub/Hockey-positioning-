@@ -31,9 +31,10 @@ into illegal ones. Variety comes from authoring more scenarios instead.
 
 ## How it's taught
 
-The game ships working through a **season plan** of seven units, in the order
+The game ships working through a **season plan** of eight units, in the order
 coaches actually teach: protect the house → get out of your end → move it up the
-ice → take it back → keep it in their end → get back → special teams. A unit
+ice → own the neutral zone → take it back → keep it in their end → get back →
+special teams. A unit
 opens the next one only when its reads are landing, and credit counts once per
 position in a situation, so repeating the one read you find easy gets you
 nowhere. Free play serves anything, for someone who already knows the game.
@@ -44,7 +45,7 @@ holds special teams back until U13.
 
 ## Features
 
-- **14 scenarios, 62 coached positions, 242 authored reads** — every one written
+- **19 scenarios, 84 coached positions, 330 authored reads** — every one written
   by hand with the reason it's right, and the principle it teaches
 - **Seven principles**, named in the feedback and tracked in the coach report, so
   a kid learns the idea rather than the picture
@@ -86,7 +87,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 81 end-to-end checks against a real browser
+npm test           # 83 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
@@ -150,9 +151,9 @@ Ideas that would add the most, roughly in order of value:
   choose, so you're reading movement rather than a still picture
 - **Two-stage decisions** — after "where do you go?", ask "now what?"
   (pass, drive the net, hold the line)
-- **More scenarios** — neutral-zone faceoffs, the three-on-two, 3v3 overtime
-  (the forecheck, backcheck, odd-man rush, end-zone faceoffs and special teams
-  are all in)
+- **More scenarios** — 3v3 overtime, line changes, short-handed odd-man rushes
+  (the forecheck, trap, backcheck, zone entries, both odd-man rushes, all three
+  faceoff locations and special teams are in)
 - **Coach mode** — a parent or coach picks the situation to drill
 - **Daily challenge** — one fixed scenario a day, compare with teammates
 
