@@ -55,10 +55,16 @@ HIQ.RINK = {
     leftBottom:  { x: R.goalLineLeft + R.endDotFromGoalLine,  y: midY + R.dotFromCentreY },
     rightTop:    { x: R.goalLineRight - R.endDotFromGoalLine, y: midY - R.dotFromCentreY },
     rightBottom: { x: R.goalLineRight - R.endDotFromGoalLine, y: midY + R.dotFromCentreY },
-    nzLeftTop:     { x: R.blueLineLeft - R.nzDotFromBlueLine,  y: midY - R.dotFromCentreY },
-    nzLeftBottom:  { x: R.blueLineLeft - R.nzDotFromBlueLine,  y: midY + R.dotFromCentreY },
-    nzRightTop:    { x: R.blueLineRight + R.nzDotFromBlueLine, y: midY - R.dotFromCentreY },
-    nzRightBottom: { x: R.blueLineRight + R.nzDotFromBlueLine, y: midY + R.dotFromCentreY },
+    /* The neutral-zone dots sit 5 ft from each blue line ON THE NEUTRAL-ZONE
+       SIDE — which is what makes them neutral-zone dots. They were placed on
+       the wrong side of both lines, putting them inside the end zones: the
+       left pair 5 ft deep in the defending zone and the right pair 5 ft
+       inside the attacking zone. The rink drew them there, so the picture
+       was wrong as well as the geometry. */
+    nzLeftTop:     { x: R.blueLineLeft + R.nzDotFromBlueLine,  y: midY - R.dotFromCentreY },
+    nzLeftBottom:  { x: R.blueLineLeft + R.nzDotFromBlueLine,  y: midY + R.dotFromCentreY },
+    nzRightTop:    { x: R.blueLineRight - R.nzDotFromBlueLine, y: midY - R.dotFromCentreY },
+    nzRightBottom: { x: R.blueLineRight - R.nzDotFromBlueLine, y: midY + R.dotFromCentreY },
   };
 
   R.centre = { x: R.centreLine, y: midY };

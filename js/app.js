@@ -525,6 +525,7 @@
       mirrored: !!play.mirrored,
       isDefense: !!play.isDefense,
       forecheck: !!play.forecheck,
+      faceoff: !!play.faceoff,
       carrier: play.carrier,
       reads: px.reads,
       prompt: "",
@@ -2086,6 +2087,15 @@
      carrier, and spell it out in words while the player is still deciding. */
   // Single source of truth for possession, shared by the renderer and the tests.
   function findPuckCarrier() {
+    /* On a draw, nobody has the puck — it hasn't been dropped yet.
+
+       Possession is worked out by proximity, and a centre lined up on the dot
+       is naturally the closest skater to it, so every faceoff scenario put a
+       bright "HAS PUCK" ring on a player who does not have it and cannot have
+       it. That is the one thing this game is most careful to state plainly,
+       so stating it wrongly is worse than not stating it at all. */
+    if (scenario && scenario.faceoff) return null;
+
     const skaters = [...offense, ...defense, ...(choice.active ? [] : controlled)]
       .filter(p => p.role !== "G");
     let carrier = null, best = Infinity;
@@ -2096,12 +2106,19 @@
     return (carrier && best <= 60) ? { player: carrier, dist: best } : null;
   }
 
+  /* What to call the puck when nobody is holding it. A puck about to be
+     dropped is a different thing from a loose one, and the answer to "where
+     should I go" depends on which it is. */
+  function puckSituationLabel() {
+    return (scenario && scenario.faceoff) ? "FACEOFF — NOBODY HAS IT YET" : "LOOSE PUCK";
+  }
+
   function drawPuckCarrier(t) {
     const found = findPuckCarrier();
     const carrier = found && found.player;
     if (!carrier) {
       // Nobody has it. Say so rather than leaving the player to wonder.
-      if (choice.active) drawPuckTag("LOOSE PUCK", puck.x, puck.y - 20);
+      if (choice.active) drawPuckTag(puckSituationLabel(), puck.x, puck.y - 20);
       return;
     }
 
@@ -2686,11 +2703,14 @@
       return out;
     },
     // What the player is told about possession on this play.
+    // Reports the label the player is actually shown. It used to work the
+    // answer out a second time with its own copy of the rule, which meant the
+    // tests could pass while the screen said something else.
     puckState: () => {
       const f = findPuckCarrier();
       return f
         ? { label: "HAS PUCK", role: f.player.role, dist: Math.round(f.dist) }
-        : { label: "LOOSE PUCK", role: null, dist: null };
+        : { label: puckSituationLabel(), role: null, dist: null };
     },
     // Rink coords <-> logical sheet coords, so tests can tap where a thing is
     // drawn and confirm the mapping round-trips.

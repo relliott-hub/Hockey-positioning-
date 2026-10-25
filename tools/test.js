@@ -250,6 +250,33 @@ const section = (t) => console.log(`\n${t}`);
     "every situation's wording matches where things actually are",
     geo.problems.length ? geo.problems.slice(0, 5).join(" | ") : `${geo.claimsChecked} claims across ${geo.plays} plays`);
 
+  /* The ice itself has to be right before anything standing on it can be.
+
+     The neutral-zone dots were on the wrong side of both blue lines — placed
+     5ft inside the end zones rather than 5ft into the neutral zone, which is
+     what makes them neutral-zone dots. The rink drew them there too, so the
+     picture a child was learning from was wrong. */
+  const dots = await page.evaluate(() => {
+    const R = HIQ.RINK, Z = HIQ.zones;
+    const bad = [];
+    for (const [name, d] of Object.entries(R.dots)) {
+      if (name.startsWith("nz")) {
+        if (!Z.inNeutralZone(d)) bad.push(`${name} at x=${d.x} is not in the neutral zone`);
+        const line = name.includes("Left") ? R.blueLineLeft : R.blueLineRight;
+        if (Math.abs(Math.abs(d.x - line) - R.nzDotFromBlueLine) > 0.01) {
+          bad.push(`${name} is ${Math.abs(d.x - line)}ft from its blue line, expected ${R.nzDotFromBlueLine}`);
+        }
+      } else {
+        // End-zone dots belong inside an end zone, not the neutral zone.
+        if (Z.inNeutralZone(d)) bad.push(`${name} at x=${d.x} is in the neutral zone`);
+      }
+      if (!Z.onIce(d)) bad.push(`${name} is off the ice`);
+    }
+    return bad;
+  });
+  check(dots.length === 0, "every faceoff dot is on the right part of the ice",
+    dots.join(" | ") || "9 dots verified against the blue lines");
+
   // Any scenario mentioning a landmark in its text must actually place the puck there.
   const wording = await page.evaluate(() => {
     const Z = HIQ.zones;
@@ -657,7 +684,7 @@ const section = (t) => console.log(`\n${t}`);
   // A play you can't read teaches nothing, so these are correctness checks too.
   section("Readability");
   const vis = await page.evaluate(() => {
-    let overlaps = 0, markerClash = 0, plays = 0, minGap = Infinity, minMarker = Infinity;
+    let faceoffs = 0, falseCarrier = 0, overlaps = 0, markerClash = 0, plays = 0, minGap = Infinity, minMarker = Infinity;
     let carrierFound = 0, unlabelled = 0, youHadPuck = 0;
     for (let i = 0; i < 150; i++) {
       HIQ.debug.newPlay();
@@ -694,8 +721,15 @@ const section = (t) => console.log(`\n${t}`);
       // The puck situation must always be spelled out — either someone is shown
       // holding it, or it's shown as loose. Never left ambiguous.
       const st = HIQ.debug.puckState();
+      const sc0 = HIQ.debug.getScenario();
       if (st.label === "HAS PUCK") carrierFound++;
-      else if (st.label !== "LOOSE PUCK") unlabelled++;
+      else if (st.label === "LOOSE PUCK") { /* genuinely nobody's */ }
+      else if (/^FACEOFF/.test(st.label || "")) faceoffs++;
+      else unlabelled++;
+      /* Nobody has the puck on a draw. Possession is worked out by proximity
+         and a centre on the dot is the closest skater to it, so every faceoff
+         scenario used to ring a player who could not possibly have it. */
+      if (sc0.faceoff && st.label === "HAS PUCK") falseCarrier++;
 
       /* You should never be assigned the position that is carrying the puck.
          Proximity to the puck is NOT the test — when you're defending, being
@@ -704,7 +738,7 @@ const section = (t) => console.log(`\n${t}`);
       if (sc.carrier === sc.role) youHadPuck++;
     }
     return {
-      overlaps, markerClash, plays, unlabelled, youHadPuck,
+      overlaps, markerClash, plays, unlabelled, youHadPuck, faceoffs, falseCarrier,
       minGap: Math.round(minGap), minMarker: Math.round(minMarker), carrierFound
     };
   });
@@ -712,8 +746,11 @@ const section = (t) => console.log(`\n${t}`);
     `closest pair ${vis.minGap}px across ${vis.plays} plays`);
   check(vis.markerClash === 0, "no player is ever hidden underneath an A/B/C marker",
     `closest marker-to-player ${vis.minMarker}px`);
-  check(vis.unlabelled === 0, "the puck situation is always spelled out (carried or loose)",
-    `${vis.carrierFound}/${vis.plays} carried, ${vis.plays - vis.carrierFound} loose`);
+  check(vis.unlabelled === 0, "the puck situation is always spelled out",
+    `${vis.carrierFound} carried, ${vis.faceoffs} faceoffs, ` +
+    `${vis.plays - vis.carrierFound - vis.faceoffs} loose, of ${vis.plays}`);
+  check(vis.falseCarrier === 0, "nobody is shown holding the puck on a faceoff",
+    `${vis.falseCarrier} false carriers across ${vis.faceoffs} draws`);
   /* Spreading players apart for legibility must never push one off the ice.
      The clamp that bounds those nudges was written for an older canvas size
      and allowed a player to be shoved past the boards and off the bottom of

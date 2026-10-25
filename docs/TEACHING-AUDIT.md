@@ -223,19 +223,41 @@ changed. What has changed is that there is now a season's worth of content and a
 defensible order to put it in, so a coach reviewing it has something complete to
 react to rather than a fragment.
 
+### The neutral zone — added
+
+More of a game happens between the blue lines than anywhere else, and almost
+none of a young player's instruction does. Five scenarios now cover it from
+every side:
+
+| Scenario | What it teaches |
+|---|---|
+| `nz_trap_1_3_1` | Holding a 1-3-1: one pressures from the middle, three across the red line, one back |
+| `nz_beat_the_trap` | The mirror of it — the boards and a quick D-to-D beat a trap; the middle never does |
+| `nz_entry` | Width holds their defence apart, and a trailing late man answers a tight gap |
+| `defend_three_on_two` | Strong-side D takes the carrier, weak-side D takes the pass, a forward back makes it even |
+| `nz_faceoff` | A draw where both a win *and* a loss become a rush immediately |
+
+Pairing the trap with beating it is deliberate. A child who has stood inside a
+1-3-1 understands why the far wall is open, which is not something the second
+scenario can teach on its own.
+
+The zone-entry reads are built on the finding that controlled entries are worth
+roughly **twice the offence** of a dump-in, and that a failed carry costs less
+than coaches tend to assume — so the scenario teaches giving the carrier a way
+in, rather than treating the dump as the default.
+
 ### Still missing
 
 Honest list of what a youth player meets that this still does not cover:
 
 | Situation | Note |
 |---|---|
-| Faceoffs at the neutral-zone dots | Only the end-zone draws are authored |
-| Defending a three-on-two | The two-on-one is in; the three-on-two is not |
 | Line changes and bench awareness | Real positional hockey, entirely absent |
+| Defending a two-on-one *short-handed* | The even-strength version is in |
 | Goaltending | Out of scope by design — this teaches skaters |
 
-None of these is as large a gap as the ones closed in this revision, and none
-should be authored before a coach has looked at what is already here.
+None of these is as large a gap as the ones closed here, and none should be
+authored before a coach has looked at what already exists.
 
 ---
 
