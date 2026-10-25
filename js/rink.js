@@ -144,6 +144,14 @@ HIQ.zones = (() => {
 
     inNeutralZone: (p) => p.x > R.blueLineLeft && p.x < R.blueLineRight,
 
+    /* On one of the nine faceoff spots. A scenario that says "a draw at the
+       dot nearest the boards" has to actually put the puck on a dot, or the
+       picture teaches a child the wrong thing about where draws happen. */
+    atFaceoffDot: (p, _side, tol = 2) => {
+      const spots = Object.values(R.dots).concat([R.centre]);
+      return spots.some(d => Math.hypot(p.x - d.x, p.y - d.y) <= tol);
+    },
+
     // A "point" is a defenceman standing on the blue line of the attacking zone.
     atBlueLine: (p, side, tol = 7) => Math.abs(p.x - blOf(side)) <= tol,
 

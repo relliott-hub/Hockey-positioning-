@@ -4,16 +4,16 @@
    Strategy is stale-while-revalidate: serve from cache straight away, then
    refresh the cache in the background so the next launch has the newest build.
    Bump CACHE_VERSION whenever the shell changes. */
-const CACHE_VERSION = "hiq-v4";
+const CACHE_VERSION = "hiq-v5";
 
 // Relative so the app works from a project subpath (GitHub Pages) or a domain root.
 const SHELL = [
   "./",
   "./index.html",
   "./styles.css",
+  "./js/util.js",
   "./js/rink.js",
   "./js/plays.js",
-  "./js/data.js",
   "./js/audio.js",
   "./js/sim.js",
   "./js/app.js",

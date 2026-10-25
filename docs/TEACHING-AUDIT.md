@@ -88,7 +88,7 @@ a vague notion of "the middle".
 
 ### ~~The biggest gap: it teaches spots, not principles~~ — addressed
 
-All 118 authored reads now carry the principle they teach or break, drawn from
+All 242 authored reads now carry the principle they teach or break, drawn from
 a deliberately small set of seven. The game names the principle in its feedback,
 and the coach report leads with which ideas have landed and which keep costing
 the player:
@@ -98,26 +98,87 @@ the player:
 
 That is a sentence a parent can act on. "68% correct" is not.
 
-### Six scenarios is not a season
+### ~~Six scenarios is not a season~~ — now fourteen, and every named gap is filled
 
-Missing situations a youth player meets **every single game**:
+Every situation this audit listed as missing now exists:
 
 | Situation | Status |
 |---|---|
-| Forechecking (F1 / F2 / F3) | **added** — 1-2-2, five coached positions |
-| Backchecking / getting back | **missing** |
-| Faceoffs (all four dots) | **missing** |
-| Power play | **missing** — disabled in the UI |
-| Penalty kill | **missing** — disabled in the UI |
-| Defending an odd-man rush | **missing** |
+| Forechecking (F1 / F2 / F3) | **added** — 1-2-2 in their end, five coached positions |
+| Neutral-zone forecheck | **added** — 1-2-2 holding the line, five positions |
+| Backchecking / getting back | **added** — five positions |
+| Defending an odd-man rush | **added** — the two-on-one, five positions |
+| Faceoffs | **added** — defensive-zone and offensive-zone draws |
+| Power play | **added** — 1-3-1, re-authored and re-enabled |
+| Penalty kill | **added** — passive box, re-authored and re-enabled |
 
-Forechecking has since been added, built on the 1-2-2 that the sources
-recommend for youth teams because the two middle forwards always outnumber the
-first pass option. The centre's read is the angle itself — *"a forecheck is only
-as good as F1's first angle; if your deepest forward skates straight at the
-puck carrier instead of taking away a lane, every system breaks down"* — which
-makes skating straight at the carrier the wrong option, and holding the middle
-in a containment forecheck a legitimate second choice.
+Forechecking is built on the 1-2-2 the sources recommend for youth teams, where
+the two middle forwards "create a wall effect that eliminates cross-ice passing
+options". The centre's read is the angle itself — skating straight at the
+carrier is the wrong option, and holding the middle in a containment forecheck
+is a legitimate second choice.
+
+The **two-on-one** is the clearest piece of coaching consensus in the sport, so
+it is taught as stated: take the pass away and let the goalie have the shot.
+*"Giving up a low-percentage shot is a win; the goalie is trained to stop the
+puck; the job is making sure the shooter, not the open teammate, gets it."* The
+two wrong reads are the two real ways children lose it — lunging at the carrier
+(*"a missed poke check turns a 2-on-1 into a breakaway pass"*) and sliding
+across to the puck, abandoning the open man.
+
+**Backchecking** reads are all about getting to the defensive side of a man,
+because a *"trailing backchecker defends nothing"*. The standard assignment —
+centre takes the middle lane, wingers the outside lanes — is the one taught,
+since somebody has to clearly own the middle.
+
+**Faceoffs** coach the four players who actually choose where to line up; the
+centre's spot is fixed by rule. Worth noting for a reviewer: on a draw the
+wingers take the opposing points, which is *different* from their in-play
+coverage job in the defensive-zone scenarios, and the reads say so explicitly.
+A child who notices that difference has learned something real.
+
+### ~~Special teams were disabled~~ — re-authored and back on
+
+They were switched off for several versions, and that was the right call: the
+old versions drew a hardcoded umbrella and box regardless of what had been
+selected, up to 282 px away from the structure they claimed to be showing.
+
+They are now authored the same way as everything else — the **1-3-1**, which
+"creates the most passing triangles and one-timer lanes", and the **passive
+box**, which the sources recommend for "youth, beginner and less mobile teams"
+because it "is forgiving, easy to teach, and rarely gives up a clean look if
+players hold their spacing".
+
+On special teams the job matters more than the badge on the jersey, so each
+position carries the name of the job it is doing — *the point, the half-wall,
+the bumper, net front, top of the box*. That vocabulary is the thing a kid needs
+in order to follow a coach drawing on a whiteboard, and the game now says it out
+loud. The test suite checks that a job is named on every special-teams play and
+that the number of players on the ice matches the strength being advertised.
+
+### ~~Random scenarios are not a practice plan~~ — added
+
+This was the gap the whole re-authoring exposed. Coaches do not teach
+positioning by showing a child a random situation and asking where to stand.
+Published practice planners are numbered plans, each with a stated theme, worked
+through in an order — and the order is not arbitrary. Hockey Canada's U13
+pathway states the rule outright:
+
+> **"skills before tactics; tactics before structure"**
+
+and its U11 guidance introduces basic defensive-zone positioning before anything
+else, holding special teams back to U13, where players *"should play in all
+situations, power play, penalty kill and special teams"*.
+
+So the game now ships as a **season plan** of seven units, running outward from
+your own net: protect the house → get out of your end → move it up the ice →
+take it back → keep it in their end → get back → special teams. A unit opens the
+next one only once its reads are landing, and credit is tracked per *position in
+a situation*, so grinding the one read you find easy advances nothing. Free play
+is still a dropdown away for anyone who already knows the game.
+
+That is the difference between a drill and a curriculum, and it is the single
+biggest change in this revision.
 
 ### ~~The 6–8 age group may be teaching the wrong thing~~ — re-framed
 
@@ -148,12 +209,33 @@ handful of players and watch. That is worth more than another twenty scenarios.
 
 ## 5. What I would do next, in order
 
-1. **Name and track the principle** behind each read — turns pictures into ideas
+1. ~~Name and track the principle behind each read~~ — **done**
 2. ~~Add forechecking~~ — **done**
-3. **Re-frame or remove the 6–8 tier** — currently at odds with published guidance, and needs an owner's decision
-4. **Re-author special teams** to the same standard and re-enable them
-5. **Add faceoffs and backchecking**
-6. **Test with real kids and a real coach** before anything goes on sale
+3. ~~Re-frame the 6–8 tier~~ — **done**, leads with the principle, not the system
+4. ~~Re-author special teams and re-enable them~~ — **done**, 1-3-1 and box
+5. ~~Add faceoffs and backchecking~~ — **done**, plus the neutral-zone forecheck and the two-on-one
+6. ~~Sequence the scenarios the way a coach would~~ — **done**, seven units
+7. **Test with real kids and a real coach** — the only item left, and the one that matters most
+
+Everything above item 7 was reasoning from published coaching guidance, which is
+a sound way to build this and is not the same as knowing it works. That has not
+changed. What has changed is that there is now a season's worth of content and a
+defensible order to put it in, so a coach reviewing it has something complete to
+react to rather than a fragment.
+
+### Still missing
+
+Honest list of what a youth player meets that this still does not cover:
+
+| Situation | Note |
+|---|---|
+| Faceoffs at the neutral-zone dots | Only the end-zone draws are authored |
+| Defending a three-on-two | The two-on-one is in; the three-on-two is not |
+| Line changes and bench awareness | Real positional hockey, entirely absent |
+| Goaltending | Out of scope by design — this teaches skaters |
+
+None of these is as large a gap as the ones closed in this revision, and none
+should be authored before a coach has looked at what is already here.
 
 ---
 
@@ -171,3 +253,33 @@ handful of players and watch. That is worth more than another twenty scenarios.
 - [Hockey positioning tips for beginners](https://allblackhockeysticks.com/hockey-positioning-tips-for-beginners/)
 - [Positionless puck chasers in youth hockey](http://www.rutschhockey.com/article_puck-chasers.php)
 - [Recurring mistakes across youth hockey](https://andrewtrimble.substack.com/p/there-are-a-handful-of-recurring)
+
+Added for this revision — practice planning, the new scenarios and special teams:
+
+- [Hockey Canada — U13 player pathway (abridged)](https://cdn.hockeycanada.ca/hockey-canada/Hockey-Programs/Coaching/u13-program/downloads/2023/u13-player-pathway-abridged-e.pdf) — *"skills before tactics; tactics before structure"*, and players "should play in all situations"
+- [Hockey Canada — skill development and progression for U11](https://www.hockeycanada.ca/en-ca/hockey-programs/coaching/under-11/coaches/skills) — 85% of practice on skills and tactics; basic defensive-zone positioning introduced first
+- [Hockey Canada — answering questions about U9 hockey](https://www.hockeycanada.ca/en-ca/hockey-programs/coaching/under-9/faq) — positional play and faceoffs introduced later, on the move to full ice
+- [Hockey Canada — player development definitions](https://cdn.hockeycanada.ca/hockey-canada/Hockey-Programs/Players/Downloads/2020/player-development-definitions-e.pdf) — practice-time splits by age
+- [USA Hockey — 10U practice plan manual](https://usahockey.cachefly.net/Coaching/Manuals/10UPracticePlan.pdf) — numbered plans, each with a stated theme
+- [USA Hockey — 14U/16U/18U practice plan manual](https://usahockey.cachefly.net/Coaching/Manuals/14_16_18UPracticePlan.pdf) — the "Team Systems" progression
+- [Ice Hockey Systems — 1-2-2 neutral zone forecheck](https://www.icehockeysystems.com/hockey-systems/1-2-2-neutral-zone-forecheck) — the wall that removes cross-ice options
+- [The Coaches Site — explained: 1-2-2 neutral zone forecheck](https://members.thecoachessite.com/article/explained-1-2-2-neutral-zone-forecheck)
+- [Hockey forecheck systems: 1-2-2 vs 2-1-2 vs 1-3-1](https://hoopsking.com/blogs/ice-hockey/hockey-forecheck-systems) — why the 1-2-2 suits youth teams
+- [How to play a 2-on-1 in hockey: offence & defence](https://hoopsking.com/blogs/ice-hockey/how-to-play-2-on-1-hockey) — play the pass, let the goalie have the shot
+- [How to hockey — defence: improve your two-on-one skills](https://howtohockey.com/defense-improve-your-two-on-one-skills/) — stick in the lane; never lunge
+- [Game theory and defending against a 2-on-1](https://puckplusplus.com/2017/12/16/game-theory-and-defending-against-a-2-on-1/) — the analytical counterpoint to "always play the pass"
+- [Athletes Untapped — forecheck structure, and F3 as the high safety valve](https://athletesuntapped.com/blog/the-relentless-hunt-mastering-forecheck-structure-in-ice-hockey/) — staying above the puck
+- [Wikipedia — backcheck](https://en.wikipedia.org/wiki/Backcheck) — wingers cover the last free attacker
+- [The Coaches Site — offensive-zone faceoff concepts](https://members.thecoachessite.com/article/o-zone-faceoff-concepts) — all five players need a job on a win *and* a loss
+- [The Coaches Site — explained: 1-3-1 power play formation](https://members.thecoachessite.com/article/explained-1-3-1-power-play-formation) — point, half-walls, bumper, net front
+- [Edge Ice Academy — the role of the bumper in the 1-3-1](https://www.edgeiceacademy.com/article/the-role-of-the-bumper-in-the-1-3-1-power-play-the-engine-of-modern-offense)
+- [Hockey power play setups](https://hoopsking.com/blogs/ice-hockey/hockey-power-play-setups) — the 1-3-1's passing triangles
+- [Hockey penalty kill systems: box vs diamond vs wedge](https://hoopsking.com/blogs/ice-hockey/hockey-penalty-kill-systems) — the box is "forgiving, easy to teach" for youth teams
+- [Better Hockey — how to kill a penalty](https://www.betterhockey.com/blogs/hockey-training/how-to-kill-a-penalty) — hold shape; the kill breaks down when one player runs around
+
+*Note on sources: the governing-body documents (Hockey Canada, USA Hockey) are
+the ones the curriculum order rests on. The coaching blogs are used for the
+mechanics of individual systems, where they agree with each other; where they
+disagreed — the umbrella's exact shape, diamond spacing, backcheck assignments —
+the game takes the more conservative, more widely taught option and the reads
+say when something is "how some teams play it" rather than the only answer.*

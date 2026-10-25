@@ -10,7 +10,27 @@
 
    Requires playwright-core and a Chromium at CHROMIUM (default /opt/pw-browsers/chromium). */
 const path = require("path");
-const { chromium } = require("playwright-core");
+
+/* Find Playwright wherever this machine keeps it.
+
+   This suite has been stranded three times by a fresh container that had
+   `playwright` installed globally instead of `playwright-core` locally, which
+   looks exactly like a broken test run. Try the known names and the common
+   global prefix before giving up, and say what to do if none of them work. */
+const { chromium } = (() => {
+  const candidates = ["playwright-core", "playwright"];
+  const extraRoots = ["/opt/node-tools/node_modules", "/usr/lib/node_modules", "/usr/local/lib/node_modules"];
+  for (const name of candidates) {
+    try { return require(name); } catch (e) { /* try the next one */ }
+    for (const root of extraRoots) {
+      try { return require(path.join(root, name)); } catch (e) { /* and the next */ }
+    }
+  }
+  console.error("Could not find playwright-core or playwright.\n" +
+    "Install one with:  npm i -D playwright-core\n" +
+    "or point NODE_PATH at a global install.");
+  process.exit(2);
+})();
 
 const ROOT = path.join(__dirname, "..");
 const URL = process.env.GAME_URL || "file://" + path.join(ROOT, "index.html");
@@ -40,7 +60,8 @@ const section = (t) => console.log(`\n${t}`);
     await page.evaluate(() => document.getElementById("rink").scrollIntoView({ block: "center" }));
     const box = await page.locator("#rink").boundingBox();
     const c = await page.evaluate(({ x, y }) => HIQ.debug.worldToScreen(x, y), { x, y });
-    const cw = await page.evaluate(() => [rink.width, rink.height]);
+    // Logical sheet size, not the pixel buffer: the buffer adapts to the device.
+    const cw = await page.evaluate(() => [HIQ.VIEW.width, HIQ.VIEW.height]);
     await page.mouse.click(box.x + c.x * (box.width / cw[0]), box.y + c.y * (box.height / cw[1]));
   };
   const settle = () => page.waitForFunction(() => !HIQ.debug.simRunning(), null, { timeout: 15000 });
@@ -64,6 +85,19 @@ const section = (t) => console.log(`\n${t}`);
   check(!(await page.locator("#tutorial").isVisible()), "stays dismissed after reload");
 
   // ------------------------------------------------------------- core loop
+  /* The settings panel ships collapsed, so a player meets the rink rather than
+     ten dropdowns. The suite drives those dropdowns, so open it first. */
+  const openSettings = () =>
+    page.evaluate(() => { document.getElementById("settingsPanel").open = true; });
+  await openSettings();
+  await page.waitForTimeout(150);
+
+  /* The game ships in season-plan mode, which deliberately serves only the
+     current unit's scenarios. Everything below this line is about the whole
+     library, so switch to free play; the plan gets its own section at the end. */
+  await page.selectOption("#plan", "free");
+  await page.waitForTimeout(300);
+
   section("Core gameplay loop");
   let sc = await page.evaluate(() => HIQ.debug.getScenario());
   check(!!sc && !!sc.id, "a scenario is built on load", sc && sc.id);
@@ -128,6 +162,37 @@ const section = (t) => console.log(`\n${t}`);
     return { bad, n };
   });
   check(roster.bad === 0, "every play is a full 5v5 with both goalies", `${roster.n - roster.bad}/${roster.n}`);
+
+  /* Special teams are back on. They were disabled for several versions because
+     the old ones drew a hardcoded shape regardless of the setting, so the first
+     thing to prove is that the number of players on the ice is actually the
+     number the format promises. */
+  for (const [fmt, ours, theirs] of [["5v4", 5, 4], ["4v5", 4, 5]]) {
+    await page.selectOption("#format", fmt);
+    await page.waitForTimeout(150);
+    const r = await page.evaluate(({ ours, theirs }) => {
+      let bad = 0, n = 0, jobs = 0;
+      const phases = new Set();
+      for (let i = 0; i < 20; i++) {
+        HIQ.debug.newPlay();
+        const p = HIQ.debug.getPieces();
+        const s = HIQ.debug.getScenario();
+        const o = p.controlled.filter(q => q.role !== "G").length + p.offense.filter(q => q.role !== "G").length;
+        const t = p.defense.filter(q => q.role !== "G").length;
+        n++;
+        phases.add(s.phase);
+        if (s.job) jobs++;
+        if (o !== ours || t !== theirs) bad++;
+      }
+      return { bad, n, jobs, phases: [...phases] };
+    }, { ours, theirs });
+    check(r.bad === 0, `${fmt} puts ${ours} of ours and ${theirs} of theirs on the ice`,
+      `${r.n - r.bad}/${r.n}, phase ${r.phases.join("/")}`);
+    check(r.jobs === r.n, `${fmt} tells the player which job they have, not just their position`,
+      `${r.jobs}/${r.n} named`);
+  }
+  await page.selectOption("#format", "5v5");
+  await page.waitForTimeout(150);
 
   // ------------------------------------------------------- geometry claims
   /* A scenario that says "the puck is below the goal line" while drawing it
@@ -487,11 +552,19 @@ const section = (t) => console.log(`\n${t}`);
     await page.selectOption("#role", role);
     await page.waitForTimeout(80);
     const v = await page.evaluate((role) => {
+      /* Count the scenarios actually served, by id and which side of the ice.
+
+         This used to bucket the coaching marker's screen position instead, as
+         a proxy. That proxy breaks: a play whose two defencemen sit roughly
+         symmetrically about centre ice puts LD in nearly the same spot whether
+         you arrive at it directly or by mirroring the play and swapping D — so
+         two genuinely different runs collided in one bucket and the game was
+         marked down for coverage it actually had. */
       const spots = new Set();
-      for (let i = 0; i < 120; i++) {
+      for (let i = 0; i < 160; i++) {
         HIQ.debug.newPlay();
-        const gg = HIQ.debug.getPieces().guidance;
-        spots.add(`${Math.round(gg.x / 12)},${Math.round(gg.y / 12)}`);
+        const s = HIQ.debug.getScenario();
+        spots.add(`${s.id}|${s.mirrored ? "m" : "o"}`);
       }
       /* A role can only be coached in a play that has a read for it AND where
          it isn't the one carrying the puck. Mirroring doubles that. */
@@ -641,19 +714,158 @@ const section = (t) => console.log(`\n${t}`);
     `closest marker-to-player ${vis.minMarker}px`);
   check(vis.unlabelled === 0, "the puck situation is always spelled out (carried or loose)",
     `${vis.carrierFound}/${vis.plays} carried, ${vis.plays - vis.carrierFound} loose`);
+  /* Spreading players apart for legibility must never push one off the ice.
+     The clamp that bounds those nudges was written for an older canvas size
+     and allowed a player to be shoved past the boards and off the bottom of
+     the picture entirely. */
+  const onSheet = await page.evaluate(() => {
+    const V = HIQ.VIEW, R = HIQ.RINK;
+    let worst = null, off = 0, checked = 0;
+    for (let i = 0; i < 120; i++) {
+      HIQ.debug.newPlay();
+      const p = HIQ.debug.getPieces();
+      for (const q of [...p.controlled, ...p.offense, ...p.defense, p.puck]) {
+        checked++;
+        const ft = V.ftPt(q);
+        if (ft.x < 0 || ft.x > R.length || ft.y < 0 || ft.y > R.width) {
+          off++;
+          if (!worst) worst = `${q.role || "puck"} at ${ft.x.toFixed(1)},${ft.y.toFixed(1)} ft`;
+        }
+      }
+    }
+    return { off, checked, worst };
+  });
+  check(onSheet.off === 0, "nobody is ever pushed off the ice to make room",
+    onSheet.worst || `${onSheet.checked} positions checked`);
+
   check(vis.carrierFound / vis.plays > 0.7, "most plays show a clear puck carrier",
     `${Math.round(vis.carrierFound / vis.plays * 100)}% carried`);
   check(vis.youHadPuck === 0, "you are never assigned the position that is carrying the puck",
     `${vis.youHadPuck} such plays`);
 
-  // Taps must land through the camera transform, not just at 1:1
-  const camOk = await page.evaluate(() => {
+  /* Taps must land through the camera transform, not just at 1:1.
+
+     Note what this is measured against: the LOGICAL sheet, not the pixel
+     buffer. The buffer is now sized to whatever the device can afford to
+     rasterise, so it is no longer the coordinate system — and this check used
+     to compare against it, which only worked while the two happened to be the
+     same size. */
+  const cam = await page.evaluate(() => {
     const c = HIQ.debug.getCamera();
-    const p = HIQ.debug.worldToScreen(c.x, c.y);
-    const cv = document.getElementById("rink");
-    return c.scale >= 1 && Math.abs(p.x - cv.width / 2) < 1 && Math.abs(p.y - cv.height / 2) < 1;
+    const mid = HIQ.debug.worldToScreen(c.x, c.y);
+    const V = HIQ.VIEW;
+    // Round-trip a handful of points: world -> screen -> world.
+    let worst = 0;
+    for (const p of [{ x: 200, y: 150 }, { x: 576, y: 260 }, { x: 900, y: 400 }]) {
+      const s = HIQ.debug.worldToScreen(p.x, p.y);
+      const back = HIQ.debug.screenToWorld(s.x, s.y);
+      worst = Math.max(worst, Math.hypot(back.x - p.x, back.y - p.y));
+    }
+    return {
+      centred: Math.abs(mid.x - V.width / 2) < 1 && Math.abs(mid.y - V.height / 2) < 1,
+      scale: c.scale,
+      worst,
+      buffer: [document.getElementById("rink").width, document.getElementById("rink").height],
+      logical: [V.width, V.height],
+    };
   });
-  check(camOk, "camera transform is self-consistent (taps map back correctly)");
+  check(cam.centred && cam.scale >= 1,
+    "the camera centre maps to the middle of the sheet",
+    `scale ${cam.scale.toFixed(2)}`);
+  check(cam.worst < 0.01,
+    "a tap maps back to the exact spot on the ice it came from",
+    `worst round-trip error ${cam.worst.toFixed(4)} px`);
+  check(cam.buffer[0] > 0 && cam.buffer[0] <= cam.logical[0],
+    "the pixel buffer is sized for the device without changing the coordinate system",
+    `buffer ${cam.buffer.join("x")}, sheet ${cam.logical.join("x")}`);
+
+  /* ------------------------------------------------------- rendering cost
+
+     Ryan's report: the graphics lag. Measured, and true — on a phone-class CPU
+     the simulation ran at 30fps with most frames overrunning their budget,
+     which is what reads as lag.
+
+     Two things are checked here, and the first matters more. Counting canvas
+     operations per frame is deterministic: it does not care how loaded the
+     machine running the tests is, and it is what actually regressed — players
+     and their name chips were being re-traced from scratch every frame, about
+     650 operations a frame to draw figures that had not changed. The frame
+     interval is also checked, with a generous bound, because a number that
+     depends on the host's spare capacity should not fail a build on its own. */
+  section("Rendering cost");
+
+  const frameOps = await page.evaluate(() => new Promise(resolve => {
+    const c = document.getElementById("rink").getContext("2d");
+    const METHODS = ["beginPath", "arc", "ellipse", "moveTo", "lineTo", "fill", "stroke",
+      "fillText", "measureText", "drawImage", "save", "restore", "createRadialGradient",
+      "createLinearGradient", "clearRect", "fillRect", "translate", "rotate", "scale",
+      "setLineDash", "closePath", "quadraticCurveTo", "bezierCurveTo", "rect", "roundRect", "arcTo"];
+    const orig = {}, count = {};
+    for (const m of METHODS) {
+      if (typeof c[m] !== "function") continue;
+      orig[m] = c[m];
+      c[m] = function (...a) { count[m] = (count[m] || 0) + 1; return orig[m].apply(this, a); };
+    }
+    let frames = 0;
+    function sample() {
+      if (++frames < 60) { requestAnimationFrame(sample); return; }
+      for (const m in orig) c[m] = orig[m];
+      const total = Object.values(count).reduce((a, b) => a + b, 0) / frames;
+      const gradients = ((count.createRadialGradient || 0) + (count.createLinearGradient || 0)) / frames;
+      resolve({
+        total: +total.toFixed(0),
+        measureText: +((count.measureText || 0) / frames).toFixed(1),
+        gradients: +gradients.toFixed(2),
+        paths: +((count.beginPath || 0) / frames).toFixed(0),
+      });
+    }
+    requestAnimationFrame(sample);
+  }));
+  check(frameOps.total < 300, "a frame costs a sane number of canvas operations",
+    `${frameOps.total} per frame (was ~650 before players were pre-rendered)`);
+  check(frameOps.paths < 40, "players are not re-traced from scratch every frame",
+    `${frameOps.paths} path builds per frame`);
+  check(frameOps.measureText <= 3, "text is not re-measured every frame",
+    `${frameOps.measureText} measureText per frame`);
+  check(frameOps.gradients < 0.1, "no gradient is rebuilt every frame",
+    `${frameOps.gradients} per frame`);
+
+  const fps = await page.evaluate(() => new Promise(resolve => {
+    const gaps = [];
+    let last = performance.now();
+    function f(t) {
+      gaps.push(t - last); last = t;
+      if (gaps.length < 90) requestAnimationFrame(f);
+      else {
+        const s = gaps.slice(5).sort((a, b) => a - b);
+        resolve({ median: +s[Math.floor(s.length / 2)].toFixed(1), scale: HIQ.debug.renderScale() });
+      }
+    }
+    requestAnimationFrame(f);
+  }));
+  check(fps.median < 25, "frames are delivered without stalling",
+    `median ${fps.median}ms (${Math.round(1000 / fps.median)}fps), render scale ${fps.scale.toFixed(2)}`);
+
+  /* Pre-rendering trades memory for speed, so the caches have to stay bounded.
+     Every distinct team colour, player size and stick position is a separate
+     sprite, so a player cycling through colours is the way to make them grow. */
+  const caches = await page.evaluate(() => {
+    for (let i = 0; i < 20; i++) HIQ.debug.newPlay();
+    for (let pass = 0; pass < 3; pass++) {
+      for (const c of ["blue", "green", "purple", "teal", "gold"]) {
+        const sel = document.getElementById("pColor");
+        sel.value = c;
+        sel.dispatchEvent(new Event("change"));
+        HIQ.debug.newPlay();
+      }
+    }
+    return HIQ.debug.spriteCaches();
+  });
+  check(caches.figures <= 80 && caches.chips <= 40 && caches.goalies <= 20 && caches.ground <= 8,
+    "pre-rendered sprite caches stay bounded as colours and plays change",
+    JSON.stringify(caches));
+  check(errors.length === 0, "no errors raised while stressing the renderer",
+    errors.slice(0, 2).join(" | ") || "clean");
 
   // ------------------------------------------------------------ persistence
   section("Progress and profile persistence");
@@ -670,6 +882,154 @@ const section = (t) => console.log(`\n${t}`);
     "player profile survives a reload", `${after.p.name} #${after.p.number} ${after.p.color}`);
   check(after.s.xp === before.s.xp && typeof after.s.xp === "number",
     "XP survives a reload", `xp=${after.s.xp}`);
+
+  /* ------------------------------------------------------------ season plan
+
+     The plan is the game's answer to "what should a kid work on first?", and
+     the order is taken from published coaching guidance rather than invented.
+     So what gets tested is the thing that makes it a plan and not a shuffle:
+     it serves one unit at a time, it opens the next one only when the reads in
+     the current one are actually landing, and every scenario in the game is
+     reachable by working through it. */
+  section("Season plan");
+  // The reload above re-collapsed the settings panel.
+  await openSettings();
+  await page.waitForTimeout(150);
+  await page.evaluate(() => HIQ.debug.resetPlan());
+  await page.selectOption("#plan", "season");
+  await page.waitForTimeout(250);
+
+  const planShape = await page.evaluate(() => {
+    const units = HIQ.CURRICULUM.map(u => ({
+      id: u.id, name: u.name, goal: u.goal,
+      size: HIQ.unitSize(u), need: Math.min(u.need, HIQ.unitSize(u)), plays: u.plays,
+    }));
+    const covered = units.flatMap(u => u.plays);
+    return {
+      units,
+      total: HIQ.PLAYS.length,
+      covered: covered.length,
+      unique: new Set(covered).size,
+      missing: HIQ.PLAYS.map(p => p.id).filter(id => !covered.includes(id)),
+      needTooBig: units.filter(u => u.need > u.size).map(u => u.id),
+      noGoal: units.filter(u => !u.goal || !u.name).map(u => u.id),
+    };
+  });
+  check(planShape.missing.length === 0 && planShape.unique === planShape.total,
+    "the plan covers every scenario in the game exactly once",
+    `${planShape.unique}/${planShape.total} plays across ${planShape.units.length} units`);
+  check(planShape.needTooBig.length === 0,
+    "no unit asks for more reads than it contains (so every unit can be finished)",
+    planShape.needTooBig.join(", ") || "all reachable");
+  check(planShape.noGoal.length === 0, "every unit states what it is teaching",
+    planShape.noGoal.join(", ") || `e.g. "${planShape.units[0].goal}"`);
+
+  // Plan mode serves only the current unit.
+  const unit0 = await page.evaluate(() => {
+    const seen = new Set();
+    for (let i = 0; i < 40; i++) { HIQ.debug.newPlay(); seen.add(HIQ.debug.getScenario().id); }
+    const plan = HIQ.debug.getPlan();
+    return { seen: [...seen], unit: plan.unit.plays, index: plan.index, on: plan.on };
+  });
+  check(unit0.on && unit0.index === 0, "a fresh player starts at unit 1", `unit index ${unit0.index}`);
+  check(unit0.seen.every(id => unit0.unit.includes(id)),
+    "only the current unit's scenarios are served", `saw ${unit0.seen.join(", ")}`);
+
+  // A wrong read must not advance the plan; the best read must.
+  const gating = await page.evaluate(() => {
+    HIQ.debug.resetPlan();
+    HIQ.debug.newPlay();
+    const startDone = HIQ.debug.getPlan().done.length;
+    // Grading a wrong option directly exercises the same path the UI uses.
+    const wrong = HIQ.debug.getChoices().find(o => o.tier === "wrong");
+    return { startDone, hasWrong: !!wrong };
+  });
+  check(gating.startDone === 0 && gating.hasWrong, "progress starts empty and a wrong option exists to try");
+
+  // Drive the real UI: a miss leaves progress alone, a best read records one.
+  let planOpts = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ t: o.tier, x: o.pos.x, y: o.pos.y })));
+  await tapCanvas(planOpts.find(o => o.t === "wrong").x, planOpts.find(o => o.t === "wrong").y);
+  await settle();
+  await page.waitForTimeout(2300);
+  const afterMiss = await page.evaluate(() => HIQ.debug.getPlan().done.length);
+  check(afterMiss === 0, "a wrong read does not advance the plan", `${afterMiss} reads credited`);
+
+  planOpts = await page.evaluate(() => HIQ.debug.getChoices().map(o => ({ t: o.tier, x: o.pos.x, y: o.pos.y })));
+  await tapCanvas(planOpts.find(o => o.t === "best").x, planOpts.find(o => o.t === "best").y);
+  await settle();
+  await page.waitForTimeout(2300);
+  const afterHit = await page.evaluate(() => HIQ.debug.getPlan());
+  check(afterHit.done.length === 1, "the best read records one learned read", `${afterHit.done.length} credited`);
+
+  // Credit is per position-and-situation, so grinding one easy read can't open a unit.
+  const noDupes = await page.evaluate(() => {
+    const plan = HIQ.debug.getPlan();
+    const key = plan.done[0];
+    return { key, unique: new Set(plan.done).size === plan.done.length };
+  });
+  check(noDupes.unique && /\//.test(noDupes.key || ""),
+    "credit is tracked per position in a situation, not per correct answer", noDupes.key);
+
+  // Filling a unit opens exactly the next one, and the last unit stays put.
+  const advance = await page.evaluate(() => {
+    HIQ.debug.resetPlan();
+    const steps = [];
+    for (let u = 0; u < HIQ.CURRICULUM.length + 2; u++) {
+      const plan = HIQ.debug.getPlan();
+      const unit = plan.unit;
+      // Credit every coachable read in this unit, which must be enough to fill it.
+      for (const id of unit.plays) {
+        const play = HIQ.PLAYS.find(p => p.id === id);
+        for (const role of Object.keys(play.reads)) {
+          if (role === play.carrier) continue;
+          HIQ.debug.creditPlan(id, role);
+        }
+      }
+      steps.push(HIQ.debug.getPlan().index);
+    }
+    return { steps, last: HIQ.CURRICULUM.length - 1 };
+  });
+  check(advance.steps[0] === 1, "finishing unit 1 opens unit 2", `landed on index ${advance.steps[0]}`);
+  check(advance.steps[advance.last] === advance.last,
+    "the plan stops at the final unit instead of running off the end",
+    `index ${advance.steps[advance.last]} of ${advance.last}`);
+  /* Finishing the nth unit must land on exactly the (n+1)th — one step, never
+     two. Once the last unit is reached the index stops moving, so only the
+     first `last` steps are the advancing ones. */
+  const marched = advance.steps.slice(0, advance.last).every((v, i) => v === i + 1);
+  check(marched, "each unit opens exactly one new unit, in order", advance.steps.join(" → "));
+
+  /* The "show me this exact scenario" hook. A coach reviewing the spec needs
+     to be able to call up the play they are reading about, and this hook had
+     silently stopped working when the authored plays replaced the old template
+     list — it filtered a list nothing read any more. */
+  await page.selectOption("#plan", "free");
+  await page.waitForTimeout(200);
+  const forced = await page.evaluate(() => {
+    const out = [];
+    for (const play of HIQ.PLAYS) {
+      const got = HIQ.debug.forceTemplate(play.id);
+      out.push({ asked: play.id, got, n: HIQ.PLAYS.length });
+    }
+    return { out, missing: HIQ.debug.forceTemplate("no_such_play") };
+  });
+  check(forced.out.every(r => r.got === r.asked),
+    "every scenario can be called up by name for review",
+    `${forced.out.filter(r => r.got === r.asked).length}/${forced.out.length}`);
+  check(forced.out.every(r => r.n === forced.out.length),
+    "calling one up leaves the full set of scenarios intact",
+    `library still ${forced.out[0].n} plays`);
+  check(forced.missing === null, "an unknown scenario name returns nothing rather than breaking");
+  await page.selectOption("#plan", "season");
+  await page.waitForTimeout(200);
+
+  // Progress is persisted — a child does not restart the season every session.
+  await page.evaluate(() => { HIQ.debug.resetPlan(); HIQ.debug.creditPlan(HIQ.CURRICULUM[0].plays[0], "C"); });
+  await page.reload();
+  await page.waitForTimeout(600);
+  const planPersist = await page.evaluate(() => HIQ.debug.getPlan().done.length);
+  check(planPersist === 1, "plan progress survives a reload", `${planPersist} read remembered`);
+  await page.evaluate(() => HIQ.debug.resetPlan());
 
   // ---------------------------------------------------------------- results
   section("Runtime health");

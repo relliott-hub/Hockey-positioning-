@@ -95,6 +95,34 @@ button:active { transform: scale(0.97); }
 .pill.scoreboard { background: #0f2a4a; color: #fff; border-color: #0f2a4a; }
 .pill.scoreboard b { color: #ffd76a; }
 
+/* Season plan — which unit of the coach's order you're working through. */
+#planBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #f3f8fd;
+  border: 1px solid #d7e3f0;
+  border-left: 4px solid #f59e0b;
+  font-size: 14px;
+}
+#planBar b { color: var(--navy); font-size: 15px; }
+#planBar .planGoal { color: #456; flex: 1 1 260px; }
+#planBar .planCount { font-weight: 600; color: #0b6b3a; white-space: nowrap; }
+#planBar .planTrack {
+  flex: 0 0 120px; height: 10px; border-radius: 999px;
+  background: #dbe7f3; border: 1px solid #c5d4e4; overflow: hidden;
+}
+#planBar .planTrack i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #34d399, #0b6b3a);
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
 #prompt { margin: 12px 0 4px; font-size: 17px; font-weight: 600; }
 #hint { font-size: 14px; font-weight: 600; color: #0b6b3a; margin: 0 0 8px; }
 
@@ -352,11 +380,16 @@ canvas { margin-top: 6px; }
     <span class="pill">🔥 Streak: <b id="streak">0</b></span>
     <span class="pill">⭐ Level <b id="level">1</b></span>
     <div id="xpwrap" title="XP to next level"><div id="xpfill"></div></div>
+    <!-- "Pressure" and "Structure" used to sit here. Pressure was a pill that
+         always read "Med" because nothing ever set it, alongside a filter that
+         was wired up but never actually filtered anything — a control that
+         implied the game had low/high-pressure variants it does not have.
+         Structure repeated the play name already in the question below. -->
     <span class="pill">Phase: <b id="phase">—</b></span>
-    <span class="pill">Pressure: <b id="pressure">—</b></span>
-    <span class="pill">Structure: <b id="structure">—</b></span>
     <span class="pill">Last score: <b id="score">—</b></span>
   </div>
+
+  <div id="planBar"></div>
 
   <p id="prompt">Loading play…</p>
   <p id="hint" style="display:none;"></p>
@@ -380,7 +413,10 @@ canvas { margin-top: 6px; }
     </div>
   </div>
 
-  <details id="settingsPanel" class="card" open>
+  <!-- Closed by default. This used to open on load on anything wider than a
+       phone, so the first thing a player met was ten dropdowns instead of the
+       rink and a question. The defaults are the ones we want them to start on. -->
+  <details id="settingsPanel" class="card">
     <summary><b>⚙️ Game settings &amp; my player</b></summary>
 
     <div class="row" style="margin-top:10px;">
@@ -392,13 +428,18 @@ canvas { margin-top: 6px; }
         </select>
       </label>
 
-      <label>Game format
+      <label>Practice plan
+        <select id="plan">
+          <option value="season" selected>Season plan (coach's order)</option>
+          <option value="free">Free play (any scenario)</option>
+        </select>
+      </label>
+
+      <label id="formatWrap">Game format
         <select id="format">
           <option value="5v5" selected>5v5 (Even Strength)</option>
-          <!-- Special teams are being re-authored against the same coaching
-               standard as the even-strength plays; disabled until they are. -->
-          <option value="5v4" disabled>5v4 Power Play — coming soon</option>
-          <option value="4v5" disabled>4v5 Penalty Kill — coming soon</option>
+          <option value="5v4">5v4 Power Play</option>
+          <option value="4v5">4v5 Penalty Kill</option>
         </select>
       </label>
 
@@ -436,7 +477,7 @@ canvas { margin-top: 6px; }
     </div>
 
     <div class="row">
-      <label>Phase filter
+      <label id="phaseFilterWrap">Phase filter
         <select id="phaseFilter">
           <option value="any" selected>Any</option>
           <option value="Breakout">Breakout</option>
@@ -444,29 +485,10 @@ canvas { margin-top: 6px; }
           <option value="O-zone">O-zone</option>
           <option value="Defend">Defend</option>
           <option value="Forecheck">Forecheck</option>
-        </select>
-      </label>
-
-      <label>Pressure
-        <select id="pressureFilter">
-          <option value="any" selected>Any</option>
-          <option value="Low">Low</option>
-          <option value="Med">Med</option>
-          <option value="High">High</option>
-        </select>
-      </label>
-
-      <label id="ppStructWrap" hidden>PP structure
-        <select id="ppStruct">
-          <option value="umbrella" selected>Umbrella</option>
-          <option value="one3one">1-3-1</option>
-        </select>
-      </label>
-
-      <label id="pkStructWrap" hidden>PK structure
-        <select id="pkStruct">
-          <option value="box" selected>Box</option>
-          <option value="diamond">Diamond</option>
+          <option value="Backcheck">Backcheck</option>
+          <option value="Faceoff">Faceoff</option>
+          <option value="Power play">Power play</option>
+          <option value="Penalty kill">Penalty kill</option>
         </select>
       </label>
 
@@ -553,6 +575,36 @@ canvas { margin-top: 6px; }
 
 
 <script>
+/* ---- js/util.js ---- */
+/* Small shared helpers.
+
+   These used to live at the top of js/data.js, alongside the old canvas-space
+   scenario model. That model was replaced by authored plays measured in feet
+   (js/rink.js, js/plays.js) after an audit found 35% of the answers it marked
+   wrong broke none of its own coaching rules, and the file it lived in carried
+   roughly seven hundred lines of superseded geometry plus a LANDMARKS table
+   still holding coordinates for a canvas size the game no longer uses.
+
+   Keeping dead geometry around the thing that replaced it is how a wrong model
+   comes back, so it was deleted and the parts still in use moved here. */
+window.HIQ = window.HIQ || {};
+
+HIQ.util = {
+  pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
+  clamp(v, min, max) { return Math.max(min, Math.min(max, v)); },
+  dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); },
+  toward(a, b, t) { return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; },
+  shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+};
+
+/* ---- js/rink.js ---- */
 /* The ice, in feet.
 
    Everything about this game is a claim about where a player should stand, so
@@ -699,6 +751,14 @@ HIQ.zones = (() => {
 
     inNeutralZone: (p) => p.x > R.blueLineLeft && p.x < R.blueLineRight,
 
+    /* On one of the nine faceoff spots. A scenario that says "a draw at the
+       dot nearest the boards" has to actually put the puck on a dot, or the
+       picture teaches a child the wrong thing about where draws happen. */
+    atFaceoffDot: (p, _side, tol = 2) => {
+      const spots = Object.values(R.dots).concat([R.centre]);
+      return spots.some(d => Math.hypot(p.x - d.x, p.y - d.y) <= tol);
+    },
+
     // A "point" is a defenceman standing on the blue line of the attacking zone.
     atBlueLine: (p, side, tol = 7) => Math.abs(p.x - blOf(side)) <= tol,
 
@@ -771,6 +831,7 @@ HIQ.ft = {
   },
 };
 
+/* ---- js/plays.js ---- */
 /* The hockey.
 
    Every position here is in FEET on a regulation sheet (see rink.js), and every
@@ -1328,6 +1389,587 @@ HIQ.PLAYS = [
       },
     },
   },
+
+  /* ------------------------------------------------------------------ */
+  /* Backchecking. Named in the teaching audit as a situation a youth player
+     meets every single game and the game did not cover.
+
+     The literature is blunt about what makes a backcheck worthless: "a
+     trailing backchecker defends nothing". So every best read here is about
+     getting to the DEFENSIVE SIDE of a man, and the standard assignment —
+     centre takes the middle lane, wingers take the outside lanes — is the one
+     taught, because somebody has to clearly own the middle. */
+  {
+    id: "backcheck_rush",
+    phase: "Backcheck",
+    name: "Backchecking a rush",
+    situation:
+      "You turned the puck over and they're coming back at you with speed. " +
+      "You're behind the play and have to get back before they get to your net.",
+    claims: { puck: ["inNeutralZone"] },
+    attackDir: "left",
+    ourNet: "left",
+    isDefense: true,
+    puck: { x: 90, y: 50 },
+    carrier: "opp",
+    players: {
+      LD: { x: 66, y: 50 },
+      RD: { x: 56, y: 36 },
+      C:  { x: 96, y: 44 },
+      LW: { x: 100, y: 66 },
+      RW: { x: 98, y: 24 },
+    },
+    opponents: [
+      { x: 90, y: 50, label: "O1" },
+      { x: 84, y: 68, label: "O2" },
+      { x: 86, y: 26, label: "O3" },
+      { x: 112, y: 56, label: "O4" },
+      { x: 114, y: 30, label: "O5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 78, y: 46, why: "Get back through the middle and stay on the defensive side of the puck. The middle lane is yours — you take away the drop pass and the late man sneaking into the slot." },
+        acceptable: [
+          { x: 56, y: 44, why: "Collapsing all the way to the top of your own circles means you're definitely home — but you've skated past the trailer, and he's the one who gets the rebound." },
+        ],
+        wrong: [
+          { x: 96, y: 62, why: "You chased the puck carrier from behind. You can't take the puck off someone you're trailing — and the middle you left is where they're going." },
+          { x: 104, y: 30, why: "You turned up ice looking for the counter-attack. Your team is defending a rush with one fewer player back." },
+        ],
+      },
+      LW: {
+        best: { x: 82, y: 64, why: "Catch your man in your lane and take the inside of him. Get between him and your net — a backchecker skating behind his man is defending nothing at all." },
+        acceptable: [
+          { x: 62, y: 74, why: "Racing right back to your own corner means you're home first — but you've skated past your man, and he'll walk in behind you with the puck." },
+        ],
+        wrong: [
+          { x: 96, y: 46, why: "You cut into the middle. That's your centre's lane — and the wall you just left is wide open." },
+          { x: 104, y: 76, why: "You stopped and stayed high hoping for a turnover. They're attacking with numbers because you aren't back." },
+        ],
+      },
+      RW: {
+        best: { x: 80, y: 28, why: "Get back on the far side and take the inside of your man. If you beat him to the middle, your defencemen don't have to guess." },
+        acceptable: [
+          { x: 60, y: 20, why: "Getting all the way back to the far post stops the tap-in — but you've let your man shoot from the circle with nobody on him." },
+        ],
+        wrong: [
+          { x: 94, y: 46, why: "You went to the puck. Your defenceman already has the carrier — the man you were supposed to take is now alone." },
+          { x: 104, y: 22, why: "You stayed high waiting for the puck to come back. It isn't coming back until someone defends." },
+        ],
+      },
+      LD: {
+        best: { x: 66, y: 50, why: "Skate backwards and keep a tight gap on the carrier, forcing him toward the boards. Don't lunge — a missed poke check turns this into a breakaway." },
+        acceptable: [
+          { x: 44, y: 44, why: "Backing off gives you room so you can't be beaten wide — but you've let him come in and shoot from the top of the circle with speed." },
+        ],
+        wrong: [
+          { x: 86, y: 54, why: "You stepped up and lunged at him near centre. Miss, and he's past you with nobody between him and your goalie." },
+          { x: 60, y: 28, why: "You drifted onto your partner's side. Both defencemen in one lane, and the side the puck is on is unguarded." },
+        ],
+      },
+      RD: {
+        best: { x: 56, y: 36, why: "Stay inside your partner and protect the middle. One of you takes the carrier, the other takes the ice in front of the net — you're the second one." },
+        acceptable: [
+          { x: 36, y: 30, why: "Dropping right back to the net front means the backdoor pass is covered — but you've given them the whole slot to shoot from first." },
+        ],
+        wrong: [
+          { x: 76, y: 30, why: "You stepped up at the far man near centre. Beat there, and it's a two-on-one on your partner." },
+          { x: 56, y: 60, why: "Both defencemen on the puck side. The entire middle of your own zone is unguarded." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Defending an odd-man rush. The clearest piece of coaching consensus in
+     the whole sport: take the pass away and let the goalie have the shot.
+
+     "Giving up a low-percentage shot is a win; the goalie is trained to stop
+     the puck; the job is making sure the shooter, not the open teammate, gets
+     it." The wrong reads are the two real ways kids lose this: lunging at the
+     carrier, and sliding across to the puck and abandoning the open man. */
+  {
+    id: "defend_two_on_one",
+    phase: "Defend",
+    name: "Two on one against you",
+    situation:
+      "Two of them are coming in over your blue line and you're the only " +
+      "defender back. Your help is behind the play. Don't let this be a goal.",
+    claims: { puck: ["atBlueLine"] },
+    attackDir: "left",
+    ourNet: "left",
+    isDefense: true,
+    puck: { x: 72, y: 52 },
+    carrier: "opp",
+    players: {
+      RD: { x: 50, y: 38 },
+      LD: { x: 84, y: 66 },
+      C:  { x: 88, y: 48 },
+      LW: { x: 92, y: 70 },
+      RW: { x: 90, y: 26 },
+    },
+    opponents: [
+      { x: 72, y: 52, label: "O1" },
+      { x: 70, y: 30, label: "O2" },
+      { x: 96, y: 44, label: "O3" },
+      { x: 100, y: 58, label: "O4" },
+      { x: 104, y: 36, label: "O5" },
+    ],
+    reads: {
+      RD: {
+        best: { x: 50, y: 38, why: "Stay between them, a little toward the open man, with your stick flat in the passing lane. Take the pass away and let your goalie have the shot — a shot from out there is the save he wants." },
+        acceptable: [
+          { x: 28, y: 42, why: "Backing right in tight takes the backdoor pass away and gives your goalie a clear view — but you've handed them the whole blue line to walk in and shoot from." },
+        ],
+        wrong: [
+          { x: 70, y: 52, why: "You lunged at the puck carrier. A missed poke check on a two-on-one is a pass to an empty net." },
+          { x: 40, y: 60, why: "You slid over to the puck carrier and left the far man. He's the one who scores — that's why you play the pass, not the puck." },
+        ],
+      },
+      LD: {
+        best: { x: 64, y: 32, why: "Sprint back and pick up the open man, not the puck. The moment a second defender arrives this stops being a two-on-one — so get to the man your partner can't cover." },
+        acceptable: [
+          { x: 44, y: 22, why: "Getting all the way back to the far post covers the tap-in — but he can shoot from the top of the circle with nobody near him." },
+        ],
+        wrong: [
+          { x: 70, y: 54, why: "You went to the puck. Your partner already has the carrier, and the open man is still open." },
+          { x: 90, y: 60, why: "You stopped and stayed high hoping for a turnover. There's no two-on-one at all if you just get back." },
+        ],
+      },
+      C: {
+        best: { x: 72, y: 44, why: "Back through the middle and take away the drop pass. On a broken-up rush it's the trailer coming late into the slot who scores." },
+        acceptable: [
+          { x: 50, y: 48, why: "Collapsing to the top of your own circles means you're home if it breaks down — but you've gone past the trailer, and he gets the rebound." },
+        ],
+        wrong: [
+          { x: 74, y: 66, why: "You went to the puck carrier. Your defenceman has him — and the middle is now wide open." },
+          { x: 94, y: 30, why: "You gave up on the backcheck and turned up ice. Your defenceman is defending two players alone because of it." },
+        ],
+      },
+      LW: {
+        best: { x: 74, y: 68, why: "Catch the man in your lane and take the inside of him. Get on the defensive side — chasing from behind him helps nobody." },
+        acceptable: [
+          { x: 54, y: 72, why: "Getting all the way back to your own corner means you beat him home — but you skated past him on the way, so he has the puck and you don't." },
+        ],
+        wrong: [
+          { x: 76, y: 46, why: "You cut into the middle where your centre already is. Two of you in one lane and the wall is open." },
+          { x: 98, y: 72, why: "You gave up on the play. One defender against two, and you're watching from the neutral zone." },
+        ],
+      },
+      RW: {
+        best: { x: 72, y: 24, why: "Get to the far side and take the open man. Beat him to the inside and your defenceman no longer has to choose." },
+        acceptable: [
+          { x: 52, y: 18, why: "All the way back to the far post stops the tap-in — but it leaves him free to shoot from the circle." },
+        ],
+        wrong: [
+          { x: 74, y: 46, why: "You came into the middle. On a two-on-one the far man is the dangerous one, and you just left him." },
+          { x: 96, y: 22, why: "You stayed high waiting for the puck to come back. They have a two-on-one — it isn't coming back." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Neutral-zone forecheck. The 1-2-2 is the setup the sources recommend for
+     youth teams: F1 pressures and steers play to one side while the two
+     forwards behind "create a wall effect that eliminates cross-ice passing
+     options", with the defencemen holding their own blue line and the whole
+     group "moving as a five-man unit". */
+  {
+    id: "nz_forecheck_1_2_2",
+    phase: "Forecheck",
+    name: "Holding the neutral zone",
+    situation:
+      "Their defenceman has carried the puck up into the neutral zone. Your " +
+      "team is set up in a 1-2-2 to take the middle away and force a turnover.",
+    claims: { puck: ["inNeutralZone"] },
+    attackDir: "right",
+    ourNet: "left",
+    forecheck: true,
+    puck: { x: 120, y: 58 },
+    carrier: "opp",
+    players: {
+      C:  { x: 114, y: 54 },
+      LW: { x: 102, y: 68 },
+      RW: { x: 100, y: 30 },
+      RD: { x: 80, y: 56 },
+      LD: { x: 78, y: 30 },
+    },
+    opponents: [
+      { x: 120, y: 58, label: "O1" },
+      { x: 126, y: 30, label: "O2" },
+      { x: 110, y: 76, label: "O3" },
+      { x: 112, y: 18, label: "O4" },
+      { x: 132, y: 44, label: "O5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 114, y: 54, why: "Angle him toward the boards from the inside. In a 1-2-2 your job isn't to steal it — it's to take the middle away so the only pass left is up the wall, where your wingers are waiting." },
+        acceptable: [
+          { x: 94, y: 46, why: "Hanging back in the middle and letting them come to you is a containing forecheck and gives up nothing — but it hands their defenceman a free look at the whole ice." },
+        ],
+        wrong: [
+          { x: 134, y: 62, why: "You chased him into his own zone alone. A 1-2-2 holds the neutral zone — once you're past their line, the wall behind you has nothing left to defend." },
+          { x: 112, y: 24, why: "You pressured from the far side. He simply moves it to the near wall, and the side you left is the side the puck went." },
+        ],
+      },
+      LW: {
+        best: { x: 102, y: 68, why: "Stand up on the near wall and hold it. When your centre forces the pass up the boards, you step into it — standing still, not chasing." },
+        acceptable: [
+          { x: 122, y: 76, why: "Stepping up early to pressure their winger can win the puck high — but if it gets past you the whole wall is beaten and you're behind the play." },
+        ],
+        wrong: [
+          { x: 98, y: 46, why: "You left the wall for the middle. Your centre has already taken the middle away — the pass is going up the boards you just abandoned." },
+          { x: 78, y: 72, why: "You backed up to your own blue line. That's your defenceman's line to hold, and the forecheck has lost its second layer." },
+        ],
+      },
+      RW: {
+        best: { x: 100, y: 30, why: "Hold the far wall and stay above the puck. If they swing it across to escape, you're the one who kills it — and you're the last man if it gets through." },
+        acceptable: [
+          { x: 94, y: 50, why: "Sliding into the middle makes the wall tighter — but the far wall is open now, and that's exactly where a trapped team goes." },
+        ],
+        wrong: [
+          { x: 122, y: 26, why: "You went up the ice to chase. Two forwards past the puck, and their breakout goes straight through the middle you both left." },
+          { x: 78, y: 26, why: "You dropped back level with your defencemen. Three players on one line with nothing in front of them." },
+        ],
+      },
+      RD: {
+        best: { x: 80, y: 56, why: "Hold your own blue line on the puck side. A 1-2-2 only works if the back two stay up — back off and you've given them the whole neutral zone to build speed in." },
+        acceptable: [
+          { x: 100, y: 62, why: "Stepping up past centre squeezes them harder and aggressive teams play it that way — but one pass that beats you is an odd-man rush." },
+        ],
+        wrong: [
+          { x: 58, y: 60, why: "You retreated into your own zone. They carry it in with speed and the forecheck never happened." },
+          { x: 80, y: 34, why: "You drifted onto your partner's side. Both defencemen in one lane and the near boards are wide open." },
+        ],
+      },
+      LD: {
+        best: { x: 78, y: 30, why: "Hold the weak-side blue line. The pass that beats a 1-2-2 is the one that goes all the way across — and you're the one standing in it." },
+        acceptable: [
+          { x: 98, y: 22, why: "Pressing up the weak side can force them to turn back — but you're the safety valve here, and stepping up costs you a step if it goes past." },
+        ],
+        wrong: [
+          { x: 56, y: 28, why: "You backed into your own zone. There's nothing left to stop them at the line." },
+          { x: 80, y: 54, why: "Both defencemen on the puck side. The whole weak side of the neutral zone is theirs." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Defensive-zone faceoff.
+     The centre's spot is fixed by rule, so the coached positions are the four
+     players who actually choose where to line up. On a draw the wingers take
+     the opposing points — which is genuinely different from their in-play
+     coverage job, and the reads say so, because a kid who notices the
+     difference has learned something real.
+     "All 5 players need to know their responsibility on a win AND a loss." */
+  {
+    id: "dzone_faceoff",
+    phase: "Faceoff",
+    name: "Faceoff in your own end",
+    situation:
+      "A draw in your own end, at the dot nearest the boards. Everybody needs " +
+      "to know their job before the puck hits the ice — on a win and on a loss.",
+    claims: { puck: ["atFaceoffDot"] },
+    attackDir: "left",
+    ourNet: "left",
+    isDefense: true,
+    puck: { x: 31, y: 64.5 },
+    carrier: "opp",
+    players: {
+      C:  { x: 29, y: 62 },
+      LD: { x: 21, y: 74 },
+      RD: { x: 17, y: 46 },
+      LW: { x: 45, y: 74 },
+      RW: { x: 46, y: 30 },
+    },
+    opponents: [
+      { x: 33, y: 67, label: "O1" },
+      { x: 24, y: 77, label: "O2" },
+      { x: 19, y: 36, label: "O3" },
+      { x: 46, y: 68, label: "O4" },
+      { x: 44, y: 28, label: "O5" },
+    ],
+    reads: {
+      LW: {
+        best: { x: 45, y: 74, why: "Line up on their defenceman on your side, between him and the boards. Win the draw back to your D and you're the one stopping their point from pinching down on him." },
+        acceptable: [
+          { x: 48, y: 54, why: "Lining up inside lets you help in the slot if the draw is lost — but their point is now free to walk down the wall and shoot." },
+        ],
+        wrong: [
+          { x: 24, y: 73, why: "You lined up low beside your own defenceman. Two of you on one wall, and their point walks in completely untouched." },
+          { x: 66, y: 72, why: "You lined up out at the blue line ready to leave. You're a man short in your own end before the puck has even dropped." },
+        ],
+      },
+      RW: {
+        best: { x: 46, y: 30, why: "On their far defenceman. When the draw gets swung across, the weak-side shot is the one that beats you — and on a faceoff that point is yours, not your D's." },
+        acceptable: [
+          { x: 26, y: 36, why: "Starting lower in the weak-side slot protects the backdoor if the draw is lost — but their far point can step into a free shot." },
+        ],
+        wrong: [
+          { x: 46, y: 66, why: "You crossed to the strong side where your winger already is. The entire weak side of your zone is unguarded." },
+          { x: 72, y: 28, why: "You're out at the blue line ready to break out. The draw hasn't happened yet and you've already left your end." },
+        ],
+      },
+      LD: {
+        best: { x: 21, y: 74, why: "Low on the boards on the draw side, inside your winger. Win it and you're the outlet; lose it and you're already between their winger and the corner." },
+        acceptable: [
+          { x: 18, y: 50, why: "Starting nearer the net means you'll never be beaten to the inside — but you've given up the boards, and that's exactly where a lost draw goes." },
+        ],
+        wrong: [
+          { x: 42, y: 76, why: "You lined up above the circle. The puck comes back low behind you and their winger has it in the corner alone." },
+          { x: 38, y: 54, why: "You lined up out in the middle. Nobody has the strong-side boards, and that's where the draw is going." },
+        ],
+      },
+      RD: {
+        best: { x: 17, y: 46, why: "Net-front on the weak side. On a lost draw the puck goes straight to the man in front of your net — and he's yours." },
+        acceptable: [
+          { x: 26, y: 26, why: "Setting up wider takes the cross-ice pass away — but it opens the front of your own net, and that's the more dangerous ice." },
+        ],
+        wrong: [
+          { x: 24, y: 70, why: "Both defencemen on the draw side. The weak side and the front of your net are both empty." },
+          { x: 44, y: 44, why: "You lined up at the top of the circle hoping for a breakout pass. That's a forward's spot and your net is unguarded." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Offensive-zone faceoff. A set play: win it back and shoot, with bodies at
+     the net. The reads are about being in a place that makes that work. */
+  {
+    id: "ozone_faceoff",
+    phase: "Faceoff",
+    name: "Faceoff in their end",
+    situation:
+      "A draw in their end, at the dot nearest the boards. A won draw here is " +
+      "a scoring chance — if everyone is in a spot that can use it.",
+    claims: { puck: ["atFaceoffDot"] },
+    attackDir: "right",
+    ourNet: "left",
+    puck: { x: 169, y: 64.5 },
+    carrier: "opp",
+    players: {
+      C:  { x: 167, y: 62 },
+      LW: { x: 174, y: 74 },
+      RW: { x: 180, y: 38 },
+      RD: { x: 152, y: 58 },
+      LD: { x: 138, y: 32 },
+    },
+    opponents: [
+      { x: 171, y: 67, label: "O1" },
+      { x: 178, y: 76, label: "O2" },
+      { x: 184, y: 46, label: "O3" },
+      { x: 156, y: 70, label: "O4" },
+      { x: 154, y: 30, label: "O5" },
+    ],
+    reads: {
+      LW: {
+        best: { x: 174, y: 74, why: "On the wall at the hash marks, ready for the draw to come back to you. From there you have the whole boards to work with and nobody can strip you from behind." },
+        acceptable: [
+          { x: 182, y: 54, why: "Driving straight to the net-front off the draw is a real set play and that's where goals come from — but lose the draw and you're below everybody, and their breakout goes up your wall." },
+        ],
+        wrong: [
+          { x: 196, y: 72, why: "You started below their goal line. The draw comes back and there is nobody on the wall to take it." },
+          { x: 148, y: 76, why: "You lined up back at the blue line. That's your defenceman's spot, and your centre has nobody to win it to." },
+        ],
+      },
+      RW: {
+        best: { x: 180, y: 38, why: "Net front on the weak side. Off an offensive draw the puck gets to the net in about a second — be the one standing where the goalie can't see it coming." },
+        acceptable: [
+          { x: 170, y: 20, why: "Looping in from the weak side with speed gives your centre a second option and it's a genuine set play — but nobody is at the net, and that's where a draw-and-shoot ends up." },
+        ],
+        wrong: [
+          { x: 176, y: 62, why: "You crossed to the strong side where your winger already is. Two of you on one wall and the whole weak side is empty." },
+          { x: 150, y: 44, why: "You dropped back to the middle at the blue line. That's a long way from the net on a play that's over in two seconds." },
+        ],
+      },
+      RD: {
+        best: { x: 152, y: 58, why: "Up at the top of the circle on the draw side, ready to shoot. Off an offensive faceoff, that quick shot with bodies at the net is the whole point of the play." },
+        acceptable: [
+          { x: 132, y: 62, why: "Holding the blue line is the safe way to play it and you'll never be beaten the other way — but it's a long shot from there, and the point of an offensive draw is a quick one." },
+        ],
+        wrong: [
+          { x: 174, y: 70, why: "You went down into the corner before the puck dropped. Lose the draw and it's a two-on-one going the other way." },
+          { x: 152, y: 36, why: "You lined up in the middle on your partner's side. Nobody has the strong-side point and the won draw has nowhere to go." },
+        ],
+      },
+      LD: {
+        best: { x: 138, y: 32, why: "Weak-side point, a little higher than your partner. You keep it in when it comes across, and you're the man back if the draw is lost." },
+        acceptable: [
+          { x: 158, y: 26, why: "Coming down level with your partner gives you a better shot — but you're the only one back, and a lost draw becomes a rush the other way." },
+        ],
+        wrong: [
+          { x: 140, y: 58, why: "Both defencemen on the draw side. They win it, swing it across, and nobody is there." },
+          { x: 180, y: 30, why: "You dropped into the slot looking for a tip. Both points are gone and the puck goes straight out of the zone." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* SPECIAL TEAMS.
+
+     These were disabled for several versions. The old versions taught a
+     hardcoded umbrella and box regardless of what the player had selected,
+     and were up to 282 px off the structure they claimed to be showing, so
+     turning them off was the honest thing to do until they could be authored
+     the same way as everything else.
+
+     Re-authored here on the 1-3-1 and the passive box, which is what the
+     sources recommend: the 1-3-1 "creates the most passing triangles and
+     one-timer lanes", and the box is the kill for "youth, beginner and less
+     mobile teams" because it "is forgiving, easy to teach, and rarely gives
+     up a clean look if players hold their spacing".
+
+     On special teams the job matters more than the badge on your jersey, so
+     each position carries the name of the job it is doing. That vocabulary —
+     point, half-wall, bumper, net front — is the thing a kid needs to be able
+     to follow a coach drawing on a whiteboard. */
+  {
+    id: "pp_one_three_one",
+    phase: "Power play",
+    name: "Power play 1-3-1",
+    situation:
+      "You're on the power play, set up in their end in a 1-3-1. Your point " +
+      "man has the puck at the blue line. Make them move, then make them pay.",
+    claims: { puck: ["atBlueLine"] },
+    fmt: "5v4",
+    attackDir: "right",
+    ourNet: "left",
+    jobs: { LD: "the point", LW: "near half-wall", RW: "far half-wall", C: "the bumper", RD: "net front" },
+    puck: { x: 128, y: 42 },
+    carrier: "LD",
+    players: {
+      LD: { x: 128, y: 42 },
+      LW: { x: 164, y: 71 },
+      RW: { x: 164, y: 14 },
+      C:  { x: 160, y: 42 },
+      RD: { x: 182, y: 45 },
+    },
+    opponents: [
+      { x: 150, y: 54, label: "K1" },
+      { x: 150, y: 32, label: "K2" },
+      { x: 176, y: 56, label: "K3" },
+      { x: 176, y: 30, label: "K4" },
+    ],
+    reads: {
+      LW: {
+        best: { x: 164, y: 71, why: "The half-wall — level with the dot, out on the boards. From there you can shoot, feed the net front, or move it back to the point. Three options, and the box can only cover one." },
+        acceptable: [
+          { x: 186, y: 68, why: "Dropping toward the corner gives you a safer place to receive it — but you're below the box now, and from down there you can't shoot and you can't feed the slot." },
+        ],
+        wrong: [
+          { x: 160, y: 46, why: "You came into the middle where your bumper already is. Two of you in one spot and one penalty killer covers you both." },
+          { x: 136, y: 66, why: "You came up level with the point. A power play needs width — up there you're just a second option in the same place." },
+        ],
+      },
+      RW: {
+        best: { x: 164, y: 14, why: "Far half-wall, and stay wide. The pass across is the one a box cannot cover — but only if you're wide enough that someone has to move to reach you." },
+        acceptable: [
+          { x: 146, y: 26, why: "Coming in tighter makes the cross-ice pass shorter and quicker — but you're inside the box now, and your shooting lane is gone." },
+        ],
+        wrong: [
+          { x: 186, y: 24, why: "You dropped below the circle. Down there you have no shot and no pass into the slot." },
+          { x: 164, y: 42, why: "You slid into the middle. Your bumper is already there and the whole far side of the ice is now empty." },
+        ],
+      },
+      C: {
+        best: { x: 160, y: 42, why: "The bumper sits in the high slot, right in the middle of their box. You're the pass nobody expects — and you screen the goalie on every shot from the point." },
+        acceptable: [
+          { x: 182, y: 42, why: "Dropping to the net front gives you a tip and a rebound — but your net-front man is already there, and the middle you left is the seam that makes a 1-3-1 work." },
+        ],
+        wrong: [
+          { x: 160, y: 68, why: "You went out to the wall where your winger already is. One penalty killer now covers both of you." },
+          { x: 134, y: 42, why: "You came up to the point. Your defenceman has the puck there, and now there is nothing at all in the middle." },
+        ],
+      },
+      RD: {
+        best: { x: 182, y: 45, why: "Net front, just off the post, facing the puck. It's the hardest job on the power play: take the goalie's eyes away and be there for the rebound." },
+        acceptable: [
+          { x: 188, y: 66, why: "Going to the corner as an outlet keeps possession when it comes down — but nobody is screening, and the goalie sees every shot." },
+        ],
+        wrong: [
+          { x: 160, y: 44, why: "You backed out to the high slot. That's the bumper's spot, and the goalie can see everything now." },
+          { x: 182, y: 22, why: "You drifted off to the weak side. The front of the net is empty, and on a power play that's the only place a goalie gets beaten." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  {
+    id: "pk_box",
+    phase: "Penalty kill",
+    name: "Penalty kill box",
+    situation:
+      "You're a man short and they're set up in your end. Hold the box, keep " +
+      "the puck out of the middle, and make them shoot from a bad place.",
+    claims: { puck: ["onHalfWall"] },
+    fmt: "4v5",
+    attackDir: "left",
+    ourNet: "left",
+    isDefense: true,
+    jobs: { C: "top of the box, puck side", LW: "top of the box, weak side", LD: "low, puck side", RD: "low, weak side" },
+    puck: { x: 30, y: 74 },
+    carrier: "opp",
+    players: {
+      C:  { x: 38, y: 56 },
+      LW: { x: 38, y: 30 },
+      LD: { x: 22, y: 56 },
+      RD: { x: 20, y: 33 },
+    },
+    opponents: [
+      { x: 30, y: 74, label: "P1" },
+      { x: 30, y: 12, label: "P2" },
+      { x: 34, y: 43, label: "P3" },
+      { x: 17, y: 41, label: "P4" },
+      { x: 72, y: 42, label: "P5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 38, y: 56, why: "Top corner of the box on the puck side, stick in the lane to the middle. On a kill you don't go and get it — you make the shot come from the worst place on the ice." },
+        acceptable: [
+          { x: 34, y: 76, why: "Stepping out to pressure the half-wall can force a bad pass, and that's how an aggressive kill works — but if it gets past you, your box is a man down and the slot is open." },
+        ],
+        wrong: [
+          { x: 60, y: 48, why: "You went up to their point. He isn't your man on a kill — the four of you have to stay a box." },
+          { x: 22, y: 42, why: "You collapsed into the middle beside your defencemen. Three of you in the slot, and both their half-walls can shoot whenever they like." },
+        ],
+      },
+      LW: {
+        best: { x: 38, y: 30, why: "Top corner of the box on the weak side. When they swing it across you have to be there already — a kill that chases the puck across is always one pass behind." },
+        acceptable: [
+          { x: 30, y: 10, why: "Going out to the far half-wall takes that shot away — but the box is broken, and the seam into the slot behind you is exactly the pass they want." },
+        ],
+        wrong: [
+          { x: 38, y: 54, why: "You followed the puck to the strong side. Your teammate is already there and the weak side is open for a one-timer." },
+          { x: 66, y: 34, why: "You went up to their point hoping for a shorthanded break. Four players have to cover five — you can't give one away." },
+        ],
+      },
+      LD: {
+        best: { x: 22, y: 56, why: "Low corner of the box, between the puck and your net. You take away the pass down to the goal line and you're first to any rebound." },
+        acceptable: [
+          { x: 32, y: 76, why: "Pressing out to the half-wall can block the shot — but you've left the front of your own net, and that's where a power play scores." },
+        ],
+        wrong: [
+          { x: 20, y: 34, why: "You slid across the front of your own net. That's your partner's man — and the side you left is the side with the puck." },
+          { x: 46, y: 58, why: "You're up at the top of the circle. On a kill everything dangerous happens below you, and you've left it behind." },
+        ],
+      },
+      RD: {
+        best: { x: 20, y: 33, why: "Low corner of the box on the weak side, stick on their net-front man. The backdoor tap-in is the goal a power play scores most — and it's yours to stop." },
+        acceptable: [
+          { x: 30, y: 14, why: "Going wide to the far half-wall takes the cross-ice shot away — but it leaves the net front, and that's the more dangerous ice." },
+        ],
+        wrong: [
+          { x: 22, y: 54, why: "Both defencemen on the puck side. Nobody is at the back post, and that's a tap-in." },
+          { x: 44, y: 36, why: "You stepped up into the high slot. Their man in the middle is your forwards' job — your net is not." },
+        ],
+      },
+    },
+  },
 ];
 
 /* The principles.
@@ -1401,6 +2043,51 @@ const PRINCIPLE_MAP = {
     RD: ["yourjob", "support", "above", "dontchase"],
     LD: ["weakside", "weakside", "above"],
   },
+  backcheck_rush: {
+    C:  ["above", "middle", "dontchase", "above"],
+    LW: ["above", "above", "yourjob", "above"],
+    RW: ["yourjob", "weakside", "dontchase", "above"],
+    LD: ["above", "above", "dontchase", "weakside"],
+    RD: ["middle", "middle", "yourjob", "weakside"],
+  },
+  defend_two_on_one: {
+    RD: ["middle", "middle", "dontchase", "weakside"],
+    LD: ["yourjob", "weakside", "dontchase", "above"],
+    C:  ["middle", "middle", "dontchase", "above"],
+    LW: ["above", "above", "yourjob", "above"],
+    RW: ["weakside", "weakside", "weakside", "above"],
+  },
+  nz_forecheck_1_2_2: {
+    C:  ["middle", "middle", "dontchase", "yourjob"],
+    LW: ["lanes", "above", "yourjob", "above"],
+    RW: ["weakside", "weakside", "dontchase", "lanes"],
+    RD: ["above", "above", "above", "weakside"],
+    LD: ["weakside", "above", "above", "weakside"],
+  },
+  dzone_faceoff: {
+    LW: ["yourjob", "middle", "lanes", "above"],
+    RW: ["weakside", "weakside", "weakside", "above"],
+    LD: ["yourjob", "yourjob", "above", "lanes"],
+    RD: ["middle", "weakside", "weakside", "middle"],
+  },
+  ozone_faceoff: {
+    LW: ["support", "middle", "support", "yourjob"],
+    RW: ["middle", "support", "lanes", "support"],
+    RD: ["support", "support", "above", "lanes"],
+    LD: ["weakside", "above", "weakside", "above"],
+  },
+  pp_one_three_one: {
+    LW: ["support", "support", "lanes", "lanes"],
+    RW: ["weakside", "weakside", "support", "lanes"],
+    C:  ["middle", "middle", "lanes", "lanes"],
+    RD: ["middle", "support", "yourjob", "middle"],
+  },
+  pk_box: {
+    C:  ["middle", "dontchase", "dontchase", "lanes"],
+    LW: ["weakside", "weakside", "dontchase", "yourjob"],
+    LD: ["middle", "middle", "yourjob", "above"],
+    RD: ["weakside", "middle", "weakside", "yourjob"],
+  },
 };
 
 // Attach the principle to every read, in the order the map lists them.
@@ -1414,6 +2101,92 @@ const PRINCIPLE_MAP = {
     }
   }
 })();
+
+/* The season plan.
+
+   Coaches do not teach positioning by showing a child a random situation and
+   asking where to stand. Published practice planners are built as numbered
+   plans, each with a stated theme, worked through in an order — and the order
+   is not arbitrary. Hockey Canada's U13 pathway states the rule plainly:
+
+     "skills before tactics; tactics before structure"
+
+   and its U11 guidance introduces basic defensive-zone positioning before
+   anything else, with special teams held back until U13, where players
+   "should play in all situations, power play, penalty kill and special teams".
+
+   So the units below run from your own net outward: protect the house, get out
+   of your end, move it up the ice, take it back, keep it in their end, get
+   back when it goes wrong, then special teams last. A player works a unit
+   until the reads in it are landing, then the next one opens.
+
+   `need` is how many distinct position-and-situation reads in the unit have to
+   be answered with the best read before it is considered learned. It is capped
+   by how many the unit actually contains, so a unit can always be finished.  */
+HIQ.CURRICULUM = [
+  {
+    id: "house",
+    name: "Protect the house",
+    goal: "Learn the most dangerous ice on the sheet — and who guards it.",
+    plays: ["dzone_corner_battle", "dzone_halfwall_coverage"],
+    need: 6,
+  },
+  {
+    id: "breakout",
+    name: "Get out of your end",
+    goal: "Give your defence somewhere safe to pass, and never through the middle.",
+    plays: ["breakout_corner_pressure", "dzone_faceoff"],
+    need: 6,
+  },
+  {
+    id: "transition",
+    name: "Move it up the ice",
+    goal: "Attack with speed and width instead of all skating to the puck.",
+    plays: ["nz_regroup", "rush_three_on_two"],
+    need: 6,
+  },
+  {
+    id: "forecheck",
+    name: "Take it back",
+    goal: "Win the puck with angles and layers, not by chasing it.",
+    plays: ["forecheck_1_2_2", "nz_forecheck_1_2_2"],
+    need: 6,
+  },
+  {
+    id: "offence",
+    name: "Keep it in their end",
+    goal: "Hold possession, and have somebody at the net when the chance comes.",
+    plays: ["ozone_cycle_support", "ozone_faceoff"],
+    need: 6,
+  },
+  {
+    id: "recover",
+    name: "Get back",
+    goal: "When it goes wrong, get to the defensive side of your man.",
+    plays: ["backcheck_rush", "defend_two_on_one"],
+    need: 6,
+  },
+  {
+    id: "special",
+    name: "Special teams",
+    goal: "A man up and a man down — the jobs change, and so do their names.",
+    plays: ["pp_one_three_one", "pk_box"],
+    need: 5,
+  },
+];
+
+/* How many coachable reads a unit actually contains, so `need` can never ask
+   for more than exists. A read is coachable if the play has one for that
+   position and that position isn't the one carrying the puck. */
+HIQ.unitSize = function (unit) {
+  let n = 0;
+  for (const id of unit.plays) {
+    const play = HIQ.PLAYS.find(p => p.id === id);
+    if (!play) continue;
+    n += Object.keys(play.reads).filter(r => r !== play.carrier).length;
+  }
+  return n;
+};
 
 /* Variation that cannot corrupt the hockey.
 
@@ -1451,6 +2224,17 @@ HIQ.varyPlay = function (play, opts = {}) {
   for (const [role, pt] of Object.entries(play.players)) {
     out.players[mirror ? (SWAP[role] || role) : role] = t(pt);
   }
+  /* Special-teams jobs are attached to positions, so mirroring has to carry
+     them across too — otherwise a mirrored power play tells the net-front
+     player he's on the far half-wall. The job's own wording is side-neutral
+     apart from "near"/"far", which flip with the ice. */
+  if (play.jobs) {
+    const flipSide = (s) => s.replace(/\b(near|far)\b/g, (m) => (m === "near" ? "far" : "near"));
+    out.jobs = {};
+    for (const [role, job] of Object.entries(play.jobs)) {
+      out.jobs[mirror ? (SWAP[role] || role) : role] = mirror ? flipSide(job) : job;
+    }
+  }
   for (const [role, r] of Object.entries(play.reads)) {
     out.reads[mirror ? (SWAP[role] || role) : role] = {
       best: t(r.best),
@@ -1473,6 +2257,9 @@ HIQ.playToPixels = function (play) {
     situation: play.situation,
     attackDir: play.attackDir,
     isDefense: !!play.isDefense,
+    forecheck: !!play.forecheck,
+    fmt: play.fmt || "5v5",
+    jobs: play.jobs || null,
     carrier: play.carrier,
     puck: p(play.puck),
     players: {},
@@ -1493,734 +2280,7 @@ HIQ.playToPixels = function (play) {
   return out;
 };
 
-/* Hockey IQ Trainer — scenario data & shared utilities
-   All coordinates are in canvas space: 1100 x 620, rink 20..1080 x 20..600. */
-window.HIQ = window.HIQ || {};
-
-HIQ.util = {
-  pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
-  clamp(v, min, max) { return Math.max(min, Math.min(max, v)); },
-  dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); },
-  toward(a, b, t) { return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }; },
-  shuffle(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-};
-
-HIQ.LANDMARKS = {
-  leftNet:   { x: 95,   y: 310 },
-  rightNet:  { x: 1005, y: 310 },
-  leftSlot:  { x: 220,  y: 310 },
-  rightSlot: { x: 880,  y: 310 },
-  center:    { x: 550,  y: 310 }
-};
-
-/* Even-strength scenario templates.
-   isDefense: true means the OPPONENTS have the puck and the player's job is coverage. */
-HIQ.TEMPLATES_EVEN = [
-  {
-    id: "breakout_left_corner_pressure",
-    phase: "Breakout",
-    pressures: ["High", "Med", "Low"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 210, y: 500 },
-    offenseFull: [
-      { role: "C",  x: 320, y: 390 },
-      { role: "LW", x: 270, y: 520 },
-      { role: "RW", x: 430, y: 200 },
-      { role: "LD", x: 190, y: 470 },
-      { role: "RD", x: 320, y: 280 },
-    ],
-    defenseFull: [
-      { role: "F1", x: 240, y: 480 },
-      { role: "F2", x: 310, y: 430 },
-      { role: "F3", x: 410, y: 320 },
-      { role: "D1", x: 410, y: 420 },
-      { role: "D2", x: 470, y: 260 },
-      { role: "G",  x: 70,  y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Breakout under pressure (puck in the corner). You are ${role}. Where should you go to help your team break out?`,
-    guidanceByRole: {
-      C:  { x: 320, y: 390, r: 90 },
-      LW: { x: 270, y: 520, r: 75 },
-      RW: { x: 430, y: 210, r: 95 },
-      LD: { x: 220, y: 450, r: 85 },
-      RD: { x: 320, y: 280, r: 95 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 70, max: 220 }, beOutlet: { preferX: "greater" } },
-      LW: { spacingFromPuck: { min: 40, max: 170 }, beOutlet: { preferX: "greater" } },
-      RW: { spacingFromPuck: { min: 120, max: 430 } },
-      LD: { spacingFromPuck: { min: 30, max: 180 } },
-      RD: { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "greater" } },
-    }
-  },
-  {
-    id: "rush_middle_lane",
-    phase: "Rush",
-    pressures: ["Low", "Med", "High"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 560, y: 310 },
-    offenseFull: [
-      { role: "C",  x: 590, y: 310 },
-      { role: "LW", x: 700, y: 430 },
-      { role: "RW", x: 700, y: 190 },
-      { role: "LD", x: 490, y: 370 },
-      { role: "RD", x: 490, y: 250 },
-    ],
-    defenseFull: [
-      { role: "D1", x: 790, y: 280 },
-      { role: "D2", x: 790, y: 340 },
-      { role: "F1", x: 640, y: 300 },
-      { role: "F2", x: 520, y: 260 },
-      { role: "F3", x: 520, y: 380 },
-      { role: "G",  x: 1040, y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Rush through the neutral zone. You are ${role}. Where should you go to be a passing option?`,
-    guidanceByRole: {
-      C:  { x: 590, y: 310, r: 85 },
-      LW: { x: 700, y: 430, r: 95 },
-      RW: { x: 700, y: 190, r: 95 },
-      LD: { x: 490, y: 370, r: 95 },
-      RD: { x: 490, y: 250, r: 95 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 20, max: 160 }, stayAbovePuck: { margin: 55, allowDeeper: true } },
-      LW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
-      RW: { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
-      LD: { spacingFromPuck: { min: 80, max: 260 } },
-      RD: { spacingFromPuck: { min: 80, max: 260 } },
-    }
-  },
-  {
-    id: "ozone_right_wall_cycle",
-    phase: "O-zone",
-    pressures: ["Low", "Med", "High"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 900, y: 410 },
-    offenseFull: [
-      { role: "C",  x: 790, y: 320 },
-      { role: "LW", x: 800, y: 190 },
-      { role: "RW", x: 910, y: 400 },
-      { role: "LD", x: 710, y: 180 },
-      { role: "RD", x: 740, y: 260 },
-    ],
-    defenseFull: [
-      { role: "F1", x: 880, y: 395 },
-      { role: "F2", x: 820, y: 360 },
-      { role: "F3", x: 760, y: 440 },
-      { role: "D1", x: 820, y: 260 },
-      { role: "D2", x: 770, y: 290 },
-      { role: "G",  x: 1040, y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — O-zone, puck on the right wall. You are ${role}. Where should you go to support the puck?`,
-    guidanceByRole: {
-      C:  { x: 790, y: 320, r: 95 },
-      LW: { x: 800, y: 200, r: 95 },
-      RW: { x: 900, y: 395, r: 70 },
-      LD: { x: 710, y: 210, r: 95 },
-      RD: { x: 745, y: 270, r: 85 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 90, max: 260 }, beOutlet: { preferX: "less" } },
-      LW: { spacingFromPuck: { min: 120, max: 320 } },
-      RW: { spacingFromPuck: { min: 5, max: 160 }, beOutlet: { preferX: "less" }, stayAbovePuck: { margin: 60, allowDeeper: true } },
-      LD: { spacingFromPuck: { min: 220, max: 540 } },
-      RD: { spacingFromPuck: { min: 180, max: 420 } },
-    }
-  },
-  {
-    id: "dzone_halfwall_defend",
-    phase: "Defend",
-    pressures: ["High", "Med", "Low"],
-    allowedFormats: ["5v5"],
-    attackDir: "left",
-    isDefense: true,
-    puck: { x: 290, y: 180 },
-    offenseFull: [
-      { role: "C",  x: 370, y: 310 },
-      { role: "LW", x: 320, y: 230 },
-      { role: "RW", x: 450, y: 270 },
-      { role: "LD", x: 240, y: 320 },
-      { role: "RD", x: 290, y: 390 },
-    ],
-    defenseFull: [
-      { role: "O1", x: 290, y: 180 },
-      { role: "O2", x: 360, y: 240 },
-      { role: "O3", x: 250, y: 410 },
-      { role: "O4", x: 420, y: 160 },
-      { role: "O5", x: 440, y: 330 },
-      { role: "G",  x: 70,  y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Defending, puck on the half-wall. You are ${role}. Protect the middle — where should you be?`,
-    guidanceByRole: {
-      C:  { x: 370, y: 310, r: 95 },
-      LW: { x: 320, y: 230, r: 75 },
-      RW: { x: 450, y: 270, r: 95 },
-      LD: { x: 240, y: 320, r: 90 },
-      RD: { x: 290, y: 390, r: 90 },
-    },
-    rulesByRole: {
-      C:  { protectSlot: { slotSide: "left", radius: 170 }, spacingFromPuck: { min: 80, max: 260 } },
-      LW: { protectSlot: { slotSide: "left", radius: 210 }, spacingFromPuck: { min: 40, max: 190 } },
-      RW: { protectSlot: { slotSide: "left", radius: 270 }, spacingFromPuck: { min: 120, max: 320 } },
-      LD: { protectSlot: { slotSide: "left", radius: 150 }, spacingFromPuck: { min: 60, max: 230 } },
-      RD: { protectSlot: { slotSide: "left", radius: 190 }, spacingFromPuck: { min: 100, max: 300 } },
-    }
-  },
-  {
-    id: "breakout_d2d_reverse",
-    phase: "Breakout",
-    pressures: ["Med", "High", "Low"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 240, y: 520 },
-    offenseFull: [
-      { role: "LD", x: 210, y: 520 },
-      { role: "RD", x: 280, y: 340 },
-      { role: "C",  x: 340, y: 400 },
-      { role: "LW", x: 290, y: 560 },
-      { role: "RW", x: 460, y: 200 },
-    ],
-    defenseFull: [
-      { role: "F1", x: 250, y: 500 },
-      { role: "F2", x: 320, y: 450 },
-      { role: "F3", x: 430, y: 340 },
-      { role: "D1", x: 420, y: 470 },
-      { role: "D2", x: 500, y: 260 },
-      { role: "G",  x: 70,  y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Breakout: D-to-D reverse look. You are ${role}. Be an outlet and protect inside ice.`,
-    guidanceByRole: {
-      C:  { x: 350, y: 410, r: 95 },
-      LW: { x: 290, y: 560, r: 75 },
-      RW: { x: 470, y: 210, r: 95 },
-      LD: { x: 240, y: 490, r: 85 },
-      RD: { x: 300, y: 340, r: 95 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 80, max: 240 }, beOutlet: { preferX: "greater" } },
-      LW: { spacingFromPuck: { min: 40, max: 180 }, beOutlet: { preferX: "greater" } },
-      RW: { spacingFromPuck: { min: 150, max: 440 } },
-      LD: { spacingFromPuck: { min: 30, max: 190 } },
-      RD: { spacingFromPuck: { min: 90, max: 270 }, beOutlet: { preferX: "greater" } },
-    }
-  },
-  {
-    id: "breakout_center_swing_low",
-    phase: "Breakout",
-    pressures: ["Low", "Med", "High"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 190, y: 310 },
-    offenseFull: [
-      { role: "LD", x: 210, y: 360 },
-      { role: "RD", x: 260, y: 270 },
-      { role: "C",  x: 300, y: 320 },
-      { role: "LW", x: 260, y: 430 },
-      { role: "RW", x: 420, y: 210 },
-    ],
-    defenseFull: [
-      { role: "F1", x: 220, y: 310 },
-      { role: "F2", x: 300, y: 290 },
-      { role: "F3", x: 380, y: 320 },
-      { role: "D1", x: 420, y: 420 },
-      { role: "D2", x: 500, y: 220 },
-      { role: "G",  x: 70,  y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Breakout: Center swings low. You are ${role}. Give an angled outlet — don't crowd the puck.`,
-    guidanceByRole: {
-      C:  { x: 310, y: 320, r: 90 },
-      LW: { x: 270, y: 430, r: 80 },
-      RW: { x: 430, y: 220, r: 90 },
-      LD: { x: 240, y: 350, r: 85 },
-      RD: { x: 290, y: 270, r: 85 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 70, max: 210 }, beOutlet: { preferX: "greater" } },
-      LW: { spacingFromPuck: { min: 90, max: 260 } },
-      RW: { spacingFromPuck: { min: 140, max: 360 } },
-      LD: { spacingFromPuck: { min: 40, max: 180 } },
-      RD: { spacingFromPuck: { min: 60, max: 220 } },
-    }
-  },
-  {
-    id: "rush_wide_drive_trailer",
-    phase: "Rush",
-    pressures: ["Low", "Med", "High"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 610, y: 420 },
-    offenseFull: [
-      { role: "LW", x: 660, y: 450 },
-      { role: "C",  x: 640, y: 320 },
-      { role: "RW", x: 660, y: 200 },
-      { role: "LD", x: 520, y: 360 },
-      { role: "RD", x: 520, y: 260 },
-    ],
-    defenseFull: [
-      { role: "D1", x: 760, y: 300 },
-      { role: "D2", x: 760, y: 360 },
-      { role: "F1", x: 650, y: 380 },
-      { role: "F2", x: 560, y: 280 },
-      { role: "F3", x: 580, y: 430 },
-      { role: "G",  x: 1040, y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Rush: wide drive with a trailer option. You are ${role}. Keep spacing and be available.`,
-    guidanceByRole: {
-      LW: { x: 680, y: 460, r: 90 },
-      C:  { x: 650, y: 330, r: 90 },
-      RW: { x: 680, y: 190, r: 90 },
-      LD: { x: 530, y: 370, r: 95 },
-      RD: { x: 530, y: 250, r: 95 },
-    },
-    rulesByRole: {
-      LW: { spacingFromPuck: { min: 40, max: 170 }, stayAbovePuck: { margin: 80, allowDeeper: true } },
-      C:  { spacingFromPuck: { min: 70, max: 260 }, beOutlet: { preferX: "greater" } },
-      RW: { spacingFromPuck: { min: 160, max: 420 } },
-      LD: { spacingFromPuck: { min: 70, max: 360 } },
-      RD: { spacingFromPuck: { min: 70, max: 360 } },
-    }
-  },
-  {
-    id: "breakout_wheel_behind_net",
-    phase: "Breakout",
-    pressures: ["Med", "High", "Low"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 70, y: 350 },
-    offenseFull: [
-      { role: "LD", x: 105, y: 380 },
-      { role: "RD", x: 170, y: 250 },
-      { role: "C",  x: 300, y: 350 },
-      { role: "LW", x: 270, y: 500 },
-      { role: "RW", x: 450, y: 180 },
-    ],
-    defenseFull: [
-      { role: "F1", x: 180, y: 420 },
-      { role: "F2", x: 280, y: 330 },
-      { role: "F3", x: 420, y: 250 },
-      { role: "D1", x: 430, y: 430 },
-      { role: "D2", x: 480, y: 180 },
-      { role: "G",  x: 70,  y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Breakout: D wheels behind the net. You are ${role}. Give a moving outlet up ice!`,
-    guidanceByRole: {
-      C:  { x: 300, y: 350, r: 90 },
-      LW: { x: 270, y: 500, r: 80 },
-      RW: { x: 450, y: 190, r: 95 },
-      LD: { x: 115, y: 385, r: 75 },
-      RD: { x: 180, y: 255, r: 85 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 90, max: 300 }, beOutlet: { preferX: "greater" } },
-      LW: { spacingFromPuck: { min: 120, max: 330 }, beOutlet: { preferX: "greater" } },
-      RW: { spacingFromPuck: { min: 200, max: 500 } },
-      LD: { spacingFromPuck: { min: 25, max: 160 } },
-      RD: { spacingFromPuck: { min: 80, max: 250 }, beOutlet: { preferX: "greater" } },
-    }
-  },
-  {
-    id: "nzone_regroup_d2d",
-    phase: "Rush",
-    pressures: ["Low", "Med", "High"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 470, y: 250 },
-    offenseFull: [
-      { role: "RD", x: 480, y: 255 },
-      { role: "LD", x: 470, y: 380 },
-      { role: "C",  x: 560, y: 315 },
-      { role: "LW", x: 700, y: 440 },
-      { role: "RW", x: 700, y: 185 },
-    ],
-    defenseFull: [
-      { role: "F1", x: 600, y: 310 },
-      { role: "F2", x: 680, y: 240 },
-      { role: "F3", x: 680, y: 390 },
-      { role: "D1", x: 820, y: 260 },
-      { role: "D2", x: 820, y: 360 },
-      { role: "G",  x: 1040, y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Neutral-zone regroup. You are ${role}. Reset with speed — give the D a target!`,
-    guidanceByRole: {
-      C:  { x: 560, y: 315, r: 85 },
-      LW: { x: 700, y: 440, r: 90 },
-      RW: { x: 700, y: 185, r: 90 },
-      LD: { x: 470, y: 380, r: 85 },
-      RD: { x: 480, y: 255, r: 75 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 60, max: 220 } },
-      LW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
-      RW: { spacingFromPuck: { min: 150, max: 380 }, beOutlet: { preferX: "greater" }, stayAbovePuck: { margin: 70, allowDeeper: true } },
-      LD: { spacingFromPuck: { min: 60, max: 200 } },
-      RD: { spacingFromPuck: { min: 0, max: 140 } },
-    }
-  },
-  {
-    id: "ozone_faceoff_right_dot",
-    phase: "O-zone",
-    pressures: ["Low", "Med"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 878, y: 450 },
-    offenseFull: [
-      { role: "C",  x: 862, y: 455 },
-      { role: "LW", x: 830, y: 400 },
-      { role: "RW", x: 845, y: 505 },
-      { role: "LD", x: 760, y: 250 },
-      { role: "RD", x: 760, y: 420 },
-    ],
-    defenseFull: [
-      { role: "O1", x: 892, y: 455 },
-      { role: "O2", x: 905, y: 405 },
-      { role: "O3", x: 905, y: 505 },
-      { role: "D1", x: 930, y: 380 },
-      { role: "D2", x: 950, y: 510 },
-      { role: "G",  x: 1040, y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — O-zone faceoff, right dot. You are ${role}. Line up ready for the win back!`,
-    guidanceByRole: {
-      C:  { x: 862, y: 455, r: 65 },
-      LW: { x: 830, y: 400, r: 75 },
-      RW: { x: 845, y: 505, r: 75 },
-      LD: { x: 760, y: 250, r: 95 },
-      RD: { x: 760, y: 420, r: 90 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 10, max: 90 } },
-      LW: { spacingFromPuck: { min: 40, max: 180 } },
-      RW: { spacingFromPuck: { min: 30, max: 160 } },
-      LD: { spacingFromPuck: { min: 180, max: 420 } },
-      RD: { spacingFromPuck: { min: 120, max: 340 } },
-    }
-  },
-  {
-    id: "dzone_net_front_battle",
-    phase: "Defend",
-    pressures: ["High", "Med"],
-    allowedFormats: ["5v5"],
-    attackDir: "left",
-    isDefense: true,
-    puck: { x: 120, y: 480 },
-    offenseFull: [
-      { role: "C",  x: 260, y: 400 },
-      { role: "LW", x: 390, y: 220 },
-      { role: "RW", x: 390, y: 440 },
-      { role: "LD", x: 150, y: 340 },
-      { role: "RD", x: 190, y: 460 },
-    ],
-    defenseFull: [
-      { role: "O1", x: 120, y: 480 },
-      { role: "O2", x: 200, y: 540 },
-      { role: "O3", x: 250, y: 330 },
-      { role: "O4", x: 420, y: 420 },
-      { role: "O5", x: 420, y: 200 },
-      { role: "G",  x: 70,  y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — Defending: puck in your corner, battle at the net-front. You are ${role}. Box out and protect the house!`,
-    guidanceByRole: {
-      C:  { x: 260, y: 400, r: 90 },
-      LW: { x: 390, y: 220, r: 90 },
-      RW: { x: 390, y: 440, r: 90 },
-      LD: { x: 150, y: 340, r: 75 },
-      RD: { x: 190, y: 460, r: 80 },
-    },
-    rulesByRole: {
-      C:  { protectSlot: { slotSide: "left", radius: 190 }, spacingFromPuck: { min: 90, max: 280 } },
-      LW: { protectSlot: { slotSide: "left", radius: 260 }, spacingFromPuck: { min: 200, max: 450 } },
-      RW: { protectSlot: { slotSide: "left", radius: 240 }, spacingFromPuck: { min: 150, max: 400 } },
-      LD: { protectSlot: { slotSide: "left", radius: 120 }, spacingFromPuck: { min: 60, max: 220 } },
-      RD: { protectSlot: { slotSide: "left", radius: 170 }, spacingFromPuck: { min: 40, max: 180 } },
-    }
-  },
-  {
-    id: "ozone_low_to_high_point",
-    phase: "O-zone",
-    pressures: ["Low", "Med", "High"],
-    allowedFormats: ["5v5"],
-    attackDir: "right",
-    puck: { x: 930, y: 520 },
-    offenseFull: [
-      { role: "RW", x: 930, y: 500 },
-      { role: "C",  x: 820, y: 360 },
-      { role: "LW", x: 820, y: 190 },
-      { role: "LD", x: 760, y: 200 },
-      { role: "RD", x: 760, y: 420 },
-    ],
-    defenseFull: [
-      { role: "D1", x: 900, y: 410 },
-      { role: "D2", x: 880, y: 300 },
-      { role: "F1", x: 820, y: 440 },
-      { role: "F2", x: 820, y: 260 },
-      { role: "F3", x: 780, y: 320 },
-      { role: "G",  x: 1040, y: 310 },
-    ],
-    prompt: (role, fmt) => `${fmt} — O-zone: low-to-high cycle. You are ${role}. Create shot support and protect against the turnover.`,
-    guidanceByRole: {
-      C:  { x: 820, y: 350, r: 95 },
-      LW: { x: 820, y: 200, r: 95 },
-      RW: { x: 920, y: 490, r: 75 },
-      LD: { x: 760, y: 220, r: 95 },
-      RD: { x: 760, y: 410, r: 95 },
-    },
-    rulesByRole: {
-      C:  { spacingFromPuck: { min: 120, max: 320 }, beOutlet: { preferX: "less" } },
-      LW: { spacingFromPuck: { min: 200, max: 520 } },
-      RW: { spacingFromPuck: { min: 30, max: 180 }, beOutlet: { preferX: "less" } },
-      LD: { spacingFromPuck: { min: 220, max: 540 } },
-      RD: { spacingFromPuck: { min: 170, max: 540 } },
-    }
-  }
-];
-
-/* --- Special teams structures --- */
-HIQ.ppPositions = function (structure) {
-  if (structure === "one3one") {
-    return [
-      { role: "LD", x: 740, y: 310 },
-      { role: "LW", x: 860, y: 200 },
-      { role: "RW", x: 860, y: 420 },
-      { role: "C",  x: 880, y: 310 },
-      { role: "RD", x: 980, y: 310 },
-    ];
-  }
-  return [
-    { role: "LD", x: 720, y: 200 },
-    { role: "RD", x: 720, y: 420 },
-    { role: "LW", x: 860, y: 200 },
-    { role: "RW", x: 860, y: 420 },
-    { role: "C",  x: 860, y: 310 },
-  ];
-};
-
-// A penalty kill is four skaters — no phantom fifth spot.
-HIQ.pkPositions = function (structure) {
-  if (structure === "diamond") {
-    return [
-      { role: "C",  x: 840, y: 310 }, // top of the diamond, pressures the point
-      { role: "LW", x: 900, y: 240 }, // strong-side flank
-      { role: "RW", x: 900, y: 380 }, // weak-side flank
-      { role: "LD", x: 960, y: 310 }, // net-front
-    ];
-  }
-  return [
-    { role: "C",  x: 900, y: 260 },
-    { role: "LW", x: 900, y: 360 },
-    { role: "LD", x: 960, y: 260 },
-    { role: "RD", x: 960, y: 360 },
-  ];
-};
-
-/* Build the coaching spots FROM the structure actually selected, shifted toward
-   the puck. Special teams units rotate as the puck moves — a static answer would
-   teach kids to stand still, which is exactly the habit we're trying to break. */
-HIQ.deriveGuidance = function (positions, puck, shift, radius) {
-  const out = {};
-  for (const p of positions) {
-    out[p.role] = {
-      x: Math.round(p.x + (puck.x - p.x) * shift),
-      y: Math.round(p.y + (puck.y - p.y) * shift),
-      r: radius
-    };
-  }
-  return out;
-};
-
-/* Turn one template into an effectively unlimited supply of distinct reads.
-
-   A fixed template teaches a kid to memorise a picture: "breakout means stand
-   there." Real hockey IQ is reading what is actually in front of you, so every
-   play mirrors the ice, nudges the puck, and moves the support spots and the
-   opposition in response. The coaching answer changes every single time. */
-HIQ.varyScenario = function (tpl, opts) {
-  const clamp = HIQ.util.clamp;
-  const rnd = (a, b) => a + Math.random() * (b - a);
-  const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
-
-  const out = Object.assign({}, tpl);
-  out.puck = { ...tpl.puck };
-  out.offenseFull = tpl.offenseFull.map(p => ({ ...p }));
-  out.defenseFull = tpl.defenseFull.map(p => ({ ...p }));
-  out.guidanceByRole = {};
-  for (const [role, g] of Object.entries(tpl.guidanceByRole || {})) out.guidanceByRole[role] = { ...g };
-  out.rulesByRole = Object.assign({}, tpl.rulesByRole);
-
-  // 1. Run the same play off the other side of the ice. Mirroring across centre
-  //    ice leaves the slot where it is, so only the wings and D swap hands.
-  if (opts.mirror) {
-    const flip = p => ({ ...p, y: 620 - p.y });
-    out.puck = flip(out.puck);
-    out.offenseFull = out.offenseFull.map(p => ({ ...flip(p), role: SWAP[p.role] || p.role }));
-    out.defenseFull = out.defenseFull.map(flip);
-    const g = {}, r = {};
-    for (const [role, v] of Object.entries(out.guidanceByRole)) g[SWAP[role] || role] = { ...v, y: 620 - v.y };
-    for (const [role, v] of Object.entries(out.rulesByRole)) r[SWAP[role] || role] = v;
-    out.guidanceByRole = g;
-    out.rulesByRole = r;
-    out.mirrored = true;
-  }
-
-  // 2. Move the puck, and move every support spot in response. Players close to
-  //    the puck adjust most; the far-side D barely shifts at all.
-  const jitter = opts.jitter ?? 45;
-  const px = clamp(out.puck.x + rnd(-jitter, jitter), 70, 1030);
-  const py = clamp(out.puck.y + rnd(-jitter, jitter), 70, 550);
-  const dx = px - out.puck.x, dy = py - out.puck.y;
-  out.puck = { x: Math.round(px), y: Math.round(py) };
-
-  // Whoever had the puck keeps it: they move with it exactly, or possession
-  // visibly drifts apart and you can no longer tell who is carrying.
-  let carrierRole = null, carrierDist = Infinity;
-  for (const [role, g] of Object.entries(out.guidanceByRole)) {
-    const d = Math.hypot(g.x - (px - dx), g.y - (py - dy));
-    if (d < carrierDist) { carrierDist = d; carrierRole = role; }
-  }
-  if (carrierDist > 60) carrierRole = null; // nobody had it to begin with
-
-  for (const [role, g] of Object.entries(out.guidanceByRole)) {
-    const d = Math.hypot(g.x - px, g.y - py);
-    const respond = role === carrierRole ? 1 : (d < 150 ? 0.7 : d < 300 ? 0.45 : 0.2);
-    g.x = Math.round(clamp(g.x + dx * respond, 60, 1040));
-    g.y = Math.round(clamp(g.y + dy * respond, 60, 560));
-  }
-
-  // Teammates stand where the coaching spots now are, so the picture stays honest.
-  out.offenseFull = out.offenseFull.map(p => {
-    const g = out.guidanceByRole[p.role];
-    return g ? { ...p, x: g.x, y: g.y } : p;
-  });
-
-  // The rule bands were written for the template's fixed picture. Now that the
-  // puck moves, give them the same slack so a correct read never falls outside
-  // its own rule.
-  const slack = Math.ceil(jitter * 0.9);
-  const widened = {};
-  for (const [role, r] of Object.entries(out.rulesByRole)) {
-    const copy = { ...r };
-    if (r.spacingFromPuck) {
-      copy.spacingFromPuck = {
-        min: Math.max(0, r.spacingFromPuck.min - slack),
-        max: r.spacingFromPuck.max + slack
-      };
-    }
-    if (r.protectSlot) copy.protectSlot = { ...r.protectSlot, radius: r.protectSlot.radius + slack };
-    widened[role] = copy;
-  }
-  out.rulesByRole = widened;
-
-  // 3. Pressure stops being a label and starts being real: under high pressure
-  //    the opposition collapses on the puck, under low pressure they sag off.
-  const press = { Low: -0.12, Med: 0, High: 0.14 }[opts.pressure] || 0;
-  out.defenseFull = out.defenseFull.map(p => {
-    if (p.role === "G") return p;
-    const bx = p.x + dx * 0.5, by = p.y + dy * 0.5;
-    return {
-      ...p,
-      x: Math.round(clamp(bx + (px - bx) * press + rnd(-13, 13), 55, 1045)),
-      y: Math.round(clamp(by + (py - by) * press + rnd(-13, 13), 55, 565))
-    };
-  });
-
-  return out;
-};
-
-HIQ.buildSpecialTeamsScenario = function (fmt, ppStruct, pkStruct) {
-  const pick = HIQ.util.pick;
-  const puckSpots = [
-    { x: 860, y: 200, label: "half wall" },
-    { x: 740, y: 310, label: "point" },
-    { x: 860, y: 420, label: "half wall" },
-    { x: 980, y: 310, label: "net-front" },
-    { x: 910, y: 520, label: "goal line" }
-  ];
-  const puckSpot = pick(puckSpots);
-
-  if (fmt === "5v4") {
-    const off = HIQ.ppPositions(ppStruct);
-    const def = (pkStruct === "diamond")
-      ? [
-          { role: "PK1", x: 900, y: 250 },
-          { role: "PK2", x: 900, y: 370 },
-          { role: "PK3", x: 960, y: 310 },
-          { role: "PK4", x: 840, y: 310 },
-          { role: "G",   x: 1040, y: 310 }
-        ]
-      : [
-          { role: "PK1", x: 900, y: 260 },
-          { role: "PK2", x: 900, y: 360 },
-          { role: "PK3", x: 960, y: 260 },
-          { role: "PK4", x: 960, y: 360 },
-          { role: "G",   x: 1040, y: 310 }
-        ];
-
-    return {
-      id: `PP_${ppStruct}_${pkStruct}_${puckSpot.label}`,
-      phase: "Special",
-      pressures: ["Low", "Med", "High"],
-      allowedFormats: ["5v4"],
-      attackDir: "right",
-      puck: { x: puckSpot.x, y: puckSpot.y },
-      offenseFull: off,
-      defenseFull: def,
-      prompt: (role, fmt2) => `${fmt2} — Power Play (${ppStruct === "one3one" ? "1-3-1" : "Umbrella"}). Puck at the ${puckSpot.label}. You are ${role}. Hold your spot and stay open!`,
-      // Shift gently toward the puck: on the PP you stay in your lane but present
-      // yourself as an option.
-      guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.14, 100),
-      // On a power play any of these five can be the one holding the puck, so a
-      // minimum spacing would punish the puck carrier for standing on the puck.
-      // Holding the shape is what matters, and the positional score covers that.
-      rulesByRole: {
-        LW: { spacingFromPuck: { min: 0, max: 500 } },
-        C:  { spacingFromPuck: { min: 0, max: 500 } },
-        RW: { spacingFromPuck: { min: 0, max: 500 } },
-        LD: { spacingFromPuck: { min: 0, max: 560 } },
-        RD: { spacingFromPuck: { min: 0, max: 560 } },
-      }
-    };
-  }
-
-  if (fmt === "4v5") {
-    const off = HIQ.pkPositions(pkStruct);
-    const oppPP = HIQ.ppPositions(ppStruct);
-    const def = oppPP.map(p => ({ role: `PP-${p.role}`, x: p.x, y: p.y }))
-      .concat([{ role: "G", x: 1040, y: 310 }]);
-
-    return {
-      id: `PK_${pkStruct}_${ppStruct}_${puckSpot.label}`,
-      phase: "Special",
-      pressures: ["Low", "Med", "High"],
-      allowedFormats: ["4v5"],
-      attackDir: "right",
-      isDefense: true,
-      puck: { x: puckSpot.x, y: puckSpot.y },
-      offenseFull: off,
-      defenseFull: def,
-      prompt: (role, fmt2) => `${fmt2} — Penalty Kill (${pkStruct}). Puck at the ${puckSpot.label}. You are ${role}. Rotate with the puck and protect the middle!`,
-      // The box/diamond rotates toward the puck as the power play moves it around.
-      guidanceByRole: HIQ.deriveGuidance(off, puckSpot, 0.20, 105),
-      rulesByRole: {
-        C:  { protectSlot: { slotSide: "right", radius: 230 } },
-        LW: { protectSlot: { slotSide: "right", radius: 230 } },
-        RW: { protectSlot: { slotSide: "right", radius: 230 } },
-        LD: { protectSlot: { slotSide: "right", radius: 230 } },
-        RD: { protectSlot: { slotSide: "right", radius: 230 } },
-      }
-    };
-  }
-
-  return null;
-};
-
+/* ---- js/audio.js ---- */
 /* Hockey IQ Trainer — synthesized sound effects (no audio files needed). */
 window.HIQ = window.HIQ || {};
 
@@ -2306,6 +2366,7 @@ HIQ.audio = (() => {
   };
 })();
 
+/* ---- js/sim.js ---- */
 /* Hockey IQ Trainer — play simulation runner.
    Runs a sequential list of steps; each step tweens pieces toward targets over its duration.
    Step: { d: ms, movers: [{obj, to:{x,y}}], sound, msg, banner: {…}|null, fx: {…}, shake: n }
@@ -2366,6 +2427,7 @@ HIQ.Sim = (() => {
   return { run, cancel, isRunning: () => running };
 })();
 
+/* ---- js/app.js ---- */
 /* Hockey IQ Trainer — main application: scenario building, scoring, rendering, input, and outcomes. */
 (() => {
   // Never fail silently: surface any runtime error where the player can see it.
@@ -2375,11 +2437,52 @@ HIQ.Sim = (() => {
   });
 
   const { pick, clamp, dist, toward, shuffle } = HIQ.util;
-  const LM = HIQ.LANDMARKS;
 
   // --- DOM
   const canvas = document.getElementById("rink");
   const ctx = canvas.getContext("2d");
+
+  /* Render resolution, separated from the coordinate system.
+
+     Everything in this file draws in a fixed LOGICAL space the size of the
+     regulation sheet at 5.5 px/ft — 1152 x 520 — and that never changes, so
+     no positioning code has to care about any of what follows.
+
+     What does change is how many real pixels that logical space is rasterised
+     into. Measured on a phone-class CPU, this scene is fill-rate bound, not
+     draw-call bound: cutting the number of drawing commands by 77% barely
+     moved the frame time, while shrinking the pixel buffer to a quarter took a
+     six-times-throttled device from 30fps to a steady 60. The cost is pixels.
+
+     A phone was being asked for the full 599,000 of them because the canvas
+     element had a fixed size, which on a 390px-wide phone is about three
+     device pixels for every CSS pixel — far more detail than anyone can see,
+     paid for in dropped frames. So the buffer is sized from what the display
+     can actually show, and then adapted down if the device still can't keep
+     up. Dropping resolution is always preferred over dropping frames: 60fps
+     slightly softer reads much better than 30fps sharp. */
+  const LOGICAL_W = HIQ.VIEW.width;
+  const LOGICAL_H = HIQ.VIEW.height;
+  let renderScale = 0;
+
+  function applyRenderScale(q) {
+    q = clamp(q, 0.5, 1);
+    if (Math.abs(q - renderScale) < 0.02) return false;
+    renderScale = q;
+    canvas.width = Math.round(LOGICAL_W * q);
+    canvas.height = Math.round(LOGICAL_H * q);
+    return true;
+  }
+
+  /* The most resolution worth rendering: whatever the element is actually
+     displayed at, in real device pixels, capped at the logical size. Rendering
+     beyond this is invisible by definition. */
+  function displayJustifiedScale() {
+    const shown = canvas.getBoundingClientRect().width;
+    if (!shown) return 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    return clamp((shown * dpr) / LOGICAL_W, 0.5, 1);
+  }
 
   const ageSel = document.getElementById("age");
   const formatSel = document.getElementById("format");
@@ -2389,12 +2492,11 @@ HIQ.Sim = (() => {
   const answerSel = document.getElementById("answerStyle");
 
   const phaseFilterSel = document.getElementById("phaseFilter");
-  const pressureFilterSel = document.getElementById("pressureFilter");
-  const ppStructSel = document.getElementById("ppStruct");
-  const pkStructSel = document.getElementById("pkStruct");
-  const ppStructWrap = document.getElementById("ppStructWrap");
-  const pkStructWrap = document.getElementById("pkStructWrap");
   const overlaySel = document.getElementById("overlay");
+  const planSel = document.getElementById("plan");
+  const planBarEl = document.getElementById("planBar");
+  const phaseFilterWrap = document.getElementById("phaseFilterWrap");
+  const formatWrap = document.getElementById("formatWrap");
 
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
@@ -2402,8 +2504,6 @@ HIQ.Sim = (() => {
 
   const streakEl = document.getElementById("streak");
   const phaseEl = document.getElementById("phase");
-  const pressureEl = document.getElementById("pressure");
-  const structureEl = document.getElementById("structure");
   const scoreEl = document.getElementById("score");
   const gfEl = document.getElementById("gf");
   const gaEl = document.getElementById("ga");
@@ -2692,28 +2792,65 @@ HIQ.Sim = (() => {
     return { score: g.score, failures: g.tier === "best" ? [] : [{ key: g.tier, msg: g.why, pts: 100 - g.score }], allFailures: [], grade: g };
   }
 
+  /* Which plays belong to a format.
+
+     Special teams used to be excluded here, because the versions that existed
+     taught a hardcoded shape regardless of what had been selected. They are
+     authored on the same model as everything else now — one scenario per
+     strength — so a play simply declares the strength it belongs to, and
+     anything that says nothing is even strength. */
   function getCandidateTemplates(fmt) {
-    // Special teams have not been re-authored on the new model yet, so the
-    // even-strength set is used for every format rather than shipping
-    // positions we can no longer vouch for.
-    return HIQ.PLAYS.slice();
+    const want = fmt || "5v5";
+    return HIQ.PLAYS.filter(p => (p.fmt || "5v5") === want);
   }
 
-  function applyFormat(offenseFull, defenseFull, fmt) {
-    const off = offenseFull.map(p => ({ ...p }));
-    const def = defenseFull.map(p => ({ ...p }));
-    const defSkaters = def.filter(p => p.role !== "G");
-    const defGoalies = def.filter(p => p.role === "G");
+  /* --- The season plan -------------------------------------------------
 
-    if (fmt === "5v4") return { off: off.slice(0, 5), def: defSkaters.slice(0, 4).concat(defGoalies) };
-    if (fmt === "4v5") return { off: off.slice(0, 4), def: defSkaters.slice(0, 5).concat(defGoalies) };
-    return { off: off.slice(0, 5), def: defSkaters.slice(0, 5).concat(defGoalies) };
+     Free play serves any scenario the filters allow, which is the right thing
+     for someone who already knows the game. A child learning it needs the
+     order coaches actually use, so the plan walks the units in HIQ.CURRICULUM
+     and only opens the next one when the current one's reads are landing.
+
+     Progress is a set of "play/position" keys answered with the best read, so
+     repeating the one situation you find easy doesn't advance anything. */
+  const planProgress = loadStore("hiq_plan", { unit: 0, done: {} });
+
+  function planOn() { return planSel && planSel.value === "season"; }
+  function unitIndex() { return clamp(planProgress.unit | 0, 0, HIQ.CURRICULUM.length - 1); }
+  function currentUnit() { return HIQ.CURRICULUM[unitIndex()]; }
+  function unitNeed(unit) { return Math.min(unit.need, HIQ.unitSize(unit)); }
+  function unitDoneKeys(unit) { return planProgress.done[unit.id] || []; }
+
+  function recordPlanWin(unit, playId, role) {
+    /* Only a read from this unit counts toward it. Without this, a scenario
+       from anywhere else — the unit that just closed, or one played in free
+       play — lands in the current unit's tally and can open the next unit
+       before the player has seen any of it. */
+    if (!unit.plays.includes(playId)) return false;
+    const key = `${playId}/${role}`;
+    const keys = unitDoneKeys(unit);
+    if (keys.includes(key)) return false;
+    keys.push(key);
+    planProgress.done[unit.id] = keys;
+    const finished = keys.length >= unitNeed(unit) && unitIndex() < HIQ.CURRICULUM.length - 1;
+    if (finished) planProgress.unit = unitIndex() + 1;
+    saveStore("hiq_plan", planProgress);
+    return finished;
   }
 
-  function structureLabel(fmt) {
-    if (fmt === "5v4") return `PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"} vs PK ${pkStructSel.value}`;
-    if (fmt === "4v5") return `PK ${pkStructSel.value} vs PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"}`;
-    return "—";
+  function renderPlanBar() {
+    if (!planBarEl) return;
+    if (!planOn()) { planBarEl.style.display = "none"; return; }
+    planBarEl.style.display = "";
+    const unit = currentUnit();
+    const need = unitNeed(unit);
+    const got = Math.min(unitDoneKeys(unit).length, need);
+    const last = unitIndex() === HIQ.CURRICULUM.length - 1;
+    planBarEl.innerHTML =
+      `<b>Unit ${unitIndex() + 1} of ${HIQ.CURRICULUM.length} — ${unit.name}</b>` +
+      `<span class="planGoal">${unit.goal}</span>` +
+      `<span class="planCount">${got} / ${need} reads learned${last && got >= need ? " — plan complete" : ""}</span>` +
+      `<span class="planTrack"><i style="width:${need ? Math.round((got / need) * 100) : 0}%"></i></span>`;
   }
 
   function isChoiceMode() {
@@ -2740,14 +2877,24 @@ HIQ.Sim = (() => {
     const role = roleSel.value;
     const diff = diffSel.value;
 
-    const isSpecial = (fmt === "5v4" || fmt === "4v5");
-    ppStructWrap.style.display = isSpecial ? "" : "none";
-    pkStructWrap.style.display = isSpecial ? "" : "none";
+    /* In plan mode the unit decides what you see — including the strength, so
+       the season can put you on the power play without asking you to go and
+       find the setting. The format and phase pickers are hidden rather than
+       silently ignored. */
+    const onPlan = planOn();
+    if (formatWrap) formatWrap.style.display = onPlan ? "none" : "";
+    if (phaseFilterWrap) phaseFilterWrap.style.display = onPlan ? "none" : "";
 
-    let candidates = getCandidateTemplates(fmt);
-    const phaseFilter = phaseFilterSel.value;
-    candidates = candidates.filter(t => phaseFilter === "any" || t.phase === phaseFilter);
-    if (!candidates.length) candidates = getCandidateTemplates(fmt);
+    let candidates;
+    if (onPlan) {
+      const unit = currentUnit();
+      candidates = HIQ.PLAYS.filter(p => unit.plays.includes(p.id));
+    } else {
+      candidates = getCandidateTemplates(fmt);
+      const phaseFilter = phaseFilterSel.value;
+      const filtered = candidates.filter(t => phaseFilter === "any" || t.phase === phaseFilter);
+      if (filtered.length) candidates = filtered;
+    }
     if (!candidates.length) { statusEl.textContent = "No scenarios available for those filters."; return; }
 
     /* Pick a play the chosen position actually has a coached read for, and never
@@ -2794,16 +2941,28 @@ HIQ.Sim = (() => {
       phase: play.phase,
       name: play.name,
       situation: play.situation,
-      pressure: play.pressure || "Med",
-      fmt, mode, diff,
+      // The strength comes from the play, not the picker: in plan mode the
+      // unit chooses it, and the scoreboard should say what's actually on ice.
+      fmt: play.fmt || "5v5",
+      mode, diff,
       role: playRole,
+      // On special teams the job matters more than the badge on your jersey.
+      job: (play.jobs && play.jobs[playRole]) || null,
       attackDir: play.attackDir,
+      // Which side of the ice this run of the play is on. Carried so coverage
+      // can be measured by the scenario actually served rather than inferred
+      // from where a marker landed on screen.
+      mirrored: !!play.mirrored,
       isDefense: !!play.isDefense,
       forecheck: !!play.forecheck,
       carrier: play.carrier,
       reads: px.reads,
-      prompt: `${play.name} — you are ${playRole}. ${play.situation}`,
+      prompt: "",
     };
+    /* Naming the job is the whole point of the special-teams vocabulary: a kid
+       who knows what "the bumper" means can follow a coach at a whiteboard. */
+    const who = scenario.job ? `you are ${playRole} — ${scenario.job}` : `you are ${playRole}`;
+    scenario.prompt = `${play.name} — ${who}. ${play.situation}`;
     if (playRole !== role) {
       scenario.roleNote = `This play doesn't use ${role} — you're playing ${playRole}.`;
     }
@@ -2857,9 +3016,8 @@ HIQ.Sim = (() => {
     camera.ready = false;
 
     // UI
+    renderPlanBar();
     phaseEl.textContent = scenario.phase;
-    pressureEl.textContent = scenario.pressure;
-    structureEl.textContent = scenario.name;
     promptEl.textContent = scenario.prompt;
     scoreEl.textContent = "—";
     lockBtn.style.display = choice.active ? "none" : "";
@@ -2874,7 +3032,8 @@ HIQ.Sim = (() => {
       const best = scenario.reads[scenario.role] && scenario.reads[scenario.role].best;
       const pr = best && HIQ.PRINCIPLES[best.principle];
       if (pr) promptEl.innerHTML =
-        `<span class="principle">\uD83D\uDCA1 ${pr.name}</span><br/>${pr.kid} You are ${scenario.role}.`;
+        `<span class="principle">\uD83D\uDCA1 ${pr.name}</span><br/>${pr.kid} You are ${scenario.role}` +
+        `${scenario.job ? " \u2014 " + scenario.job : ""}.`;
     }
 
     const showHints = (diffSel.value === "easy" || youngest);
@@ -2915,9 +3074,19 @@ HIQ.Sim = (() => {
     }
     const pinned = (carrier && best < 80) ? carrier : null;
 
+    /* Keep a nudged player on the ice, measured from the rink itself.
+
+       These bounds were hardcoded for a canvas the game stopped using: the
+       vertical limit was 562 on a sheet whose boards end at 493 and a buffer
+       only 520 tall, so a player shoved for clarity could be pushed past the
+       boards and straight off the bottom of the picture. The horizontal
+       limits were lopsided for the same reason. */
+    const INSET = 32; // a player plus the name chip under them
+    const minX = V.x(0) + INSET, maxX = V.x(RK.length) - INSET;
+    const minY = V.y(0) + INSET, maxY = V.y(RK.width) - INSET;
     const nudge = (p, ux, uy, amount) => {
-      p.x = clamp(p.x + ux * amount, 58, 1042);
-      p.y = clamp(p.y + uy * amount, 58, 562);
+      p.x = clamp(p.x + ux * amount, minX, maxX);
+      p.y = clamp(p.y + uy * amount, minY, maxY);
     };
 
     for (let iter = 0; iter < 40; iter++) {
@@ -3014,12 +3183,19 @@ HIQ.Sim = (() => {
   function cameraTarget() {
     const pts = [];
     const add = p => { if (p && isFinite(p.x) && isFinite(p.y)) pts.push(p); };
-    offense.forEach(add);
+    /* Goalies do not frame the shot. Ours was being included, and on anything
+       happening in the attacking end he stands two hundred feet away from it —
+       so the camera stretched to hold both and the play it was supposed to be
+       showing shrank into a third of the screen. On plays in our own end the
+       skaters are around our net anyway, so it stays in frame regardless. */
+    offense.forEach(p => { if (p.role !== "G") add(p); });
     defense.forEach(p => { if (p.role !== "G") add(p); });
     if (!choice.active) controlled.forEach(add); // hidden while choosing
     add(puck);
     if (choice.active) choice.options.forEach(o => add(o.pos));
-    if (!pts.length) return { x: 550, y: 310, scale: 1 };
+    // Centre of the sheet. Was hardcoded to the middle of a canvas size the
+    // game stopped using when the ice moved to regulation feet.
+    if (!pts.length) return { x: LOGICAL_W / 2, y: LOGICAL_H / 2, scale: 1 };
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const p of pts) {
@@ -3029,16 +3205,22 @@ HIQ.Sim = (() => {
       if (p.y > maxY) maxY = p.y;
     }
 
-    const pad = 95; // breathing room so nothing sits against the edge
+    /* Breathing room so nothing sits against the edge. This was 95px — about
+       17 feet of ice on every side — which on a play confined to one end was
+       enough to stop the camera zooming in at all: the padding alone exceeded
+       the screen, the scale pinned to its 1.0 floor, and the whole sheet was
+       shown with the action squeezed into a quarter of it. 62px still clears a
+       player, their name chip and an A/B/C marker. */
+    const pad = 62;
     const scale = clamp(
-      Math.min(canvas.width / ((maxX - minX) + pad * 2), canvas.height / ((maxY - minY) + pad * 2)),
+      Math.min(LOGICAL_W / ((maxX - minX) + pad * 2), LOGICAL_H / ((maxY - minY) + pad * 2)),
       1, 2.1
     );
     // Centre on the action, but never pan past the boards.
-    const halfW = canvas.width / (2 * scale), halfH = canvas.height / (2 * scale);
+    const halfW = LOGICAL_W / (2 * scale), halfH = LOGICAL_H / (2 * scale);
     return {
-      x: clamp((minX + maxX) / 2, halfW, canvas.width - halfW),
-      y: clamp((minY + maxY) / 2, halfH, canvas.height - halfH),
+      x: clamp((minX + maxX) / 2, halfW, LOGICAL_W - halfW),
+      y: clamp((minY + maxY) / 2, halfH, LOGICAL_H - halfH),
       scale
     };
   }
@@ -3058,15 +3240,15 @@ HIQ.Sim = (() => {
   }
 
   function applyCamera() {
-    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.translate(LOGICAL_W / 2, LOGICAL_H / 2);
     ctx.scale(camera.scale, camera.scale);
     ctx.translate(-camera.x, -camera.y);
   }
 
   function screenToWorld(x, y) {
     return {
-      x: (x - canvas.width / 2) / camera.scale + camera.x,
-      y: (y - canvas.height / 2) / camera.scale + camera.y
+      x: (x - LOGICAL_W / 2) / camera.scale + camera.x,
+      y: (y - LOGICAL_H / 2) / camera.scale + camera.y
     };
   }
 
@@ -3565,6 +3747,16 @@ HIQ.Sim = (() => {
     checkBadges({ comeback: wasComeback });
     saveStore("hiq_stats", stats);
 
+    /* Season plan: only the best read counts, and only once per position in a
+       situation. Partial credit is honest feedback but it isn't yet learned,
+       and repeating the one read you find easy shouldn't open the next unit. */
+    if (planOn() && grade === "best") {
+      const unit = currentUnit();
+      const advanced = recordPlanWin(unit, scenario.id, scenario.role);
+      renderPlanBar();
+      if (advanced) toast("🏒", `Unit complete — ${unit.name}`, `Next up: ${currentUnit().name}`);
+    }
+
     addReportEntry({
       time: nowTime(), fmt: scenario.fmt, phase: scenario.phase,
       mode, role: reportRole, ok, score,
@@ -3885,8 +4077,8 @@ HIQ.Sim = (() => {
 
   // --- Static rink pre-rendered once to an offscreen layer
   const rinkLayer = document.createElement("canvas");
-  rinkLayer.width = canvas.width;
-  rinkLayer.height = canvas.height;
+  rinkLayer.width = LOGICAL_W;
+  rinkLayer.height = LOGICAL_H;
 
   function roundRectPath(c, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
@@ -3902,7 +4094,7 @@ HIQ.Sim = (() => {
   function buildRinkLayer() {
     const R = HIQ.RINK, V = HIQ.VIEW;
     const c = rinkLayer.getContext("2d");
-    c.clearRect(0, 0, canvas.width, canvas.height);
+    c.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
     const X = (ft) => V.x(ft), Y = (ft) => V.y(ft), S = (ft) => V.px(ft);
     const boardsX = X(0), boardsY = Y(0);
@@ -4049,155 +4241,274 @@ HIQ.Sim = (() => {
     oppGoalie: { jersey: "#a11d1d", trim: "#4a0d0d", helmet: "#380808" }
   };
 
-  function drawRoleChip(p, style, t) {
+  /* Name and position chips, pre-rendered.
+
+     These were being rebuilt from scratch every single frame: a measureText, a
+     nine-call rounded rectangle and a fillText for each of twelve players —
+     roughly ninety canvas operations a frame, to draw text that changes maybe
+     once a minute. Measured on a phone-class CPU that was a real part of the
+     frame budget, and it is pure waste.
+
+     Each distinct chip is now drawn once and blitted. Baked at twice the size
+     and drawn at half, so it stays sharp when the camera zooms in. */
+  const CHIP_SS = 2;
+  const chipCache = new Map();
+  let chipProbe = null;
+
+  function chipSprite(label, isYou) {
+    const key = `${isYou ? "y" : "n"}|${label}`;
+    const hit = chipCache.get(key);
+    if (hit) return hit;
+
+    if (!chipProbe) chipProbe = document.createElement("canvas").getContext("2d");
+    chipProbe.font = "bold 10px system-ui";
+    const w = chipProbe.measureText(label).width + 10, h = 14;
+
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(w * CHIP_SS);
+    c.height = Math.ceil(h * CHIP_SS);
+    const g = c.getContext("2d");
+    g.scale(CHIP_SS, CHIP_SS);
+    roundRectPath(g, 0, 0, w, h, 6);
+    g.fillStyle = isYou ? "#facc15" : "rgba(15, 23, 42, 0.75)";
+    g.fill();
+    g.font = "bold 10px system-ui";
+    g.fillStyle = isYou ? "#1f2937" : "#fff";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(label, w / 2, h / 2 + 0.5);
+
+    const sprite = { canvas: c, w, h };
+    // A player renaming themselves repeatedly shouldn't grow this forever.
+    if (chipCache.size > 40) chipCache.clear();
+    chipCache.set(key, sprite);
+    return sprite;
+  }
+
+  function drawRoleChip(p, style) {
     let label = p.role;
     if (style.isYou) {
       const nm = (profile.name || "").trim().toUpperCase();
       label = `${p.role} · ${nm ? nm + " " : ""}#${profile.number || 9}`;
     }
     if (!label) return;
-    ctx.font = "bold 10px system-ui";
-    const tw = ctx.measureText(label).width;
-    const w = tw + 10, h = 14;
-    const y = p.y + (p.r || 16) + 8;
-    ctx.save();
-    roundRectPath(ctx, p.x - w / 2, y, w, h, 6);
-    ctx.fillStyle = style.isYou ? "#facc15" : "rgba(15, 23, 42, 0.75)";
-    ctx.fill();
-    ctx.fillStyle = style.isYou ? "#1f2937" : "#fff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, p.x, y + h / 2 + 0.5);
-    ctx.restore();
+    const s = chipSprite(label, !!style.isYou);
+    ctx.drawImage(s.canvas, p.x - s.w / 2, p.y + (p.r || 16) + 8, s.w, s.h);
+  }
+
+  /* Players, pre-rendered.
+
+     A skater is about twenty path operations — a shadow, an ice ring, a stick
+     in two strokes, a body, a stripe, two gloves, a helmet and its shine. With
+     twelve of them on the ice that was over two hundred path operations every
+     frame, re-tracing identical figures, and it was what kept a phone from
+     holding its frame budget.
+
+     Each distinct figure is drawn once into a small offscreen canvas and then
+     blitted, which turns those twenty operations into one. Two sprites per
+     player rather than one, because the shadow and the ice ring do NOT turn
+     with the player — the shadow sits at a fixed offset and the ring is a
+     circle — so they are baked unrotated and the figure is rotated on top.
+
+     Baked at twice the final size so the figures stay sharp at the camera's
+     closest zoom, and keyed so that only the handful of variants actually on
+     the ice are ever built. */
+  const FIG_SS = 2;
+  const figCache = new Map();
+  const groundCache = new Map();
+
+  function spriteCanvas(half, ss) {
+    const c = document.createElement("canvas");
+    c.width = c.height = Math.ceil(half * 2 * ss);
+    const g = c.getContext("2d");
+    g.scale(ss, ss);
+    g.translate(half, half);
+    return { canvas: c, ctx: g, half };
+  }
+
+  // The shadow and the pale ring of ice behind a player — these never rotate.
+  function groundSprite(R) {
+    const hit = groundCache.get(R);
+    if (hit) return hit;
+    const s = R / 16;
+    const sp = spriteCanvas(R + 7, FIG_SS);
+    const g = sp.ctx;
+    g.fillStyle = "rgba(10, 20, 40, 0.18)";
+    g.beginPath();
+    g.ellipse(2 * s, 4 * s, 15 * s, 11 * s, 0, 0, Math.PI * 2);
+    g.fill();
+    /* A pale ring of "ice" behind each player, so two skaters standing close
+       together still read as two distinct figures rather than one blob. */
+    g.fillStyle = "rgba(255, 255, 255, 0.55)";
+    g.beginPath();
+    g.arc(0, 0, R + 4.5, 0, Math.PI * 2);
+    g.fill();
+    groundCache.set(R, sp);
+    return sp;
+  }
+
+  // The figure itself, in the local units the artwork was drawn in. `strideStep`
+  // is -1, 0 or 1: the slight waggle of the stick while skating.
+  function figureSprite(style, R, strideStep) {
+    const key = `${style.jersey}|${style.trim}|${style.helmet}|${R}|${strideStep}`;
+    const hit = figCache.get(key);
+    if (hit) return hit;
+
+    const s = R / 16;
+    // Local artwork reaches x=29 (stick blade) and y=+-17 (gloves); the sprite
+    // is rotated about the player's centre, so it has to hold the full radius.
+    const sp = spriteCanvas(Math.ceil(35 * s) + 2, FIG_SS);
+    const g = sp.ctx;
+    g.scale(s, s);
+    const stride = strideStep * 2.2;
+
+    // Stick (shaft + blade), waggling slightly while skating
+    g.lineCap = "round";
+    g.strokeStyle = "#8a5a2b";
+    g.lineWidth = 2.6;
+    g.beginPath();
+    g.moveTo(3, 9);
+    g.lineTo(21, 13 + stride);
+    g.stroke();
+    g.strokeStyle = "#3d2b1f";
+    g.lineWidth = 3.8;
+    g.beginPath();
+    g.moveTo(21, 13 + stride);
+    g.lineTo(27, 10.5 + stride);
+    g.stroke();
+
+    // Body: shoulder pads (wide across the direction of travel)
+    g.fillStyle = style.jersey;
+    g.strokeStyle = style.trim;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.ellipse(0, 0, 11, 15, 0, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+
+    // Jersey shoulder stripe
+    g.strokeStyle = "rgba(255,255,255,0.65)";
+    g.lineWidth = 2.2;
+    g.beginPath();
+    g.moveTo(-3.5, -13);
+    g.lineTo(-3.5, 13);
+    g.stroke();
+
+    // Gloves at the shoulder tips
+    g.fillStyle = style.trim;
+    g.beginPath(); g.arc(3, -13.5, 3.6, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(3, 13.5, 3.6, 0, Math.PI * 2); g.fill();
+
+    // Helmet with a shine
+    g.fillStyle = style.helmet;
+    g.beginPath(); g.arc(1.5, 0, 6.6, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.35)";
+    g.beginPath(); g.arc(3.4, -1.8, 2.2, 0, Math.PI * 2); g.fill();
+
+    // Changing team colour mid-session shouldn't grow this without bound.
+    if (figCache.size > 80) figCache.clear();
+    figCache.set(key, sp);
+    return sp;
+  }
+
+  function blitSprite(sp, x, y) {
+    ctx.drawImage(sp.canvas, x - sp.half, y - sp.half, sp.half * 2, sp.half * 2);
   }
 
   function drawSkater(p, style, t) {
     if (p._ph === undefined) p._ph = Math.random() * Math.PI * 2;
     const R = p.r || 16;
-    const s = R / 16;
-    const a = p.angle || 0;
-    const stride = p._moving ? Math.sin(t / 70 + p._ph) * 2.2 : 0;
+    const strideStep = p._moving ? Math.round(Math.sin(t / 70 + p._ph)) : 0;
 
+    blitSprite(groundSprite(R), p.x, p.y);
+
+    const fig = figureSprite(style, R, strideStep);
     ctx.save();
     ctx.translate(p.x, p.y);
-
-    // Shadow on the ice
-    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
-    ctx.beginPath();
-    ctx.ellipse(2 * s, 4 * s, 15 * s, 11 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // A pale ring of "ice" behind each player, so two skaters standing close
-    // together still read as two distinct figures rather than one blob.
-    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
-    ctx.beginPath();
-    ctx.arc(0, 0, R + 4.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.rotate(a);
-    ctx.scale(s, s);
-
-    // Stick (shaft + blade), waggling slightly while skating
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#8a5a2b";
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(3, 9);
-    ctx.lineTo(21, 13 + stride);
-    ctx.stroke();
-    ctx.strokeStyle = "#3d2b1f";
-    ctx.lineWidth = 3.8;
-    ctx.beginPath();
-    ctx.moveTo(21, 13 + stride);
-    ctx.lineTo(27, 10.5 + stride);
-    ctx.stroke();
-
-    // Body: shoulder pads (wide across the direction of travel)
-    ctx.fillStyle = style.jersey;
-    ctx.strokeStyle = style.trim;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 11, 15, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Jersey shoulder stripe
-    ctx.strokeStyle = "rgba(255,255,255,0.65)";
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(-3.5, -13);
-    ctx.lineTo(-3.5, 13);
-    ctx.stroke();
-
-    // Gloves at the shoulder tips
-    ctx.fillStyle = style.trim;
-    ctx.beginPath(); ctx.arc(3, -13.5, 3.6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(3, 13.5, 3.6, 0, Math.PI * 2); ctx.fill();
-
-    // Helmet with a shine
-    ctx.fillStyle = style.helmet;
-    ctx.beginPath(); ctx.arc(1.5, 0, 6.6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.beginPath(); ctx.arc(3.4, -1.8, 2.2, 0, Math.PI * 2); ctx.fill();
-
+    ctx.rotate(p.angle || 0);
+    blitSprite(fig, 0, 0);
     ctx.restore();
 
-    drawRoleChip(p, style, t);
+    drawRoleChip(p, style);
+  }
+
+  // Goalies, pre-rendered the same way. They turn to track the puck, so the
+  // shadow is baked unrotated and the figure is turned on top of it.
+  const goalieCache = new Map();
+  const goalieGroundCache = new Map();
+
+  function goalieGroundSprite(R) {
+    const hit = goalieGroundCache.get(R);
+    if (hit) return hit;
+    const s = R / 16;
+    const sp = spriteCanvas(Math.ceil(19 * s) + 2, FIG_SS);
+    sp.ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
+    sp.ctx.beginPath();
+    sp.ctx.ellipse(2 * s, 4 * s, 16 * s, 13 * s, 0, 0, Math.PI * 2);
+    sp.ctx.fill();
+    goalieGroundCache.set(R, sp);
+    return sp;
+  }
+
+  function goalieSprite(style, R) {
+    const key = `${style.jersey}|${style.trim}|${R}`;
+    const hit = goalieCache.get(key);
+    if (hit) return hit;
+
+    const s = R / 16;
+    const sp = spriteCanvas(Math.ceil(22 * s) + 2, FIG_SS);
+    const g = sp.ctx;
+    g.scale(s, s);
+
+    // Leg pads out front
+    g.fillStyle = "#efe3cd";
+    g.strokeStyle = "#b7a27b";
+    g.lineWidth = 1.5;
+    roundRectPath(g, 5, -15, 8, 12, 3); g.fill(); g.stroke();
+    roundRectPath(g, 5, 3, 8, 12, 3); g.fill(); g.stroke();
+
+    // Goalie stick held across
+    g.strokeStyle = "#3d2b1f";
+    g.lineWidth = 3.5;
+    g.lineCap = "round";
+    g.beginPath();
+    g.moveTo(12, -12);
+    g.lineTo(12, 12);
+    g.stroke();
+
+    // Body
+    g.fillStyle = style.jersey;
+    g.strokeStyle = style.trim;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.ellipse(0, 0, 12, 15.5, 0, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+
+    // Mask
+    g.fillStyle = "#f5f5f5";
+    g.strokeStyle = style.trim;
+    g.lineWidth = 1.5;
+    g.beginPath(); g.arc(1.5, 0, 6.8, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.strokeStyle = "rgba(80,80,80,0.7)";
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(-1, -4); g.lineTo(-1, 4); g.stroke();
+    g.beginPath(); g.moveTo(2, -4.5); g.lineTo(2, 4.5); g.stroke();
+
+    if (goalieCache.size > 20) goalieCache.clear();
+    goalieCache.set(key, sp);
+    return sp;
   }
 
   function drawGoalie(p, style, t) {
     const R = (p.r || 16) + 2;
-    const s = R / 16;
-    const a = p.angle || 0;
-
+    blitSprite(goalieGroundSprite(R), p.x, p.y);
     ctx.save();
     ctx.translate(p.x, p.y);
-    ctx.fillStyle = "rgba(10, 20, 40, 0.18)";
-    ctx.beginPath();
-    ctx.ellipse(2 * s, 4 * s, 16 * s, 13 * s, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.rotate(a);
-    ctx.scale(s, s);
-
-    // Leg pads out front
-    ctx.fillStyle = "#efe3cd";
-    ctx.strokeStyle = "#b7a27b";
-    ctx.lineWidth = 1.5;
-    roundRectPath(ctx, 5, -15, 8, 12, 3); ctx.fill(); ctx.stroke();
-    roundRectPath(ctx, 5, 3, 8, 12, 3); ctx.fill(); ctx.stroke();
-
-    // Goalie stick held across
-    ctx.strokeStyle = "#3d2b1f";
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(12, -12);
-    ctx.lineTo(12, 12);
-    ctx.stroke();
-
-    // Body
-    ctx.fillStyle = style.jersey;
-    ctx.strokeStyle = style.trim;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 12, 15.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Mask
-    ctx.fillStyle = "#f5f5f5";
-    ctx.strokeStyle = style.trim;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(1.5, 0, 6.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = "rgba(80,80,80,0.7)";
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(-1, -4); ctx.lineTo(-1, 4); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(2, -4.5); ctx.lineTo(2, 4.5); ctx.stroke();
-
+    ctx.rotate(p.angle || 0);
+    blitSprite(goalieSprite(style, R), 0, 0);
     ctx.restore();
-
-    drawRoleChip(p, style, t);
+    drawRoleChip(p, style);
   }
 
   /* Who has the puck is the first thing you need to know to read a play, and a
@@ -4267,6 +4578,42 @@ HIQ.Sim = (() => {
     ctx.restore();
   }
 
+  /* The puck, pre-rendered. Baked at three times the size and drawn down, so
+     it stays round and sharp at the camera's closest zoom. */
+  let puckSpriteCache = null;
+  function puckSprite(r) {
+    if (puckSpriteCache && puckSpriteCache.r === r) return puckSpriteCache;
+    const SS = 3, pad = 5, half = r + pad;
+    const c = document.createElement("canvas");
+    c.width = c.height = Math.ceil(half * 2 * SS);
+    const g = c.getContext("2d");
+    g.scale(SS, SS);
+    g.translate(half, half);
+
+    g.shadowColor = "rgba(0,0,0,0.35)";
+    g.shadowBlur = 4;
+    g.shadowOffsetY = 2;
+    const grad = g.createRadialGradient(-2, -2, 1, 0, 0, r);
+    grad.addColorStop(0, "#3a3a3a");
+    grad.addColorStop(1, "#0b0b0b");
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(0, 0, r, 0, Math.PI * 2);
+    g.fill();
+
+    g.shadowColor = "transparent";
+    g.shadowBlur = 0;
+    g.shadowOffsetY = 0;
+    g.strokeStyle = "rgba(255,255,255,0.25)";
+    g.lineWidth = 1.4;
+    g.beginPath();
+    g.arc(0, 0, r - 2.5, -2.4, -0.9);
+    g.stroke();
+
+    puckSpriteCache = { canvas: c, r, half };
+    return puckSpriteCache;
+  }
+
   function drawPuck(t) {
     // Motion trail
     for (let i = 0; i < puckTrail.length; i++) {
@@ -4277,24 +4624,11 @@ HIQ.Sim = (() => {
       ctx.arc(q.x, q.y, puck.r * (0.4 + k * 0.5), 0, Math.PI * 2);
       ctx.fill();
     }
-    // Disc
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.35)";
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 2;
-    const g = ctx.createRadialGradient(puck.x - 2, puck.y - 2, 1, puck.x, puck.y, puck.r);
-    g.addColorStop(0, "#3a3a3a");
-    g.addColorStop(1, "#0b0b0b");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(puck.x, puck.y, puck.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(puck.x, puck.y, puck.r - 2.5, -2.4, -0.9);
-    ctx.stroke();
+    // Disc — one blit. This used to build a radial gradient and a blurred
+    // shadow from scratch on every frame, and a blurred shadow is one of the
+    // most expensive things you can ask a 2D canvas for.
+    const s = puckSprite(puck.r);
+    ctx.drawImage(s.canvas, puck.x - s.half, puck.y - s.half, s.half * 2, s.half * 2);
   }
 
   function drawDirectionTag() {
@@ -4311,7 +4645,10 @@ HIQ.Sim = (() => {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "rgba(15, 42, 74, 0.5)";
-    ctx.fillText(text, 550, 52);
+    // Centre of the sheet, from the rink itself. This was hardcoded to 550,
+    // the middle of a canvas the game stopped using when the ice moved to
+    // regulation feet — so the label sat 26px left of centre.
+    ctx.fillText(text, V.width / 2, 52);
   }
 
   function drawGuidance(t) {
@@ -4457,7 +4794,10 @@ HIQ.Sim = (() => {
   }
 
   function draw(t) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // One transform maps the fixed logical sheet onto however many real pixels
+    // this device can afford. Everything below is in logical units.
+    ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+    ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
     // Screen shake on big moments
     let shx = 0, shy = 0;
@@ -4514,8 +4854,72 @@ HIQ.Sim = (() => {
     ctx.restore();
   }
 
+  /* Frame pacing.
+
+     Measured on a phone-class CPU, a frame of this scene costs more than the
+     16.7ms a 60fps budget allows, and the result was not a slower game — it
+     was a juddering one, because most frames overran and the browser dropped
+     them unevenly. An erratic 40-odd frames a second reads as lag. A steady
+     30 does not.
+
+     So the game measures what a frame actually costs it and, on a device that
+     cannot hold 60, deliberately draws every second frame instead. The
+     simulation still updates at full rate, so nothing moves differently — it
+     is only the drawing that halves, and it halves evenly.
+
+     The thresholds have a gap between them on purpose: a device that is
+     borderline should settle on one cadence rather than flip between the two
+     every half second, which would look worse than either. */
+  /* Adapting the resolution to the device.
+
+     Tuning on how long draw() takes does not work, and it is worth saying why:
+     the JavaScript call returns once the drawing commands are queued, while
+     the rasterising happens afterwards. On a device that is fill-rate bound —
+     which this one is — the measured draw cost stays low while frames are
+     visibly dropping, so the budget never trips and nothing adapts.
+
+     The honest signal is the frame interval itself, which includes everything
+     the browser actually had to do. A device holding 60fps delivers frames
+     about 16.7ms apart; one that cannot will show a clearly longer average.
+
+     Adaptation only ever goes DOWN, and needs two consecutive slow windows to
+     move. Letting it climb back up invites a permanent oscillation: lower the
+     resolution, hit 60fps, conclude there is room, raise it, drop frames
+     again, forever — which looks far worse than simply settling. The ladder
+     resets when the viewport changes, which is the one moment the right
+     answer genuinely differs. */
+  const RES_STEPS = [1, 0.84, 0.7, 0.58, 0.5];
+  const FRAME_SLOW_MS = 20;      // slower than this and 60fps is not happening
+  const WINDOW = 30;             // frames per measurement window
+  const pacing = { n: 0, elapsed: 0, step: 0, slowWindows: 0 };
+
+  function resolutionFor(step) {
+    // Never render finer than the display can actually show.
+    return Math.min(RES_STEPS[clamp(step, 0, RES_STEPS.length - 1)], displayJustifiedScale());
+  }
+
+  function retune() {
+    const avg = pacing.elapsed / pacing.n;
+    pacing.n = 0;
+    pacing.elapsed = 0;
+
+    if (avg > FRAME_SLOW_MS) {
+      pacing.slowWindows++;
+      // One slow window is a hiccup — a tab regaining focus, a garbage
+      // collection. Two in a row is the device telling you something.
+      if (pacing.slowWindows >= 2 && pacing.step < RES_STEPS.length - 1) {
+        pacing.step++;
+        pacing.slowWindows = 0;
+        applyRenderScale(resolutionFor(pacing.step));
+      }
+    } else {
+      pacing.slowWindows = 0;
+    }
+  }
+
   function tick(t) {
-    const dt = Math.min(0.05, lastTick ? (t - lastTick) / 1000 : 0.016);
+    const raw = lastTick ? t - lastTick : 16.7;
+    const dt = Math.min(0.05, raw / 1000);
     lastTick = t;
     updateHeadings(dt);
     updateGoalies(dt);
@@ -4523,6 +4927,12 @@ HIQ.Sim = (() => {
     updateParticles(dt);
     updateCamera();
     draw(t);
+
+    // A tab in the background gets no frames at all; that is not slowness.
+    if (raw < 200) {
+      pacing.elapsed += raw;
+      if (++pacing.n >= WINDOW) retune();
+    }
     requestAnimationFrame(tick);
   }
 
@@ -4534,8 +4944,8 @@ HIQ.Sim = (() => {
     const clientY = isTouch ? evt.touches[0].clientY : evt.clientY;
     // Canvas pixels, then back through the camera transform into rink coords.
     return screenToWorld(
-      (clientX - rect.left) * (canvas.width / rect.width),
-      (clientY - rect.top) * (canvas.height / rect.height)
+      (clientX - rect.left) * (LOGICAL_W / rect.width),
+      (clientY - rect.top) * (LOGICAL_H / rect.height)
     );
   }
 
@@ -4629,15 +5039,12 @@ HIQ.Sim = (() => {
   });
 
   function onSettingChange() {
-    const fmt = formatSel.value;
-    const isSpecial = (fmt === "5v4" || fmt === "4v5");
-    ppStructWrap.style.display = isSpecial ? "" : "none";
-    pkStructWrap.style.display = isSpecial ? "" : "none";
+    renderPlanBar();
     if (scenario) buildScenario();
   }
 
-  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, pressureFilterSel, ppStructSel, pkStructSel, overlaySel]
-    .forEach(el => el.addEventListener("change", onSettingChange));
+  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, overlaySel, planSel]
+    .forEach(el => el && el.addEventListener("change", onSettingChange));
 
   // Debug/testing hooks (not used by gameplay)
   HIQ.debug = {
@@ -4650,6 +5057,26 @@ HIQ.Sim = (() => {
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
     getStats: () => stats,
+    getPlan: () => ({
+      on: planOn(),
+      index: unitIndex(),
+      unit: currentUnit(),
+      need: unitNeed(currentUnit()),
+      done: unitDoneKeys(currentUnit()).slice(),
+    }),
+    resetPlan: () => {
+      planProgress.unit = 0;
+      planProgress.done = {};
+      saveStore("hiq_plan", planProgress);
+      renderPlanBar();
+    },
+    // Credit a learned read without playing it out — lets the suite walk the
+    // whole season in one go instead of tapping through every unit.
+    creditPlan: (playId, role) => {
+      const advanced = recordPlanWin(currentUnit(), playId, role);
+      renderPlanBar();
+      return advanced;
+    },
     getProfile: () => profile,
     guidanceShown: () => renderState.showGuidance,
     getCamera: () => ({ ...camera }),
@@ -4695,23 +5122,47 @@ HIQ.Sim = (() => {
         ? { label: "HAS PUCK", role: f.player.role, dist: Math.round(f.dist) }
         : { label: "LOOSE PUCK", role: null, dist: null };
     },
-    // Rink coords -> canvas pixels, so tests can tap where a thing is drawn.
-    worldToScreen: (x, y) => ({
-      x: (x - camera.x) * camera.scale + canvas.width / 2,
-      y: (y - camera.y) * camera.scale + canvas.height / 2
+    // Rink coords <-> logical sheet coords, so tests can tap where a thing is
+    // drawn and confirm the mapping round-trips.
+    screenToWorld: (x, y) => screenToWorld(x, y),
+    renderScale: () => renderScale,
+    spriteCaches: () => ({
+      figures: figCache.size, ground: groundCache.size,
+      goalies: goalieCache.size, chips: chipCache.size,
     }),
-    // Auditing hooks: score an arbitrary spot, and force a specific template
+    worldToScreen: (x, y) => ({
+      x: (x - camera.x) * camera.scale + LOGICAL_W / 2,
+      y: (y - camera.y) * camera.scale + LOGICAL_H / 2
+    }),
+    // Auditing hooks: score an arbitrary spot, and force a specific scenario
     scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
+    /* Build one named play on demand, so a specific situation can be reviewed
+       or tested without re-rolling until it comes up. It used to filter the
+       old TEMPLATES_EVEN list, which stopped driving the game when the
+       authored plays replaced it — so it quietly did nothing at all. It now
+       pins HIQ.PLAYS, and it restores the full set and the chosen format
+       whichever way it exits. */
     forceTemplate: (id, role) => {
-      const tpl = HIQ.TEMPLATES_EVEN.find(t => t.id === id);
-      if (!tpl) return null;
+      const play = HIQ.PLAYS.find(p => p.id === id);
+      if (!play) return null;
       if (role) roleSel.value = role;
-      const saved = HIQ.TEMPLATES_EVEN.slice();
-      HIQ.TEMPLATES_EVEN.length = 0;
-      HIQ.TEMPLATES_EVEN.push(tpl);
-      buildScenario();
-      HIQ.TEMPLATES_EVEN.length = 0;
-      saved.forEach(t => HIQ.TEMPLATES_EVEN.push(t));
+      const savedPlays = HIQ.PLAYS.slice();
+      const savedPlan = planSel ? planSel.value : null;
+      const savedFmt = formatSel.value;
+      try {
+        // A play only gets served if the format matches the strength it is
+        // authored at, and the plan would restrict it to the current unit.
+        if (planSel) planSel.value = "free";
+        formatSel.value = play.fmt || "5v5";
+        HIQ.PLAYS.length = 0;
+        HIQ.PLAYS.push(play);
+        buildScenario();
+      } finally {
+        HIQ.PLAYS.length = 0;
+        savedPlays.forEach(p => HIQ.PLAYS.push(p));
+        if (planSel && savedPlan !== null) planSel.value = savedPlan;
+        formatSel.value = savedFmt;
+      }
       return scenario.id;
     }
   };
@@ -4786,14 +5237,47 @@ HIQ.Sim = (() => {
   if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
-  ppStructWrap.style.display = "none";
-  pkStructWrap.style.display = "none";
-  // Phones: start with the settings panel collapsed so the rink is front and center
-  const settingsPanel = document.getElementById("settingsPanel");
-  if (settingsPanel && window.innerWidth <= 760) settingsPanel.open = false;
+  renderPlanBar();
+  /* The "turn your phone sideways" tip was permanent — in portrait it simply
+     sat above the rink forever, which is a nag, not a tip. Show it once, let a
+     tap dismiss it, remember that, and have it leave by itself after a few
+     seconds so it never becomes furniture. */
+  const rotateHint = document.getElementById("rotateHint");
+  if (rotateHint) {
+    const hideHint = () => {
+      rotateHint.style.display = "none";
+      try { localStorage.setItem("hiq.rotateTip", "done"); } catch (e) { /* private mode */ }
+    };
+    let tipSeen = false;
+    try { tipSeen = localStorage.getItem("hiq.rotateTip") === "done"; } catch (e) { /* private mode */ }
+    if (tipSeen) {
+      rotateHint.style.display = "none";
+    } else {
+      rotateHint.title = "Tap to dismiss";
+      rotateHint.addEventListener("click", hideHint);
+      setTimeout(hideHint, 9000);
+    }
+  }
   syncProfileUI();
   renderProgress();
   renderTrophies();
+  /* Size the pixel buffer before the first frame, from what the display can
+     actually show. Turning a phone sideways changes that, so re-check it then
+     — and let the adaptive tuning take over from there. */
+  applyRenderScale(displayJustifiedScale());
+  let resizeTimer = 0;
+  const onViewportChange = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      // A new viewport is a new question, so let it earn its resolution again.
+      pacing.step = 0;
+      pacing.slowWindows = 0;
+      applyRenderScale(resolutionFor(0));
+    }, 150);
+  };
+  window.addEventListener("resize", onViewportChange);
+  window.addEventListener("orientationchange", onViewportChange);
+
   buildRinkLayer();
   buildScenario();
   requestAnimationFrame(tick);
