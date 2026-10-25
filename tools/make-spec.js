@@ -39,7 +39,12 @@ function describe(p, play) {
     : Math.abs(fromMid) > 30 ? `tight to the ${fromMid > 0 ? "near" : "far"} boards`
     : `toward the ${fromMid > 0 ? "near" : "far"} side`;
 
-  return `${zone}, ${side} (${Math.round(p.x)} ft from the end boards, ${Math.round(Math.abs(fromMid))} ft ${fromMid >= 0 ? "near" : "far"} of centre)`;
+  /* Distance to the END BOARDS the point is actually nearest, not to x=0 —
+     reporting "182 ft from the end boards" for a spot 18 ft off the far boards
+     is the sort of thing that makes a coach stop trusting the document. */
+  const toEndBoards = Math.min(p.x, R.length - p.x);
+  return `${zone}, ${side} (${Math.round(toEndBoards)} ft from the nearest end boards, ` +
+    `${Math.round(Math.abs(fromMid))} ft ${fromMid >= 0 ? "near" : "far"} of centre)`;
 }
 
 const lines = [];
@@ -97,18 +102,51 @@ w();
 w("---");
 w();
 
+w("## The season plan");
+w();
+w("The game ships working through these units in order, and only opens the next");
+w("one when the reads in the current one are landing. The order is taken from");
+w("published coaching guidance rather than invented: Hockey Canada's U13 pathway");
+w("states the rule as **\"skills before tactics; tactics before structure\"**, its");
+w("U11 guidance introduces basic defensive-zone positioning first, and special");
+w("teams are held back to U13, where players *\"should play in all situations,");
+w("power play, penalty kill and special teams\"*. So the units run outward from");
+w("your own net.");
+w();
+w("| # | Unit | What it teaches | Scenarios | Reads to pass |");
+w("|---|---|---|---|---|");
+HIQ.CURRICULUM.forEach((u, i) => {
+  const size = HIQ.unitSize(u);
+  w(`| ${i + 1} | **${u.name}** | ${u.goal} | ${u.plays.join(", ")} | ${Math.min(u.need, size)} of ${size} |`);
+});
+w();
+w("Free play ignores the plan and serves anything, which is the right mode for");
+w("someone who already knows the game.");
+w();
+w("---");
+w();
+
 w("## Plays");
 w();
-w(`${HIQ.PLAYS.length} scenarios. Special teams are not yet re-authored and are disabled in the game.`);
+const strengths = HIQ.PLAYS.reduce((a, p) => { const f = p.fmt || "5v5"; a[f] = (a[f] || 0) + 1; return a; }, {});
+w(`${HIQ.PLAYS.length} scenarios — ` +
+  Object.entries(strengths).map(([f, n]) => `${n} at ${f}`).join(", ") + ".");
 w();
 
 for (const play of HIQ.PLAYS) {
   w(`### ${play.name}`);
   w();
-  w(`*${play.phase} · \`${play.id}\`*`);
+  w(`*${play.phase} · ${play.fmt || "5v5"} · \`${play.id}\`*`);
   w();
   w(play.situation);
   w();
+  if (play.jobs) {
+    w("**Jobs** — on special teams the job matters more than the position, and the");
+    w("game names it, because that is the vocabulary a coach uses at a whiteboard.");
+    w();
+    for (const [role, job] of Object.entries(play.jobs)) w(`- **${role}** — ${job}`);
+    w();
+  }
   w(`**Puck:** ${describe(play.puck, play)}  `);
   w(`**Carried by:** ${play.carrier === "opp" ? "an opponent" : play.carrier}  `);
   w(`**Attacking:** ${play.attackDir === "right" ? "left to right" : "right to left"}`);

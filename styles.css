@@ -91,6 +91,34 @@ button:active { transform: scale(0.97); }
 .pill.scoreboard { background: #0f2a4a; color: #fff; border-color: #0f2a4a; }
 .pill.scoreboard b { color: #ffd76a; }
 
+/* Season plan — which unit of the coach's order you're working through. */
+#planBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #f3f8fd;
+  border: 1px solid #d7e3f0;
+  border-left: 4px solid #f59e0b;
+  font-size: 14px;
+}
+#planBar b { color: var(--navy); font-size: 15px; }
+#planBar .planGoal { color: #456; flex: 1 1 260px; }
+#planBar .planCount { font-weight: 600; color: #0b6b3a; white-space: nowrap; }
+#planBar .planTrack {
+  flex: 0 0 120px; height: 10px; border-radius: 999px;
+  background: #dbe7f3; border: 1px solid #c5d4e4; overflow: hidden;
+}
+#planBar .planTrack i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #34d399, #0b6b3a);
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
 #prompt { margin: 12px 0 4px; font-size: 17px; font-weight: 600; }
 #hint { font-size: 14px; font-weight: 600; color: #0b6b3a; margin: 0 0 8px; }
 

@@ -7,7 +7,6 @@
   });
 
   const { pick, clamp, dist, toward, shuffle } = HIQ.util;
-  const LM = HIQ.LANDMARKS;
 
   // --- DOM
   const canvas = document.getElementById("rink");
@@ -22,11 +21,11 @@
 
   const phaseFilterSel = document.getElementById("phaseFilter");
   const pressureFilterSel = document.getElementById("pressureFilter");
-  const ppStructSel = document.getElementById("ppStruct");
-  const pkStructSel = document.getElementById("pkStruct");
-  const ppStructWrap = document.getElementById("ppStructWrap");
-  const pkStructWrap = document.getElementById("pkStructWrap");
   const overlaySel = document.getElementById("overlay");
+  const planSel = document.getElementById("plan");
+  const planBarEl = document.getElementById("planBar");
+  const phaseFilterWrap = document.getElementById("phaseFilterWrap");
+  const formatWrap = document.getElementById("formatWrap");
 
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
@@ -324,28 +323,65 @@
     return { score: g.score, failures: g.tier === "best" ? [] : [{ key: g.tier, msg: g.why, pts: 100 - g.score }], allFailures: [], grade: g };
   }
 
+  /* Which plays belong to a format.
+
+     Special teams used to be excluded here, because the versions that existed
+     taught a hardcoded shape regardless of what had been selected. They are
+     authored on the same model as everything else now — one scenario per
+     strength — so a play simply declares the strength it belongs to, and
+     anything that says nothing is even strength. */
   function getCandidateTemplates(fmt) {
-    // Special teams have not been re-authored on the new model yet, so the
-    // even-strength set is used for every format rather than shipping
-    // positions we can no longer vouch for.
-    return HIQ.PLAYS.slice();
+    const want = fmt || "5v5";
+    return HIQ.PLAYS.filter(p => (p.fmt || "5v5") === want);
   }
 
-  function applyFormat(offenseFull, defenseFull, fmt) {
-    const off = offenseFull.map(p => ({ ...p }));
-    const def = defenseFull.map(p => ({ ...p }));
-    const defSkaters = def.filter(p => p.role !== "G");
-    const defGoalies = def.filter(p => p.role === "G");
+  /* --- The season plan -------------------------------------------------
 
-    if (fmt === "5v4") return { off: off.slice(0, 5), def: defSkaters.slice(0, 4).concat(defGoalies) };
-    if (fmt === "4v5") return { off: off.slice(0, 4), def: defSkaters.slice(0, 5).concat(defGoalies) };
-    return { off: off.slice(0, 5), def: defSkaters.slice(0, 5).concat(defGoalies) };
+     Free play serves any scenario the filters allow, which is the right thing
+     for someone who already knows the game. A child learning it needs the
+     order coaches actually use, so the plan walks the units in HIQ.CURRICULUM
+     and only opens the next one when the current one's reads are landing.
+
+     Progress is a set of "play/position" keys answered with the best read, so
+     repeating the one situation you find easy doesn't advance anything. */
+  const planProgress = loadStore("hiq_plan", { unit: 0, done: {} });
+
+  function planOn() { return planSel && planSel.value === "season"; }
+  function unitIndex() { return clamp(planProgress.unit | 0, 0, HIQ.CURRICULUM.length - 1); }
+  function currentUnit() { return HIQ.CURRICULUM[unitIndex()]; }
+  function unitNeed(unit) { return Math.min(unit.need, HIQ.unitSize(unit)); }
+  function unitDoneKeys(unit) { return planProgress.done[unit.id] || []; }
+
+  function recordPlanWin(unit, playId, role) {
+    /* Only a read from this unit counts toward it. Without this, a scenario
+       from anywhere else — the unit that just closed, or one played in free
+       play — lands in the current unit's tally and can open the next unit
+       before the player has seen any of it. */
+    if (!unit.plays.includes(playId)) return false;
+    const key = `${playId}/${role}`;
+    const keys = unitDoneKeys(unit);
+    if (keys.includes(key)) return false;
+    keys.push(key);
+    planProgress.done[unit.id] = keys;
+    const finished = keys.length >= unitNeed(unit) && unitIndex() < HIQ.CURRICULUM.length - 1;
+    if (finished) planProgress.unit = unitIndex() + 1;
+    saveStore("hiq_plan", planProgress);
+    return finished;
   }
 
-  function structureLabel(fmt) {
-    if (fmt === "5v4") return `PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"} vs PK ${pkStructSel.value}`;
-    if (fmt === "4v5") return `PK ${pkStructSel.value} vs PP ${ppStructSel.value === "one3one" ? "1-3-1" : "Umbrella"}`;
-    return "—";
+  function renderPlanBar() {
+    if (!planBarEl) return;
+    if (!planOn()) { planBarEl.style.display = "none"; return; }
+    planBarEl.style.display = "";
+    const unit = currentUnit();
+    const need = unitNeed(unit);
+    const got = Math.min(unitDoneKeys(unit).length, need);
+    const last = unitIndex() === HIQ.CURRICULUM.length - 1;
+    planBarEl.innerHTML =
+      `<b>Unit ${unitIndex() + 1} of ${HIQ.CURRICULUM.length} — ${unit.name}</b>` +
+      `<span class="planGoal">${unit.goal}</span>` +
+      `<span class="planCount">${got} / ${need} reads learned${last && got >= need ? " — plan complete" : ""}</span>` +
+      `<span class="planTrack"><i style="width:${need ? Math.round((got / need) * 100) : 0}%"></i></span>`;
   }
 
   function isChoiceMode() {
@@ -372,14 +408,24 @@
     const role = roleSel.value;
     const diff = diffSel.value;
 
-    const isSpecial = (fmt === "5v4" || fmt === "4v5");
-    ppStructWrap.style.display = isSpecial ? "" : "none";
-    pkStructWrap.style.display = isSpecial ? "" : "none";
+    /* In plan mode the unit decides what you see — including the strength, so
+       the season can put you on the power play without asking you to go and
+       find the setting. The format and phase pickers are hidden rather than
+       silently ignored. */
+    const onPlan = planOn();
+    if (formatWrap) formatWrap.style.display = onPlan ? "none" : "";
+    if (phaseFilterWrap) phaseFilterWrap.style.display = onPlan ? "none" : "";
 
-    let candidates = getCandidateTemplates(fmt);
-    const phaseFilter = phaseFilterSel.value;
-    candidates = candidates.filter(t => phaseFilter === "any" || t.phase === phaseFilter);
-    if (!candidates.length) candidates = getCandidateTemplates(fmt);
+    let candidates;
+    if (onPlan) {
+      const unit = currentUnit();
+      candidates = HIQ.PLAYS.filter(p => unit.plays.includes(p.id));
+    } else {
+      candidates = getCandidateTemplates(fmt);
+      const phaseFilter = phaseFilterSel.value;
+      const filtered = candidates.filter(t => phaseFilter === "any" || t.phase === phaseFilter);
+      if (filtered.length) candidates = filtered;
+    }
     if (!candidates.length) { statusEl.textContent = "No scenarios available for those filters."; return; }
 
     /* Pick a play the chosen position actually has a coached read for, and never
@@ -427,15 +473,24 @@
       name: play.name,
       situation: play.situation,
       pressure: play.pressure || "Med",
-      fmt, mode, diff,
+      // The strength comes from the play, not the picker: in plan mode the
+      // unit chooses it, and the scoreboard should say what's actually on ice.
+      fmt: play.fmt || "5v5",
+      mode, diff,
       role: playRole,
+      // On special teams the job matters more than the badge on your jersey.
+      job: (play.jobs && play.jobs[playRole]) || null,
       attackDir: play.attackDir,
       isDefense: !!play.isDefense,
       forecheck: !!play.forecheck,
       carrier: play.carrier,
       reads: px.reads,
-      prompt: `${play.name} — you are ${playRole}. ${play.situation}`,
+      prompt: "",
     };
+    /* Naming the job is the whole point of the special-teams vocabulary: a kid
+       who knows what "the bumper" means can follow a coach at a whiteboard. */
+    const who = scenario.job ? `you are ${playRole} — ${scenario.job}` : `you are ${playRole}`;
+    scenario.prompt = `${play.name} — ${who}. ${play.situation}`;
     if (playRole !== role) {
       scenario.roleNote = `This play doesn't use ${role} — you're playing ${playRole}.`;
     }
@@ -489,6 +544,7 @@
     camera.ready = false;
 
     // UI
+    renderPlanBar();
     phaseEl.textContent = scenario.phase;
     pressureEl.textContent = scenario.pressure;
     structureEl.textContent = scenario.name;
@@ -506,7 +562,8 @@
       const best = scenario.reads[scenario.role] && scenario.reads[scenario.role].best;
       const pr = best && HIQ.PRINCIPLES[best.principle];
       if (pr) promptEl.innerHTML =
-        `<span class="principle">\uD83D\uDCA1 ${pr.name}</span><br/>${pr.kid} You are ${scenario.role}.`;
+        `<span class="principle">\uD83D\uDCA1 ${pr.name}</span><br/>${pr.kid} You are ${scenario.role}` +
+        `${scenario.job ? " \u2014 " + scenario.job : ""}.`;
     }
 
     const showHints = (diffSel.value === "easy" || youngest);
@@ -1196,6 +1253,16 @@
     awardXP(grade === "best" ? 100 : grade === "acceptable" ? 55 : 15);
     checkBadges({ comeback: wasComeback });
     saveStore("hiq_stats", stats);
+
+    /* Season plan: only the best read counts, and only once per position in a
+       situation. Partial credit is honest feedback but it isn't yet learned,
+       and repeating the one read you find easy shouldn't open the next unit. */
+    if (planOn() && grade === "best") {
+      const unit = currentUnit();
+      const advanced = recordPlanWin(unit, scenario.id, scenario.role);
+      renderPlanBar();
+      if (advanced) toast("🏒", `Unit complete — ${unit.name}`, `Next up: ${currentUnit().name}`);
+    }
 
     addReportEntry({
       time: nowTime(), fmt: scenario.fmt, phase: scenario.phase,
@@ -2261,15 +2328,12 @@
   });
 
   function onSettingChange() {
-    const fmt = formatSel.value;
-    const isSpecial = (fmt === "5v4" || fmt === "4v5");
-    ppStructWrap.style.display = isSpecial ? "" : "none";
-    pkStructWrap.style.display = isSpecial ? "" : "none";
+    renderPlanBar();
     if (scenario) buildScenario();
   }
 
-  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, pressureFilterSel, ppStructSel, pkStructSel, overlaySel]
-    .forEach(el => el.addEventListener("change", onSettingChange));
+  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, pressureFilterSel, overlaySel, planSel]
+    .forEach(el => el && el.addEventListener("change", onSettingChange));
 
   // Debug/testing hooks (not used by gameplay)
   HIQ.debug = {
@@ -2282,6 +2346,26 @@
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
     getStats: () => stats,
+    getPlan: () => ({
+      on: planOn(),
+      index: unitIndex(),
+      unit: currentUnit(),
+      need: unitNeed(currentUnit()),
+      done: unitDoneKeys(currentUnit()).slice(),
+    }),
+    resetPlan: () => {
+      planProgress.unit = 0;
+      planProgress.done = {};
+      saveStore("hiq_plan", planProgress);
+      renderPlanBar();
+    },
+    // Credit a learned read without playing it out — lets the suite walk the
+    // whole season in one go instead of tapping through every unit.
+    creditPlan: (playId, role) => {
+      const advanced = recordPlanWin(currentUnit(), playId, role);
+      renderPlanBar();
+      return advanced;
+    },
     getProfile: () => profile,
     guidanceShown: () => renderState.showGuidance,
     getCamera: () => ({ ...camera }),
@@ -2332,18 +2416,35 @@
       x: (x - camera.x) * camera.scale + canvas.width / 2,
       y: (y - camera.y) * camera.scale + canvas.height / 2
     }),
-    // Auditing hooks: score an arbitrary spot, and force a specific template
+    // Auditing hooks: score an arbitrary spot, and force a specific scenario
     scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
+    /* Build one named play on demand, so a specific situation can be reviewed
+       or tested without re-rolling until it comes up. It used to filter the
+       old TEMPLATES_EVEN list, which stopped driving the game when the
+       authored plays replaced it — so it quietly did nothing at all. It now
+       pins HIQ.PLAYS, and it restores the full set and the chosen format
+       whichever way it exits. */
     forceTemplate: (id, role) => {
-      const tpl = HIQ.TEMPLATES_EVEN.find(t => t.id === id);
-      if (!tpl) return null;
+      const play = HIQ.PLAYS.find(p => p.id === id);
+      if (!play) return null;
       if (role) roleSel.value = role;
-      const saved = HIQ.TEMPLATES_EVEN.slice();
-      HIQ.TEMPLATES_EVEN.length = 0;
-      HIQ.TEMPLATES_EVEN.push(tpl);
-      buildScenario();
-      HIQ.TEMPLATES_EVEN.length = 0;
-      saved.forEach(t => HIQ.TEMPLATES_EVEN.push(t));
+      const savedPlays = HIQ.PLAYS.slice();
+      const savedPlan = planSel ? planSel.value : null;
+      const savedFmt = formatSel.value;
+      try {
+        // A play only gets served if the format matches the strength it is
+        // authored at, and the plan would restrict it to the current unit.
+        if (planSel) planSel.value = "free";
+        formatSel.value = play.fmt || "5v5";
+        HIQ.PLAYS.length = 0;
+        HIQ.PLAYS.push(play);
+        buildScenario();
+      } finally {
+        HIQ.PLAYS.length = 0;
+        savedPlays.forEach(p => HIQ.PLAYS.push(p));
+        if (planSel && savedPlan !== null) planSel.value = savedPlan;
+        formatSel.value = savedFmt;
+      }
       return scenario.id;
     }
   };
@@ -2418,8 +2519,7 @@
   if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
-  ppStructWrap.style.display = "none";
-  pkStructWrap.style.display = "none";
+  renderPlanBar();
   // Phones: start with the settings panel collapsed so the rink is front and center
   const settingsPanel = document.getElementById("settingsPanel");
   if (settingsPanel && window.innerWidth <= 760) settingsPanel.open = false;
