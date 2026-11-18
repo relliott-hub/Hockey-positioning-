@@ -2397,6 +2397,673 @@ HIQ.PLAYS = [
       },
     },
   },
+
+  /* ================================================================== */
+  /* DECISIONS IN EVERY ZONE.
+
+     The eight scenarios below fill in the reads a youth player meets most
+     often and the game did not yet ask about: the puck behind your own net,
+     a shot coming from your point, the race back for a dump-in, both sides
+     of a two-on-one, the point shot and the attack from behind the net in
+     their end, the decision to pinch, and the chase after your own dump-in.
+
+     Two of them are races for a loose puck. Nobody has it yet, and the game
+     says so rather than ringing whoever happens to be nearest.              */
+  /* ================================================================== */
+
+  /* Puck behind your own net. "If the puck is behind the net, the forwards
+     should collapse into the dot area"; the defencemen take the posts and
+     try to force the carrier out on his backhand. The classic mistake is a
+     defenceman chasing him round the back of the net, which hands him the
+     front of it. */
+  {
+    id: "dzone_behind_net",
+    phase: "Defend",
+    name: "Puck behind your net",
+    situation:
+      "The other team has the puck behind your net and is looking for a pass " +
+      "out front. Don't chase it round the net — close off the front of it.",
+    claims: { puck: ["belowGoalLine", "behindNet"], opponentDAtBlueLine: true },
+    attackDir: "left",
+    ourNet: "left",
+    isDefense: true,
+    puck: { x: 5, y: 47 },
+    carrier: "opp",
+    players: {
+      LD: { x: 9, y: 53 },
+      RD: { x: 14, y: 36 },
+      C:  { x: 22, y: 44 },
+      LW: { x: 32, y: 60 },
+      RW: { x: 32, y: 26 },
+    },
+    opponents: [
+      { x: 5, y: 47, label: "O1" },
+      { x: 17, y: 30, label: "O2" },
+      { x: 20, y: 66, label: "O3" },
+      { x: 72, y: 62, label: "D1" },
+      { x: 72, y: 24, label: "D2" },
+    ],
+    reads: {
+      LD: {
+        best: { x: 9, y: 53, why: "Take the post on his side and close him in. Make him come out the far side on his backhand — if you chase him round the back of the net, he walks out the front with you behind him." },
+        acceptable: [
+          { x: 30, y: 56, why: "Sagging out to the hash marks keeps everything in front of you and nobody gets the slot — but it gives him all the time he wants behind the net to pick his pass." },
+        ],
+        wrong: [
+          { x: 6, y: 32, why: "You chased him behind the net. He reverses it, and you're on the wrong side of your own goal." },
+          { x: 52, y: 64, why: "You left for the top of the circle. Everything dangerous is happening behind your goal line right now." },
+        ],
+      },
+      RD: {
+        best: { x: 14, y: 36, why: "Far post, stick on the man at the back door. When the puck is behind the net, the pass out to the far post is the one that scores." },
+        acceptable: [
+          { x: 34, y: 28, why: "Stepping out to the weak-side circle covers the cross-ice pass — but it leaves the back door open, and that's the tap-in." },
+        ],
+        wrong: [
+          { x: 6, y: 58, why: "You went to the puck side too. Two of you on one man and the far post is empty." },
+          { x: 54, y: 42, why: "You drifted up to the top of the zone. Your net is undefended." },
+        ],
+      },
+      C: {
+        best: { x: 22, y: 44, why: "Low slot, between the puck and the front of the net. You're the third player low — any pass out front has to come through you." },
+        acceptable: [
+          { x: 14, y: 64, why: "Going down to help your defenceman on the puck side is honest hockey if he's in trouble — but the slot is empty while you're down there." },
+        ],
+        wrong: [
+          { x: 46, y: 44, why: "You stayed high waiting for a breakout pass. Defend first — you're the player in the slot." },
+          { x: 6, y: 30, why: "You chased behind the net. Now three of you are below the goal line and the slot is empty." },
+        ],
+      },
+      LW: {
+        best: { x: 32, y: 60, why: "Puck-side dot, between the corner and the slot. Take away the pass out to the hash marks, and be ready to collapse if it comes out front." },
+        acceptable: [
+          { x: 64, y: 66, why: "Staying up on their point takes the shot away — but with the puck behind the net, the point is a long way from the danger, and you're needed lower." },
+        ],
+        wrong: [
+          { x: 10, y: 62, why: "You went down to the puck. Three of you on one player behind the net, and the slot is open." },
+          { x: 34, y: 36, why: "You slid into the middle where your centre already is. Now nobody takes the pass to the puck-side dot." },
+        ],
+      },
+      RW: {
+        best: { x: 32, y: 26, why: "Weak-side dot. Collapse toward the net and watch the back door — and the far point, if the puck goes up there." },
+        acceptable: [
+          { x: 64, y: 20, why: "Covering their weak-side point stops the cross-ice shot — but it leaves the slot, and with the puck behind the net that's the ice that matters." },
+        ],
+        wrong: [
+          { x: 30, y: 58, why: "You crossed to the puck side. Nobody is left on the weak side for the pass out to the far post." },
+          { x: 92, y: 24, why: "You left the zone early. It's five on four in your own end." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* A shot coming from your point. When the puck goes high, coverage moves
+     up with it: "when the puck is high in the zone, cover the middle of the
+     ice from the blue line to about the top of the circles". The winger
+     gets into the shooting lane — "your stick and body belong between him
+     and the net" — and the defencemen own the screen and the rebound. */
+  {
+    id: "dzone_point_shot",
+    phase: "Defend",
+    name: "Shot from the point",
+    situation:
+      "Their defenceman has the puck at the point, on your blue line, with " +
+      "players crowding the front of your net. Take away the shot and the screen.",
+    claims: { puck: ["atBlueLine"], opponentDAtBlueLine: true },
+    attackDir: "left",
+    ourNet: "left",
+    isDefense: true,
+    puck: { x: 72, y: 64 },
+    carrier: "opp",
+    players: {
+      LW: { x: 58, y: 60 },
+      RW: { x: 44, y: 30 },
+      LD: { x: 16, y: 48 },
+      RD: { x: 18, y: 34 },
+      C:  { x: 32, y: 46 },
+    },
+    opponents: [
+      { x: 72, y: 64, label: "D1" },
+      { x: 72, y: 22, label: "D2" },
+      { x: 13, y: 42, label: "O1" },
+      { x: 20, y: 60, label: "O2" },
+      { x: 28, y: 30, label: "O3" },
+    ],
+    reads: {
+      LW: {
+        best: { x: 58, y: 60, why: "Get into the shooting lane between him and your net, stick on the ice. You don't have to reach him — you have to be where the puck is going." },
+        acceptable: [
+          { x: 72, y: 76, why: "Pressuring him hard toward the boards can force a rushed shot — but if he fakes and steps past you, he's alone at the top of the circle." },
+        ],
+        wrong: [
+          { x: 30, y: 62, why: "You sagged down to the hash marks. The shooter has a clear lane and a screen in front — that's how point shots go in." },
+          { x: 60, y: 34, why: "You drifted to the middle. The shooter on your side has nobody in his lane at all." },
+        ],
+      },
+      RW: {
+        best: { x: 44, y: 30, why: "When the puck goes up to the point, you move up with it: high slot on the weak side, between their far point and the net. If it goes D-to-D, the second shooting lane is yours." },
+        acceptable: [
+          { x: 66, y: 22, why: "Going right up to their far point stops the one-timer — but it leaves the high slot, and a pass there is a shot from the best spot on the ice." },
+        ],
+        wrong: [
+          { x: 50, y: 62, why: "You crossed to the puck side. Your winger already has that shooter, and the far point is free." },
+          { x: 92, y: 24, why: "You left the zone waiting for a breakout pass. The puck is still theirs." },
+        ],
+      },
+      LD: {
+        best: { x: 16, y: 48, why: "Net front, on the screen. Move him out of your goalie's eyes or tie up his stick — the shot is your winger's job, the man in front is yours." },
+        acceptable: [
+          { x: 32, y: 64, why: "Stepping out to the puck-side hash marks covers the man down low — but now nobody is on the screen in front of your goalie." },
+        ],
+        wrong: [
+          { x: 54, y: 62, why: "You went up to the shooter. That's your winger's job — and the man in front of your net has nobody on him." },
+          { x: 6, y: 66, why: "You went into the corner. There's no puck down there — the danger is the shot and the screen." },
+        ],
+      },
+      RD: {
+        best: { x: 18, y: 34, why: "Weak-side post, stick on their man there. A point shot that misses the net bounces out to the far side — be the one who gets there first." },
+        acceptable: [
+          { x: 38, y: 26, why: "Stepping out to the weak-side circle covers their man there — but the far post is open for the rebound." },
+        ],
+        wrong: [
+          { x: 18, y: 56, why: "You slid across to the puck side. Both defencemen on one side and the far post is empty." },
+          { x: 56, y: 42, why: "You went up to block the shot from the high slot. That's a forward's lane — the rebound in front is yours." },
+        ],
+      },
+      C: {
+        best: { x: 32, y: 46, why: "Middle of the slot, facing the puck. You take away the pass into the slot and you're first to any rebound." },
+        acceptable: [
+          { x: 52, y: 56, why: "Stepping up into the shooting lane gives a second blocker — but it leaves the slot empty for the rebound." },
+        ],
+        wrong: [
+          { x: 12, y: 62, why: "You went down to the puck-side corner. The puck is at the point — the slot is the job." },
+          { x: 92, y: 44, why: "You left early for a breakout pass. They still have the puck, and it's five on four in front of your net." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* The race back for a dump-in. Most breakouts in youth hockey start here,
+     before anyone has the puck: the defenceman is skating back for it and
+     the other four decide whether he'll have somewhere to go when he gets
+     there. The partner goes behind the net for the D-to-D, the centre swings
+     low, the wingers get to the walls — and nobody goes to the corner with
+     him. */
+  {
+    id: "dzone_retrieval",
+    phase: "Breakout",
+    name: "Racing back for a dump-in",
+    situation:
+      "They've dumped the puck into your end and your defenceman is racing " +
+      "back for it with a forechecker chasing. Give him somewhere to go before he gets there.",
+    claims: { puck: ["belowGoalLine", "inCorner"] },
+    attackDir: "right",
+    ourNet: "left",
+    loose: true,
+    puck: { x: 6, y: 76 },
+    carrier: "opp",
+    players: {
+      LD: { x: 18, y: 68 },
+      RD: { x: 6, y: 34 },
+      C:  { x: 28, y: 56 },
+      LW: { x: 34, y: 76 },
+      RW: { x: 52, y: 20 },
+    },
+    opponents: [
+      { x: 28, y: 72, label: "F1" },
+      { x: 46, y: 60, label: "F2" },
+      { x: 60, y: 40, label: "F3" },
+      { x: 72, y: 64, label: "D1" },
+      { x: 72, y: 22, label: "D2" },
+    ],
+    reads: {
+      RD: {
+        best: { x: 6, y: 34, why: "Get behind the net on the far side. If the forechecker takes away his side, the D-to-D behind the net is the pass that's always there — and it never goes across the front of your goal." },
+        acceptable: [
+          // Not the weak-side wall: from the near corner, that pass crosses the
+          // front of your own net, and the validator rightly refused it.
+          { x: 7, y: 56, why: "Staying on the near side of the net gives him a short, safe pass straight away — but you're on the same side as the forechecker, and one checker can take you both." },
+        ],
+        wrong: [
+          { x: 14, y: 64, why: "You went into the corner with your partner. Two of you on one puck, and nobody anywhere else." },
+          { x: 60, y: 40, why: "You left the zone before your team had the puck. If he loses the race, there's nobody back." },
+        ],
+      },
+      C: {
+        best: { x: 28, y: 56, why: "Swing low on the puck side, between the corner and the middle. You're the short pass that gets the puck moving forward." },
+        acceptable: [
+          { x: 48, y: 44, why: "Waiting high in the middle is quick up the ice when it works — but it's a long pass with a forechecker on your defenceman." },
+        ],
+        wrong: [
+          { x: 12, y: 70, why: "You went to the corner too. Now two of you are fighting for one puck and there's nobody to pass to." },
+          { x: 78, y: 40, why: "You left the zone before the puck did. Your defenceman has no short option." },
+        ],
+      },
+      LW: {
+        best: { x: 34, y: 76, why: "On the wall at the hash marks, facing in. That's where the first pass goes when he gets it — be there before he is." },
+        acceptable: [
+          { x: 60, y: 78, why: "Stretching high up the wall beats the forecheck when it works — but it's a long pass for a defenceman under pressure." },
+        ],
+        wrong: [
+          { x: 12, y: 72, why: "You went down to the puck. Your defenceman needs you on the wall, not next to him." },
+          { x: 30, y: 44, why: "You came across the front of your own net. A pass there that gets picked off is a goal against." },
+        ],
+      },
+      RW: {
+        best: { x: 52, y: 20, why: "Wide on the weak side and getting ready to go. When the puck comes out, you're the one stretching their forecheck across the ice." },
+        acceptable: [
+          { x: 72, y: 26, why: "Getting up to the blue line gives a stretch option — but a pass that long from your own corner, under pressure, is the one that gets picked off." },
+        ],
+        wrong: [
+          { x: 16, y: 60, why: "You collapsed all the way back to the puck. Everyone is below it now." },
+          { x: 96, y: 14, why: "You're too far ahead. The pass can't reach you and you've left the play." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* The two-on-one from the attacking side. The off-puck player's job is
+     the most under-taught skill in the game: "far post, stick down, drive
+     the net", arriving as the shot is released. The trailer and the two
+     defencemen decide whether a turnover becomes a rush the other way. */
+  {
+    id: "rush_two_on_one_attack",
+    phase: "Rush",
+    name: "Two on one for you",
+    situation:
+      "Your winger is carrying the puck over their blue line and there's only " +
+      "one defender back. You have a two-on-one — make it count.",
+    claims: { puck: ["atBlueLine"] },
+    attackDir: "right",
+    ourNet: "left",
+    puck: { x: 130, y: 64 },
+    carrier: "RW",
+    players: {
+      RW: { x: 130, y: 64 },
+      LW: { x: 128, y: 26 },
+      C:  { x: 104, y: 48 },
+      RD: { x: 96, y: 58 },
+      LD: { x: 90, y: 36 },
+    },
+    opponents: [
+      { x: 150, y: 44, label: "D1" },
+      { x: 112, y: 22, label: "D2" },
+      { x: 110, y: 60, label: "F1" },
+      { x: 102, y: 30, label: "F2" },
+      { x: 96, y: 46, label: "F3" },
+    ],
+    reads: {
+      LW: {
+        best: { x: 158, y: 32, why: "Drive to the far post with your stick on the ice, slightly behind the puck. The defender can't take you and the shooter at the same time — and you can't score a backdoor goal with your stick in the air." },
+        acceptable: [
+          { x: 140, y: 22, why: "Staying wide keeps you open for the pass — but from out there it's a sharp-angle shot, and you're not there for the rebound." },
+        ],
+        wrong: [
+          { x: 136, y: 46, why: "You cut into the middle toward the puck. Now one defender can cover both of you." },
+          { x: 182, y: 22, why: "You raced to the net too early and went past the play. Arrive as the shot does, not before it." },
+        ],
+      },
+      C: {
+        best: { x: 112, y: 46, why: "Trail the rush through the middle. If the defender takes away the pass, the drop back to you is wide open." },
+        acceptable: [
+          { x: 90, y: 46, why: "Staying back is safe — but you're too far away to be the trailer, so the rush is just two players." },
+        ],
+        wrong: [
+          { x: 130, y: 58, why: "You followed the puck carrier. Two of you in one lane — that's one defender's easy job." },
+          { x: 152, y: 54, why: "You charged all the way in. Nobody is high if it gets turned over." },
+        ],
+      },
+      RD: {
+        best: { x: 104, y: 58, why: "Follow the rush up on your side. Close enough to keep it in if it comes back out, and back in time if it's turned over." },
+        acceptable: [
+          { x: 124, y: 62, why: "Getting up to their blue line keeps the puck in if it squirts out — but on an odd-man rush nobody is covering for you." },
+        ],
+        wrong: [
+          { x: 72, y: 56, why: "You stopped at your own blue line. You're too far back to support anything." },
+          { x: 104, y: 34, why: "You drifted to your partner's side. Both defencemen in one lane." },
+        ],
+      },
+      LD: {
+        best: { x: 92, y: 36, why: "Hang back in the middle. On a two-on-one somebody has to be the last player back in case it's turned over — that's you." },
+        acceptable: [
+          { x: 112, y: 30, why: "Following the rush up gives another option — but you're the safety valve on this one." },
+        ],
+        wrong: [
+          { x: 136, y: 40, why: "You joined the rush. Two of you caught up the ice, and they have open ice the other way." },
+          { x: 92, y: 62, why: "You drifted to your partner's side. The middle behind the rush is unguarded." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* The point shot in their end. A shot the goalie can see is a save. "One
+     forward goes to the net front to screen and tip, with another
+     supporting in the high slot to form a triangle with the point"; the
+     weak-side player waits at the back door, where misses end up. */
+  {
+    id: "ozone_point_shot",
+    phase: "O-zone",
+    name: "Point shot",
+    situation:
+      "Your defenceman has the puck at the point in their end and is getting " +
+      "ready to shoot. Make the shot count.",
+    claims: { puck: ["atBlueLine"], ourDAtBlueLine: true },
+    attackDir: "right",
+    ourNet: "left",
+    puck: { x: 128, y: 64 },
+    carrier: "RD",
+    players: {
+      RD: { x: 128, y: 64 },
+      LD: { x: 128, y: 24 },
+      C:  { x: 180, y: 44 },
+      LW: { x: 176, y: 26 },
+      RW: { x: 158, y: 62 },
+    },
+    opponents: [
+      { x: 184, y: 50, label: "D1" },
+      { x: 178, y: 32, label: "D2" },
+      { x: 140, y: 62, label: "F1" },
+      { x: 150, y: 38, label: "F2" },
+      { x: 166, y: 70, label: "F3" },
+    ],
+    reads: {
+      C: {
+        best: { x: 180, y: 44, why: "In front of the net, in the goalie's eyes, stick on the ice. A point shot the goalie can see is a save — the one he can't see is a goal." },
+        acceptable: [
+          { x: 158, y: 44, why: "The high slot gives you a tip and a shot from further out — but the goalie can see the puck the whole way." },
+        ],
+        wrong: [
+          { x: 136, y: 58, why: "You went up to help your defenceman. The puck's already there — and now nobody is screening." },
+          { x: 192, y: 62, why: "You went into the corner. If the shot comes off the goalie, you're nowhere near it." },
+        ],
+      },
+      LW: {
+        best: { x: 176, y: 26, why: "Weak side, near the far post. Point shots that miss go wide to the back door, and the goalie can't get across in time." },
+        acceptable: [
+          { x: 154, y: 24, why: "The weak-side circle gives you a one-timer if the point passes across — but you're too far out for the rebound." },
+        ],
+        wrong: [
+          { x: 176, y: 50, why: "You went to the net front where your centre already is. Two of you screening and nobody at the back door." },
+          { x: 130, y: 30, why: "You drifted up to the point. That's your defenceman's spot, and the far post is empty." },
+        ],
+      },
+      RW: {
+        best: { x: 158, y: 62, why: "Puck side, between the wall and the slot. If the shot is blocked you're the one who keeps it in — and if it comes back down, you're the next shooter." },
+        acceptable: [
+          { x: 182, y: 60, why: "Crashing the puck-side post finds the strong-side rebound — but if the shot is blocked, nobody's there to keep it in." },
+        ],
+        wrong: [
+          { x: 176, y: 40, why: "You went into the crowd in front. Three of you at the net, and nobody high if it's blocked." },
+          { x: 130, y: 72, why: "You went back up to the point with your defenceman. That's one shooter, not two." },
+        ],
+      },
+      LD: {
+        best: { x: 128, y: 24, why: "Hold the weak-side point. If it's blocked and squirts across, you keep it in — and you're the last one back if they break out." },
+        acceptable: [
+          { x: 140, y: 42, why: "Sliding to the middle of the line gives you a shot of your own — but it leaves the weak-side boards, where the puck escapes." },
+        ],
+        wrong: [
+          { x: 172, y: 34, why: "You dropped into the slot. Both points are empty and a blocked shot goes straight out." },
+          { x: 104, y: 26, why: "You retreated to centre. The puck comes out easily and the shot was wasted." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Attacking from behind their net. The player behind the net is the hub,
+     with support "around the face-off dots and high slot", and shots set up
+     from behind the net produce more rebound chances than most. The reads
+     are about being in a lane the pass out can actually reach. */
+  {
+    id: "ozone_behind_net",
+    phase: "O-zone",
+    name: "Attacking from behind the net",
+    situation:
+      "Your centre has the puck behind their net and their defence is " +
+      "turning to find it. Get somewhere he can pass to.",
+    claims: { puck: ["belowGoalLine", "behindNet"], ourDAtBlueLine: true },
+    attackDir: "right",
+    ourNet: "left",
+    puck: { x: 194, y: 40 },
+    carrier: "C",
+    players: {
+      C:  { x: 194, y: 40 },
+      LW: { x: 178, y: 34 },
+      RW: { x: 166, y: 56 },
+      RD: { x: 128, y: 62 },
+      LD: { x: 128, y: 24 },
+    },
+    opponents: [
+      { x: 190, y: 52, label: "D1" },
+      { x: 182, y: 44, label: "D2" },
+      { x: 170, y: 40, label: "F1" },
+      { x: 140, y: 60, label: "F2" },
+      { x: 140, y: 26, label: "F3" },
+    ],
+    reads: {
+      LW: {
+        best: { x: 178, y: 34, why: "At the far post, stick down. A pass out from behind the net is quick and the goalie has to turn to see it — be the one he can't see." },
+        acceptable: [
+          { x: 158, y: 28, why: "Sitting on the weak-side dot gives you a one-timer — but you're a long way from the net if it turns into a jam play." },
+        ],
+        wrong: [
+          { x: 194, y: 20, why: "You went below the goal line too. Two of you back there and nobody out front." },
+          { x: 132, y: 30, why: "You drifted to the point. Nobody's at the net for the pass out." },
+        ],
+      },
+      RW: {
+        best: { x: 166, y: 56, why: "Near-side slot, above the dot. If they take away the pass to the post, the pass out to you is open — and you're facing the net when you get it." },
+        acceptable: [
+          { x: 150, y: 42, why: "The high slot in the middle gives a great shot — but the pass from behind the net to there has to get through three players." },
+        ],
+        wrong: [
+          { x: 194, y: 62, why: "You went down into the corner. Your centre already has the puck behind the net — now nobody is in the slot." },
+          { x: 176, y: 22, why: "You crossed to the far side where your winger already is. The near side of the slot is empty." },
+        ],
+      },
+      RD: {
+        best: { x: 128, y: 62, why: "Hold the blue line on your side. A pass out from behind the net that gets blocked ends up at the point — be there to keep it in and shoot." },
+        acceptable: [
+          { x: 150, y: 66, why: "Sliding down to the top of the circle gives another shooting option — but if it comes out, you're caught deep." },
+        ],
+        wrong: [
+          { x: 106, y: 60, why: "You backed out of the zone. Any puck that comes up the wall goes straight out." },
+          { x: 188, y: 66, why: "You went all the way into the corner. If they win it, it's a two-on-one the other way." },
+        ],
+      },
+      LD: {
+        best: { x: 128, y: 24, why: "Hold the weak-side point. When their defence collapses on the net, the pass up to you is open — and you're the last one back." },
+        acceptable: [
+          { x: 140, y: 42, why: "Sliding to the middle of the blue line gives a better shooting angle — but it leaves the weak-side boards, where the puck escapes." },
+        ],
+        wrong: [
+          { x: 170, y: 30, why: "You dropped into the slot. Both points are empty and the puck comes straight out." },
+          { x: 104, y: 26, why: "You retreated to centre. The puck comes out easily and the zone time is wasted." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* To pinch or not. "Never pinch if it is obvious you're going to get beat
+     to the puck. Never pinch if it is 50/50", and a pinch is only
+     defensible with "a centre high in the zone behind the pinching
+     defenceman". This one is authored so the defenceman clearly wins the
+     race and the centre is already high — so pinching is right here, and
+     the reads say exactly why, so the condition is learned with the answer. */
+  {
+    id: "ozone_pinch",
+    phase: "O-zone",
+    name: "Pinch or hold the line",
+    situation:
+      "The puck has been rimmed up the boards toward your point and their " +
+      "winger is racing for it. Your defenceman is closer — pinch, or hold the line?",
+    claims: { ourDAtBlueLine: true },
+    attackDir: "right",
+    ourNet: "left",
+    loose: true,
+    puck: { x: 138, y: 79 },
+    carrier: "opp",
+    players: {
+      RD: { x: 128, y: 66 },
+      LD: { x: 128, y: 24 },
+      C:  { x: 132, y: 46 },
+      RW: { x: 172, y: 66 },
+      LW: { x: 170, y: 30 },
+    },
+    opponents: [
+      { x: 162, y: 74, label: "W1" },
+      { x: 184, y: 50, label: "D1" },
+      { x: 182, y: 28, label: "D2" },
+      { x: 164, y: 44, label: "F2" },
+      { x: 150, y: 22, label: "F3" },
+    ],
+    reads: {
+      RD: {
+        best: { x: 146, y: 72, why: "Pinch, and take the inside line between their winger and the puck. You'll clearly get there first and your centre is high to cover for you — keep it in and the zone stays yours. If either of those weren't true, you'd hold." },
+        acceptable: [
+          { x: 122, y: 60, why: "Backing up so nothing gets behind you is never a disaster — but you'd have won this race, and now the puck is out of the zone." },
+        ],
+        wrong: [
+          { x: 176, y: 74, why: "You went all the way down to the corner. The puck is behind you up the wall — and if they get it, it's a two-on-one going back." },
+          { x: 130, y: 40, why: "You drifted to the middle of the line. The puck is coming up your boards and you've left them." },
+        ],
+      },
+      C: {
+        best: { x: 132, y: 46, why: "Stay high in the middle, near the blue line. Your defenceman is pinching — if it gets past him, you're the one who's back." },
+        acceptable: [
+          { x: 154, y: 38, why: "Dropping into the slot keeps you ready to shoot if the pinch works — but if it doesn't, nobody is covering for your defenceman." },
+        ],
+        wrong: [
+          { x: 144, y: 76, why: "You went to the puck with your defenceman. Two of you in one battle and nobody at the point." },
+          { x: 182, y: 44, why: "You went down to the net. If the pinch fails, there are three of you below the puck." },
+        ],
+      },
+      LD: {
+        best: { x: 126, y: 36, why: "Slide toward the middle of the blue line. With your partner pinching, the middle of the line is yours." },
+        acceptable: [
+          { x: 130, y: 16, why: "Staying out wide on your side is the usual spot — but with your partner pinching, the middle of the line is empty." },
+        ],
+        wrong: [
+          { x: 150, y: 28, why: "You pinched too. Both defencemen are deep and the whole blue line is open behind you." },
+          { x: 104, y: 40, why: "You backed off into the neutral zone. If it comes out, they're attacking with speed." },
+        ],
+      },
+      RW: {
+        best: { x: 164, y: 64, why: "Come up the wall toward the puck as a second option. If your defenceman wins it, the short pass to you keeps the cycle going." },
+        acceptable: [
+          { x: 178, y: 48, why: "Going to the net gives a shot option if he wins it — but you're a long way from the wall if he needs help." },
+        ],
+        wrong: [
+          { x: 132, y: 76, why: "You raced all the way up the wall to the puck. Now you and your defenceman are chasing the same puck, and nobody's low." },
+          { x: 182, y: 26, why: "You crossed to the far side where your winger is. The puck side is empty if it gets past the pinch." },
+        ],
+      },
+      LW: {
+        best: { x: 168, y: 32, why: "Weak-side slot. If the pinch keeps it in, the quick pass across to you is a scoring chance." },
+        acceptable: [
+          { x: 148, y: 22, why: "Sliding high on the weak side helps cover the pinch — but your centre is already there, and you're out of scoring range." },
+        ],
+        wrong: [
+          { x: 176, y: 62, why: "You crossed to the puck side. Three of you near one puck." },
+          { x: 192, y: 18, why: "You went into the far corner. Nothing is happening there." },
+        ],
+      },
+    },
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Chasing your own dump-in. F1 "should be accelerating as the dump is
+     released, not after it"; F2 reads F1 and takes away the escape; F3
+     stays high so a lost battle never becomes a three-on-two. Unlike the
+     forecheck scenarios, the puck here is loose — the first decision is to
+     go and get it. */
+  {
+    id: "ozone_dump_retrieval",
+    phase: "Forecheck",
+    name: "Chasing your dump-in",
+    situation:
+      "You've just dumped the puck into their end and their defenceman is " +
+      "turning back for it. The puck is loose — go and get it back.",
+    claims: { puck: ["belowGoalLine", "inCorner"], ourDAtBlueLine: true },
+    attackDir: "right",
+    ourNet: "left",
+    forecheck: true,
+    loose: true,
+    puck: { x: 194, y: 76 },
+    carrier: "opp",
+    players: {
+      C:  { x: 170, y: 66 },
+      LW: { x: 160, y: 54 },
+      RW: { x: 146, y: 40 },
+      RD: { x: 128, y: 62 },
+      LD: { x: 128, y: 24 },
+    },
+    opponents: [
+      { x: 184, y: 60, label: "O1" },
+      { x: 184, y: 30, label: "O2" },
+      { x: 150, y: 72, label: "O3" },
+      { x: 140, y: 56, label: "O4" },
+      { x: 150, y: 24, label: "O5" },
+    ],
+    reads: {
+      C: {
+        best: { x: 182, y: 68, why: "Go hard and take the inside line to the puck. Get there first if you can — and if you can't, get your body between their defenceman and the middle so he has to go up the wall." },
+        acceptable: [
+          { x: 166, y: 52, why: "Taking an angle and waiting for him to touch it is a safe forecheck — but on a loose puck you've handed it to him for free." },
+        ],
+        wrong: [
+          { x: 194, y: 48, why: "You went to the other side of the net. He picks it up and goes the way you left open." },
+          { x: 150, y: 44, why: "You stayed high and let him have it. A dump-in only works if somebody goes and gets it." },
+        ],
+      },
+      LW: {
+        best: { x: 176, y: 52, why: "Read your first forechecker and take away the pass behind the net. If he wins it, you're his first option out front." },
+        acceptable: [
+          { x: 164, y: 72, why: "Supporting on the wall is the right lane if the puck comes up the boards — but it leaves the pass behind the net open." },
+        ],
+        wrong: [
+          { x: 192, y: 70, why: "You went to the puck too. Two forwards in the corner, and they chip it out past you both." },
+          { x: 140, y: 40, why: "You stayed high in the middle. That's your third forechecker's spot — and the puck has no second player on it." },
+        ],
+      },
+      RW: {
+        best: { x: 150, y: 42, why: "High in the slot, above everyone. If they win the battle you stop the odd-man rush — and if we win it, you're the shooter." },
+        acceptable: [
+          { x: 134, y: 26, why: "Taking the weak-side wall shuts that outlet — but the breakout through the middle is the one that hurts." },
+        ],
+        wrong: [
+          { x: 184, y: 62, why: "You dived in low as well. Three forwards below the puck — if it comes out, nobody is home." },
+          { x: 124, y: 46, why: "You backed all the way to the blue line. That's your defenceman's job." },
+        ],
+      },
+      RD: {
+        best: { x: 128, y: 62, why: "Hold the blue line on the puck side. When their winger tries to chip it up the wall, you're the one who keeps it in." },
+        acceptable: [
+          { x: 148, y: 72, why: "Pinching down the wall keeps it in if you get there — but miss, and their winger is gone with you behind him." },
+        ],
+        wrong: [
+          { x: 106, y: 58, why: "You backed into the neutral zone. The puck comes out and the dump-in was wasted." },
+          { x: 128, y: 34, why: "You drifted to the middle. The puck is coming up your boards and you've left them." },
+        ],
+      },
+      LD: {
+        best: { x: 128, y: 24, why: "Hold the weak-side point. If they reverse it behind the net and swing it across, you're the one who kills the breakout." },
+        acceptable: [
+          { x: 142, y: 42, why: "Sliding toward the middle helps cover the slot — but it opens the weak-side boards." },
+        ],
+        wrong: [
+          { x: 136, y: 62, why: "Both defencemen on the puck side. If it goes around the boards, nobody's on the far side." },
+          { x: 104, y: 28, why: "You retreated to centre. They walk out of their zone with speed." },
+        ],
+      },
+    },
+  },
 ];
 
 /* The principles.
@@ -2547,6 +3214,58 @@ const PRINCIPLE_MAP = {
     RD: ["yourjob", "middle", "above", "above"],
     LD: ["middle", "weakside", "above", "weakside"],
   },
+  dzone_behind_net: {
+    LD: ["dontchase", "middle", "dontchase", "middle"],
+    RD: ["weakside", "weakside", "weakside", "middle"],
+    C:  ["middle", "yourjob", "middle", "dontchase"],
+    LW: ["middle", "yourjob", "dontchase", "lanes"],
+    RW: ["weakside", "weakside", "weakside", "yourjob"],
+  },
+  dzone_point_shot: {
+    LW: ["middle", "dontchase", "yourjob", "lanes"],
+    RW: ["weakside", "weakside", "yourjob", "above"],
+    LD: ["middle", "yourjob", "yourjob", "middle"],
+    RD: ["weakside", "weakside", "weakside", "yourjob"],
+    C:  ["middle", "middle", "middle", "above"],
+  },
+  dzone_retrieval: {
+    RD: ["support", "lanes", "dontchase", "above"],
+    C:  ["support", "support", "dontchase", "above"],
+    LW: ["support", "support", "dontchase", "middle"],
+    RW: ["weakside", "support", "dontchase", "above"],
+  },
+  rush_two_on_one_attack: {
+    LW: ["support", "support", "lanes", "support"],
+    C:  ["support", "above", "lanes", "above"],
+    RD: ["support", "above", "support", "lanes"],
+    LD: ["above", "above", "above", "middle"],
+  },
+  ozone_point_shot: {
+    C:  ["middle", "support", "dontchase", "support"],
+    LW: ["weakside", "weakside", "lanes", "yourjob"],
+    RW: ["support", "support", "lanes", "yourjob"],
+    LD: ["weakside", "weakside", "above", "above"],
+  },
+  ozone_behind_net: {
+    LW: ["middle", "weakside", "lanes", "yourjob"],
+    RW: ["support", "support", "dontchase", "lanes"],
+    RD: ["yourjob", "support", "above", "above"],
+    LD: ["weakside", "weakside", "above", "above"],
+  },
+  ozone_pinch: {
+    RD: ["support", "above", "dontchase", "lanes"],
+    C:  ["above", "above", "dontchase", "above"],
+    LD: ["above", "weakside", "above", "above"],
+    RW: ["support", "support", "dontchase", "lanes"],
+    LW: ["weakside", "support", "lanes", "yourjob"],
+  },
+  ozone_dump_retrieval: {
+    C:  ["yourjob", "yourjob", "lanes", "yourjob"],
+    LW: ["support", "lanes", "dontchase", "yourjob"],
+    RW: ["above", "weakside", "above", "yourjob"],
+    RD: ["yourjob", "support", "above", "lanes"],
+    LD: ["weakside", "weakside", "weakside", "above"],
+  },
 };
 
 // Attach the principle to every read, in the order the map lists them.
@@ -2586,23 +3305,33 @@ HIQ.CURRICULUM = [
   {
     id: "house",
     name: "Protect the house",
-    goal: "Learn the most dangerous ice on the sheet — and who guards it.",
-    plays: ["dzone_corner_battle", "dzone_halfwall_coverage"],
+    goal: "Learn the most dangerous ice on the sheet \u2014 and who guards it.",
+    plays: ["dzone_corner_battle", "dzone_behind_net"],
+    need: 6,
+  },
+  {
+    /* Same end, puck higher up. The point of splitting this from the unit
+       above is that coverage MOVES with the puck: low puck, defend the net;
+       high puck, defend the middle out to the top of the circles. */
+    id: "shot",
+    name: "Take away the shot",
+    goal: "When the puck goes up high, your coverage goes up with it.",
+    plays: ["dzone_halfwall_coverage", "dzone_point_shot"],
     need: 6,
   },
   {
     id: "breakout",
     name: "Get out of your end",
     goal: "Give your defence somewhere safe to pass, and never through the middle.",
-    plays: ["breakout_corner_pressure", "dzone_faceoff"],
-    need: 6,
+    plays: ["dzone_retrieval", "breakout_corner_pressure", "dzone_faceoff"],
+    need: 7,
   },
   {
     id: "transition",
     name: "Move it up the ice",
     goal: "Attack with speed and width instead of all skating to the puck.",
-    plays: ["nz_regroup", "rush_three_on_two"],
-    need: 6,
+    plays: ["nz_regroup", "rush_three_on_two", "rush_two_on_one_attack"],
+    need: 7,
   },
   {
     /* More of a game happens between the blue lines than anywhere else, and
@@ -2624,9 +3353,16 @@ HIQ.CURRICULUM = [
   {
     id: "offence",
     name: "Keep it in their end",
-    goal: "Hold possession, and have somebody at the net when the chance comes.",
-    plays: ["ozone_cycle_support", "ozone_faceoff"],
-    need: 6,
+    goal: "Win the puck back down low, and know when to hold the line.",
+    plays: ["ozone_dump_retrieval", "ozone_cycle_support", "ozone_pinch"],
+    need: 7,
+  },
+  {
+    id: "score",
+    name: "Create the chance",
+    goal: "Be where the pass can reach you, and where the goalie can't see.",
+    plays: ["ozone_point_shot", "ozone_behind_net", "ozone_faceoff"],
+    need: 7,
   },
   {
     id: "recover",
@@ -2638,7 +3374,7 @@ HIQ.CURRICULUM = [
   {
     id: "special",
     name: "Special teams",
-    goal: "A man up and a man down — the jobs change, and so do their names.",
+    goal: "A man up and a man down \u2014 the jobs change, and so do their names.",
     plays: ["pp_one_three_one", "pk_box"],
     need: 5,
   },
@@ -2728,6 +3464,7 @@ HIQ.playToPixels = function (play) {
     isDefense: !!play.isDefense,
     forecheck: !!play.forecheck,
     faceoff: !!play.faceoff,
+    loose: !!play.loose,
     fmt: play.fmt || "5v5",
     jobs: play.jobs || null,
     carrier: play.carrier,
@@ -3426,6 +4163,8 @@ HIQ.Sim = (() => {
       isDefense: !!play.isDefense,
       forecheck: !!play.forecheck,
       faceoff: !!play.faceoff,
+      // A race for a puck nobody has yet, e.g. a dump-in.
+      loose: !!play.loose,
       carrier: play.carrier,
       reads: px.reads,
       prompt: "",
@@ -4993,8 +5732,11 @@ HIQ.Sim = (() => {
        is naturally the closest skater to it, so every faceoff scenario put a
        bright "HAS PUCK" ring on a player who does not have it and cannot have
        it. That is the one thing this game is most careful to state plainly,
-       so stating it wrongly is worse than not stating it at all. */
-    if (scenario && scenario.faceoff) return null;
+       so stating it wrongly is worse than not stating it at all.
+
+       The same goes for a race to a loose puck, such as a dump-in: whoever
+       is closest is chasing it, not holding it. */
+    if (scenario && (scenario.faceoff || scenario.loose)) return null;
 
     const skaters = [...offense, ...defense, ...(choice.active ? [] : controlled)]
       .filter(p => p.role !== "G");
@@ -5040,6 +5782,7 @@ HIQ.Sim = (() => {
     if (choice.active) drawPuckTag("HAS PUCK", carrier.x, carrier.y - r - 13);
   }
 
+  let lastPuckTag = null;
   function drawPuckTag(label, cx, cy) {
     ctx.save();
     ctx.font = "700 12px 'Segoe UI', system-ui, Arial";
@@ -5048,9 +5791,42 @@ HIQ.Sim = (() => {
        room — above normally, below when they're tight to the top boards, where
        a label above would sit on whoever is behind them. */
     const V = HIQ.VIEW, R = HIQ.RINK;
-    const bx = clamp(cx - w / 2, V.x(2), V.x(R.length - 2) - w);
+    const H = 18;
+    const minX = V.x(2), maxX = V.x(R.length - 2) - w;
+    const minY = V.y(2), maxY = V.y(R.width - 2) - H;
     const nearTop = V.ftY(cy) < R.width * 0.28;
-    const by = nearTop ? cy + 44 : cy - 9;
+
+    /* ...and clear of the A/B/C markers. The tag used to go above or below
+       on a fixed rule, and when the right answer was close to the puck — a
+       pinch, the race to a dump-in — it landed underneath that answer's
+       marker, so the one label telling a child where the puck is was the
+       one thing they couldn't read. Try each side, keep the preferred one
+       unless a marker is in the way. */
+    const markers = choice.active ? choice.options.map(o => o.pos) : [];
+    const clearance = (x, y) => {
+      let worst = Infinity;
+      for (const m of markers) {
+        const nx = clamp(m.x, x, x + w), ny = clamp(m.y, y, y + H);
+        worst = Math.min(worst, Math.hypot(m.x - nx, m.y - ny) - 28);
+      }
+      return worst;
+    };
+    const place = (x, y) => ({ x: clamp(x, minX, maxX), y: clamp(y, minY, maxY) });
+    const above = place(cx - w / 2, cy - 9), below = place(cx - w / 2, cy + 44);
+    const candidates = (nearTop ? [below, above] : [above, below]).concat([
+      place(cx + 22, cy + 12),          // beside, to the right
+      place(cx - w - 22, cy + 12),      // beside, to the left
+      place(cx - w / 2, cy - 42),       // further above, clear of a crowd
+      place(cx - w / 2, cy + 76),       // further below
+    ]);
+    let pick = candidates[0];
+    if (clearance(pick.x, pick.y) < 0) {
+      for (const c of candidates) {
+        if (clearance(c.x, c.y) > clearance(pick.x, pick.y)) pick = c;
+      }
+    }
+    const bx = pick.x, by = pick.y;
+    lastPuckTag = { x: bx, y: by, w, h: H, clearance: clearance(bx, by) };
     ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.lineWidth = 1.5;
@@ -5326,9 +6102,14 @@ HIQ.Sim = (() => {
     }
 
     drawPuckCarrier(t);
-    drawPuck(t);
     drawEffects(t);
     drawChoices(t);
+    /* The puck goes on top of the A/B/C markers. Some correct reads are
+       right on the puck by design — "get on the carrier", "win the race to
+       the dump-in" — and a marker drawn over it hid the one thing a player
+       most needs to see to read the play. A small disc over the edge of a
+       marker costs nothing; a hidden puck costs the whole decision. */
+    drawPuck(t);
     drawParticles();
 
     ctx.restore();
@@ -5616,6 +6397,8 @@ HIQ.Sim = (() => {
     // drawn and confirm the mapping round-trips.
     screenToWorld: (x, y) => screenToWorld(x, y),
     renderScale: () => renderScale,
+    // Where the possession tag was last drawn, and how clear of the markers.
+    puckTag: () => lastPuckTag,
     spriteCaches: () => ({
       figures: figCache.size, ground: groundCache.size,
       goalies: goalieCache.size, chips: chipCache.size,

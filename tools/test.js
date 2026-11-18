@@ -684,7 +684,7 @@ const section = (t) => console.log(`\n${t}`);
   // A play you can't read teaches nothing, so these are correctness checks too.
   section("Readability");
   const vis = await page.evaluate(() => {
-    let faceoffs = 0, falseCarrier = 0, overlaps = 0, markerClash = 0, plays = 0, minGap = Infinity, minMarker = Infinity;
+    let faceoffs = 0, races = 0, falseCarrier = 0, overlaps = 0, markerClash = 0, plays = 0, minGap = Infinity, minMarker = Infinity;
     let carrierFound = 0, unlabelled = 0, youHadPuck = 0;
     for (let i = 0; i < 150; i++) {
       HIQ.debug.newPlay();
@@ -723,13 +723,14 @@ const section = (t) => console.log(`\n${t}`);
       const st = HIQ.debug.puckState();
       const sc0 = HIQ.debug.getScenario();
       if (st.label === "HAS PUCK") carrierFound++;
-      else if (st.label === "LOOSE PUCK") { /* genuinely nobody's */ }
+      else if (st.label === "LOOSE PUCK") { if (sc0.loose) races++; }
       else if (/^FACEOFF/.test(st.label || "")) faceoffs++;
       else unlabelled++;
       /* Nobody has the puck on a draw. Possession is worked out by proximity
          and a centre on the dot is the closest skater to it, so every faceoff
          scenario used to ring a player who could not possibly have it. */
-      if (sc0.faceoff && st.label === "HAS PUCK") falseCarrier++;
+      // A race for a loose puck is the same: closest is chasing, not holding.
+      if ((sc0.faceoff || sc0.loose) && st.label === "HAS PUCK") falseCarrier++;
 
       /* You should never be assigned the position that is carrying the puck.
          Proximity to the puck is NOT the test — when you're defending, being
@@ -738,7 +739,7 @@ const section = (t) => console.log(`\n${t}`);
       if (sc.carrier === sc.role) youHadPuck++;
     }
     return {
-      overlaps, markerClash, plays, unlabelled, youHadPuck, faceoffs, falseCarrier,
+      overlaps, markerClash, plays, unlabelled, youHadPuck, faceoffs, races, falseCarrier,
       minGap: Math.round(minGap), minMarker: Math.round(minMarker), carrierFound
     };
   });
@@ -749,8 +750,8 @@ const section = (t) => console.log(`\n${t}`);
   check(vis.unlabelled === 0, "the puck situation is always spelled out",
     `${vis.carrierFound} carried, ${vis.faceoffs} faceoffs, ` +
     `${vis.plays - vis.carrierFound - vis.faceoffs} loose, of ${vis.plays}`);
-  check(vis.falseCarrier === 0, "nobody is shown holding the puck on a faceoff",
-    `${vis.falseCarrier} false carriers across ${vis.faceoffs} draws`);
+  check(vis.falseCarrier === 0, "nobody is shown holding a puck that nobody has",
+    `${vis.falseCarrier} false carriers across ${vis.faceoffs} draws and ${vis.races} loose-puck races`);
   /* Spreading players apart for legibility must never push one off the ice.
      The clamp that bounds those nudges was written for an older canvas size
      and allowed a player to be shoved past the boards and off the bottom of
@@ -775,8 +776,45 @@ const section = (t) => console.log(`\n${t}`);
   check(onSheet.off === 0, "nobody is ever pushed off the ice to make room",
     onSheet.worst || `${onSheet.checked} positions checked`);
 
-  check(vis.carrierFound / vis.plays > 0.7, "most plays show a clear puck carrier",
-    `${Math.round(vis.carrierFound / vis.plays * 100)}% carried`);
+  /* Every play where somebody HAS the puck must show who. This used to be
+     "more than 70% of plays show a carrier", which treated every uncarried
+     puck as a failure; faceoffs and races for a loose puck are uncarried
+     because that is the truth of them. So the denominator is the plays that
+     should have a carrier, and the bar is all of them. */
+  const shouldCarry = vis.plays - vis.faceoffs - vis.races;
+  check(vis.carrierFound === shouldCarry, "every play where someone has the puck shows who",
+    `${vis.carrierFound}/${shouldCarry} carried (plus ${vis.faceoffs} draws, ${vis.races} loose-puck races)`);
+  /* The possession tag — "HAS PUCK", "LOOSE PUCK", "FACEOFF" — must never
+     sit under an A/B/C marker. It used to go above or below on a fixed rule,
+     and when the right answer was close to the puck, as it is in a pinch or
+     the race to a dump-in, the label was hidden by that answer's own marker. */
+  const tags = await page.evaluate(async () => {
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const fmtSel = document.getElementById("format"), roleSel = document.getElementById("role");
+    const keep = [fmtSel.value, roleSel.value];
+    let n = 0, hidden = 0, worst = Infinity, who = "";
+    for (const fmt of ["5v5", "5v4", "4v5"]) {
+      fmtSel.value = fmt;
+      for (const role of ["C", "LW", "RW", "LD", "RD"]) {
+        roleSel.value = role;
+        for (let i = 0; i < 8; i++) {
+          HIQ.debug.newPlay();
+          await frame();
+          const t = HIQ.debug.puckTag();
+          if (!t) continue;
+          n++;
+          if (t.clearance < 0) hidden++;
+          if (t.clearance < worst) { worst = t.clearance; who = HIQ.debug.getScenario().id; }
+        }
+      }
+    }
+    fmtSel.value = keep[0]; roleSel.value = keep[1];
+    HIQ.debug.newPlay();
+    return { n, hidden, worst: Math.round(worst), who };
+  });
+  check(tags.hidden === 0, "the possession label is never hidden under an A/B/C marker",
+    `${tags.n} labels checked, tightest ${tags.worst}px clear (${tags.who})`);
+
   check(vis.youHadPuck === 0, "you are never assigned the position that is carrying the puck",
     `${vis.youHadPuck} such plays`);
 
