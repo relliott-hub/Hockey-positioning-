@@ -246,6 +246,56 @@ roughly **twice the offence** of a dump-in, and that a failed carry costs less
 than coaches tend to assume — so the scenario teaches giving the carrier a way
 in, rather than treating the dump as the default.
 
+### Decisions in every zone — added
+
+Hockey IQ is decision-making, and a decision a player has never been asked to
+make is one they will make for the first time in a game. Eight more scenarios
+cover the reads a youth player meets most often that the game did not yet ask
+about — **19 scenarios → 27, 330 authored reads → 474**:
+
+| Scenario | The decision |
+|---|---|
+| Puck behind your net | Take the posts; never chase him round the back of the net |
+| Shot from the point | When the puck goes high, coverage goes up with it — get in the lane |
+| Racing back for a dump-in | Give the retrieving defenceman somewhere to go *before* he gets there |
+| Two on one for you | "Far post, stick down, drive the net" — and arrive as the shot does |
+| Point shot | A shot the goalie can see is a save; screen, tip, back door |
+| Attacking from behind the net | Be in a lane the pass out can actually reach |
+| Pinch or hold the line | Pinch only if you'll clearly win it *and* someone is high behind you |
+| Chasing your dump-in | F1 goes, F2 reads, F3 stays high |
+
+Two of them teach the same idea from opposite ends: a defence that **moves
+with the puck**. *Puck behind your net* and *Shot from the point* sit in the
+same zone, but the right coverage is completely different because the puck
+is in a different place — so the season plan now teaches them as two
+separate units, *Protect the house* and *Take away the shot*, rather than
+one.
+
+**Pinch or hold the line** is authored so pinching is correct, and the read
+says exactly why: you'll clearly win the race, and your centre is high. A
+child who only learns "pinch here" has learned a picture; one who learns the
+two conditions has learned when *not* to.
+
+The season plan is now **ten units**.
+
+#### Found while building them
+
+- **The validator refused one of the new options, and was right.** In the
+  dump-in retrieval, "go up the weak-side wall" looked like a sensible
+  outlet. From the near corner it is a pass straight across the front of
+  your own net — the exact pass this game forbids. It was replaced.
+- **The puck was drawn underneath the A/B/C markers.** Some correct reads
+  are right on the puck by design — get on the carrier, win the race to the
+  dump-in — so the marker for the right answer hid the one thing a player
+  most needs to see. The puck now draws on top.
+- **The possession label hid under markers too.** "HAS PUCK" / "LOOSE PUCK"
+  went above or below on a fixed rule, and landed under the nearest answer.
+  It now picks a side that is clear, and a test checks every play.
+- **"Most plays show a carrier" was the wrong test.** It required more than
+  70% of plays to show someone with the puck, which counted every faceoff
+  and every loose-puck race as a failure. It now requires *every* play where
+  someone has the puck to show who — a stricter bar, measured correctly.
+
 ### Still missing
 
 Honest list of what a youth player meets that this still does not cover:

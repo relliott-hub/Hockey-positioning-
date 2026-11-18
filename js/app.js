@@ -526,6 +526,8 @@
       isDefense: !!play.isDefense,
       forecheck: !!play.forecheck,
       faceoff: !!play.faceoff,
+      // A race for a puck nobody has yet, e.g. a dump-in.
+      loose: !!play.loose,
       carrier: play.carrier,
       reads: px.reads,
       prompt: "",
@@ -2093,8 +2095,11 @@
        is naturally the closest skater to it, so every faceoff scenario put a
        bright "HAS PUCK" ring on a player who does not have it and cannot have
        it. That is the one thing this game is most careful to state plainly,
-       so stating it wrongly is worse than not stating it at all. */
-    if (scenario && scenario.faceoff) return null;
+       so stating it wrongly is worse than not stating it at all.
+
+       The same goes for a race to a loose puck, such as a dump-in: whoever
+       is closest is chasing it, not holding it. */
+    if (scenario && (scenario.faceoff || scenario.loose)) return null;
 
     const skaters = [...offense, ...defense, ...(choice.active ? [] : controlled)]
       .filter(p => p.role !== "G");
@@ -2140,6 +2145,7 @@
     if (choice.active) drawPuckTag("HAS PUCK", carrier.x, carrier.y - r - 13);
   }
 
+  let lastPuckTag = null;
   function drawPuckTag(label, cx, cy) {
     ctx.save();
     ctx.font = "700 12px 'Segoe UI', system-ui, Arial";
@@ -2148,9 +2154,42 @@
        room — above normally, below when they're tight to the top boards, where
        a label above would sit on whoever is behind them. */
     const V = HIQ.VIEW, R = HIQ.RINK;
-    const bx = clamp(cx - w / 2, V.x(2), V.x(R.length - 2) - w);
+    const H = 18;
+    const minX = V.x(2), maxX = V.x(R.length - 2) - w;
+    const minY = V.y(2), maxY = V.y(R.width - 2) - H;
     const nearTop = V.ftY(cy) < R.width * 0.28;
-    const by = nearTop ? cy + 44 : cy - 9;
+
+    /* ...and clear of the A/B/C markers. The tag used to go above or below
+       on a fixed rule, and when the right answer was close to the puck — a
+       pinch, the race to a dump-in — it landed underneath that answer's
+       marker, so the one label telling a child where the puck is was the
+       one thing they couldn't read. Try each side, keep the preferred one
+       unless a marker is in the way. */
+    const markers = choice.active ? choice.options.map(o => o.pos) : [];
+    const clearance = (x, y) => {
+      let worst = Infinity;
+      for (const m of markers) {
+        const nx = clamp(m.x, x, x + w), ny = clamp(m.y, y, y + H);
+        worst = Math.min(worst, Math.hypot(m.x - nx, m.y - ny) - 28);
+      }
+      return worst;
+    };
+    const place = (x, y) => ({ x: clamp(x, minX, maxX), y: clamp(y, minY, maxY) });
+    const above = place(cx - w / 2, cy - 9), below = place(cx - w / 2, cy + 44);
+    const candidates = (nearTop ? [below, above] : [above, below]).concat([
+      place(cx + 22, cy + 12),          // beside, to the right
+      place(cx - w - 22, cy + 12),      // beside, to the left
+      place(cx - w / 2, cy - 42),       // further above, clear of a crowd
+      place(cx - w / 2, cy + 76),       // further below
+    ]);
+    let pick = candidates[0];
+    if (clearance(pick.x, pick.y) < 0) {
+      for (const c of candidates) {
+        if (clearance(c.x, c.y) > clearance(pick.x, pick.y)) pick = c;
+      }
+    }
+    const bx = pick.x, by = pick.y;
+    lastPuckTag = { x: bx, y: by, w, h: H, clearance: clearance(bx, by) };
     ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
     ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.lineWidth = 1.5;
@@ -2426,9 +2465,14 @@
     }
 
     drawPuckCarrier(t);
-    drawPuck(t);
     drawEffects(t);
     drawChoices(t);
+    /* The puck goes on top of the A/B/C markers. Some correct reads are
+       right on the puck by design — "get on the carrier", "win the race to
+       the dump-in" — and a marker drawn over it hid the one thing a player
+       most needs to see to read the play. A small disc over the edge of a
+       marker costs nothing; a hidden puck costs the whole decision. */
+    drawPuck(t);
     drawParticles();
 
     ctx.restore();
@@ -2716,6 +2760,8 @@
     // drawn and confirm the mapping round-trips.
     screenToWorld: (x, y) => screenToWorld(x, y),
     renderScale: () => renderScale,
+    // Where the possession tag was last drawn, and how clear of the markers.
+    puckTag: () => lastPuckTag,
     spriteCaches: () => ({
       figures: figCache.size, ground: groundCache.size,
       goalies: goalieCache.size, chips: chipCache.size,
