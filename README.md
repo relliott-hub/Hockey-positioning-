@@ -81,6 +81,11 @@ holds special teams back until U13.
   answer and the coach's reason, the settings and the build's version) for
   pasting into a message. It's shown before it's copied, leaves the player's
   name out, and is never sent anywhere by the game
+- **Never stuck** — if something breaks mid-play (drawing a frame, the play
+  animation, grading, building the next play), the game drops that play and
+  serves a fresh one instead of freezing. If it keeps happening it stops
+  retrying and asks for New Play, and the last error goes into the tester
+  report
 - **Runs smoothly on a phone** — players and chips are pre-rendered rather than
   re-traced every frame, and the pixel buffer is sized to what the device can
   actually afford, so a slow phone gives up a little sharpness instead of
@@ -106,7 +111,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 141 end-to-end checks against a real browser
+npm test           # 153 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
@@ -129,6 +134,7 @@ the **coaching correctness invariants**:
 - the season plan serves one unit at a time and only a best read advances it
 - nobody is ever pushed off the ice by the spacing pass
 - a frame costs a sane number of canvas operations, and frames don't stall
+- a fault injected at each point in the engine never leaves the game frozen
 - on phone-sized screens: no sideways scrolling, fingertip-sized tap areas that
   never overlap, and the whole rink in view when a play starts
 

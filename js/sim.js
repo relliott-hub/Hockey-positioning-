@@ -18,7 +18,21 @@ HIQ.Sim = (() => {
     cancelled = false;
     let i = 0, t0 = null, starts = null, banner = null;
 
+    /* A callback that throws must not leave the engine "running". Every
+       input checks isRunning(), so one exception here used to freeze the game
+       for good: no taps, no New Play effect, nothing. The error is handed on
+       instead, and the caller decides how to recover. */
     function frame(now) {
+      try { step(now); } catch (e) {
+        running = false;
+        cancelAnimationFrame(raf);
+        if (opts.onError) opts.onError(e);
+        else if (HIQ.onError) HIQ.onError(e, "sim");
+        else throw e;
+      }
+    }
+
+    function step(now) {
       if (cancelled) { running = false; return; }
       if (i >= steps.length) {
         running = false;
