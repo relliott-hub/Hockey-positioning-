@@ -97,7 +97,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 114 end-to-end checks against a real browser
+npm test           # 120 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:

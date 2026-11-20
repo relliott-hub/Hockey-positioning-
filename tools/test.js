@@ -159,6 +159,58 @@ const section = (t) => console.log(`\n${t}`);
   await settle();
   status = await page.locator("#status").innerText();
   check(/BEST READ/.test(status), "placing on the coached spot succeeds", status.slice(0, 40));
+  await page.waitForTimeout(1800);
+
+  /* The check above places the token through a debug hook, which skips the
+     drag limits entirely — and those limits were the old canvas's: they
+     stopped short of the far goal line and allowed dragging below the
+     bottom boards. Drag with a real pointer instead. */
+  const toPage = async (x, y) => {
+    const box = await page.locator("#rink").boundingBox();
+    const c = await page.evaluate(({ x, y }) => HIQ.debug.worldToScreen(x, y), { x, y });
+    return { x: box.x + c.x * (box.width / 1152), y: box.y + c.y * (box.height / 520) };
+  };
+  const realDrag = async (toFt) => {
+    await page.evaluate(() => { HIQ.debug.newPlay(); });
+    await page.waitForTimeout(250);
+    const you = await page.evaluate(() => { const c = HIQ.debug.getPieces().controlled[0]; return { x: c.x, y: c.y }; });
+    const target = await page.evaluate(({ x, y }) => ({ x: HIQ.VIEW.x(x), y: HIQ.VIEW.y(y) }), toFt);
+    const a = await toPage(you.x, you.y), b = await toPage(target.x, target.y);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2, { steps: 4 });
+    await page.mouse.move(b.x, b.y, { steps: 4 });
+    await page.mouse.up();
+    return page.evaluate(() => {
+      const c = HIQ.debug.getPieces().controlled[0];
+      return { ft: HIQ.VIEW.ftPt(c), onIce: HIQ.zones.onIce(HIQ.VIEW.ftPt(c)) };
+    });
+  };
+  const farCorner = await realDrag({ x: 260, y: 130 });   // well past the far end and the near boards
+  const nearCorner = await realDrag({ x: -60, y: -40 });  // well past our own end and the far boards
+  check(farCorner.onIce && nearCorner.onIce, "a dragged player can never leave the ice, whichever way they're dragged",
+    `stopped at ${farCorner.ft.x.toFixed(0)},${farCorner.ft.y.toFixed(0)} ft and ${nearCorner.ft.x.toFixed(0)},${nearCorner.ft.y.toFixed(0)} ft`);
+  check(farCorner.ft.x >= 194 && nearCorner.ft.x <= 6,
+    "a dragged player can get behind either net", `${farCorner.ft.x.toFixed(1)} ft and ${nearCorner.ft.x.toFixed(1)} ft`);
+  // Exhaustive: every spot any read in the game names can be reached by dragging.
+  const reach = await page.evaluate(() => {
+    let n = 0; const bad = [];
+    for (const base of HIQ.PLAYS) {
+      for (const mirror of [false, true]) {
+        const px = HIQ.playToPixels(HIQ.varyPlay(base, { mirror }));
+        for (const [role, r] of Object.entries(px.reads)) {
+          for (const spot of [r.best, ...r.acceptable, ...r.wrong]) {
+            n++;
+            const c = HIQ.debug.dragClamp(spot.x, spot.y);
+            if (c.x !== spot.x || c.y !== spot.y) bad.push(`${base.id}/${role}`);
+          }
+        }
+      }
+    }
+    return { n, bad: [...new Set(bad)] };
+  });
+  check(reach.bad.length === 0, "every spot any read names can be reached by dragging",
+    reach.bad.slice(0, 4).join(", ") || `${reach.n} spots, both sides of the ice`);
   await page.selectOption("#answerStyle", "choices");
   await page.waitForTimeout(1800);
 
@@ -292,6 +344,43 @@ const section = (t) => console.log(`\n${t}`);
   });
   check(dots.length === 0, "every faceoff dot is on the right part of the ice",
     dots.join(" | ") || "9 dots verified against the blue lines");
+
+  /* Geometry the game computes for itself must come from the rink, not
+     from the 1100x620 canvas it used to have. Three separate leftovers were
+     found: "the slot" the simulation aims at sat nine feet off the middle of
+     the ice, the drag limits stopped short of the far goal line, and the
+     lanes overlay drew vertical lines that divide nothing a coach calls a
+     lane. */
+  const geomFromRink = await page.evaluate(() => {
+    const R = HIQ.RINK, V = HIQ.VIEW;
+    const slots = ["left", "right"].map(side => {
+      const ft = V.ftPt(HIQ.debug.slotFor(side));
+      return { side, offMiddle: Math.abs(ft.y - R.midY), inHouse: HIQ.ft.inHomePlate(ft, side) };
+    });
+    return { slots, lanes: HIQ.debug.laneLinesFt(), width: R.width };
+  });
+  check(geomFromRink.slots.every(s => s.offMiddle < 0.5 && s.inHouse),
+    "the slot the simulation aims at is in the middle of the ice, in the house, at both ends",
+    geomFromRink.slots.map(s => `${s.side} ${s.offMiddle.toFixed(1)} ft off the middle`).join(", "));
+  check(Math.abs(geomFromRink.lanes[0] - geomFromRink.width / 3) < 1e-9 &&
+        Math.abs(geomFromRink.lanes[1] - geomFromRink.width * 2 / 3) < 1e-9,
+    "the lanes overlay splits the width of the ice into three lanes",
+    geomFromRink.lanes.map(v => v.toFixed(1) + " ft").join(", "));
+  {
+    /* And a guard on the whole class: none of the old canvas's coordinates
+       may come back into the game's code. Comments are stripped first — the
+       fixes explain themselves by naming the old numbers. */
+    const fs = require("fs");
+    const code = fs.readFileSync(path.join(ROOT, "js", "app.js"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const stale = [...code.matchAll(/\b(550|310|1042|1050|562|570|1100)\b/g)].map(m => {
+      const line = code.slice(0, m.index).split("\n").length;
+      return `${m[1]} (code line ${line})`;
+    });
+    check(stale.length === 0, "no coordinates from the old 1100x620 canvas are left in the game's code",
+      stale.slice(0, 5).join(", ") || "clean");
+  }
 
   // Any scenario mentioning a landmark in its text must actually place the puck there.
   const wording = await page.evaluate(() => {

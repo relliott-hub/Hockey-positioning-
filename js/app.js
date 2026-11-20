@@ -108,8 +108,8 @@
   let controlled = [];
   let offense = [];
   let defense = [];
-  const puck = { x: 550, y: 310, r: 9 };
-  let guidance = { x: 550, y: 310, r: 90 };
+  const puck = { x: HIQ.VIEW.x(HIQ.RINK.centreLine), y: HIQ.VIEW.y(HIQ.RINK.width / 2), r: 9 };
+  let guidance = { x: puck.x, y: puck.y, r: 90 };
 
   let choice = { active: false, options: [] };
   let snapshot = null;
@@ -272,9 +272,25 @@
   // Distances judged in feet, so "ten feet of room" means the same in any direction.
   const feetBetween = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by) / V.PX_PER_FT;
   function netFor(side) { return side === "left" ? PXLM.leftNet : PXLM.rightNet; }
-  function slotFor(side) {
-    const n = netFor(side);
-    return { x: side === "right" ? n.x - 125 : n.x + 125, y: 310 };
+  /* The slot the simulation aims plays at. This was 125px out from the net
+     at y=310 — numbers from the old 1100x620 canvas, which on this sheet put
+     "the slot" about nine feet off the middle of the ice, toward the near
+     boards. It now comes from the rink's own definition. */
+  function slotFor(side) { return side === "left" ? PXLM.leftSlot : PXLM.rightSlot; }
+  // The boundaries between the three lanes, in feet across the ice.
+  function laneLinesFt() { return [RK.width / 3, (RK.width * 2) / 3]; }
+
+  /* Where your player can be dragged: anywhere on the ice, a few feet in
+     from the boards. The old limits (50-1050, 50-570) were the previous
+     canvas's — they stopped short of the far goal line, so a spot behind the
+     opponent's net could not be reached at all, and let you drag below the
+     bottom boards. */
+  const DRAG_INSET_FT = 3;
+  function dragClamp(x, y) {
+    return {
+      x: clamp(x, V.x(DRAG_INSET_FT), V.x(RK.length - DRAG_INSET_FT)),
+      y: clamp(y, V.y(DRAG_INSET_FT), V.y(RK.width - DRAG_INSET_FT)),
+    };
   }
   function isFriendlyGoalie(p) {
     if (p.role !== "G" || !scenario) return false;
@@ -881,8 +897,8 @@
           // The carrier may move off the coaching spot, but the puck goes with
           // them — possession has to survive a readability nudge.
           if (p === pinned) {
-            puck.x = clamp(puck.x + (p.x - before.x), 58, 1042);
-            puck.y = clamp(puck.y + (p.y - before.y), 58, 562);
+            puck.x = clamp(puck.x + (p.x - before.x), minX, maxX);
+            puck.y = clamp(puck.y + (p.y - before.y), minY, maxY);
           }
           moved = true;
         }
@@ -937,7 +953,7 @@
 
   /* Camera: a 200-foot rink drawn to fit a phone leaves the actual play tiny in
      one corner. Frame the action instead, so the players fill the screen. */
-  const camera = { x: 550, y: 310, scale: 1, ready: false };
+  const camera = { x: LOGICAL_W / 2, y: LOGICAL_H / 2, scale: 1, ready: false };
 
   function cameraTarget() {
     const pts = [];
@@ -1794,7 +1810,7 @@
     for (let i = 0; i < 90; i++) {
       particles.push({
         kind: "confetti",
-        x: 550 + (Math.random() - 0.5) * 340,
+        x: LOGICAL_W / 2 + (Math.random() - 0.5) * 340,
         y: 130 + (Math.random() - 0.5) * 70,
         vx: (Math.random() - 0.5) * 280,
         vy: -Math.random() * 240 - 40,
@@ -1911,7 +1927,7 @@
       const net = dist(p.x, p.y, PXLM.leftNet.x, PXLM.leftNet.y) < dist(p.x, p.y, PXLM.rightNet.x, PXLM.rightNet.y)
         ? PXLM.leftNet : PXLM.rightNet;
       const ty = clamp(puck.y, net.y - 26, net.y + 26);
-      const tx = net.x + (net.x < 550 ? 8 : -8);
+      const tx = net.x + (net.x < LOGICAL_W / 2 ? 8 : -8);
       p.y += (ty - p.y) * Math.min(1, dt * 3);
       p.x += (tx - p.x) * Math.min(1, dt * 1.5);
     }
@@ -2078,9 +2094,13 @@
     ctx.globalAlpha = 0.25;
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#444";
+    /* The three lanes — two wall lanes and the middle — run the length of
+       the ice, so on this sheet they are horizontal bands. This used to draw
+       three VERTICAL lines at old-canvas x positions, which divide nothing a
+       coach means by "lanes". */
     if (ov === "lanes") {
-      for (const x of [360, 550, 740]) {
-        ctx.beginPath(); ctx.moveTo(x, 40); ctx.lineTo(x, 580); ctx.stroke();
+      for (const yFt of laneLinesFt()) {
+        ctx.beginPath(); ctx.moveTo(V.x(0), V.y(yFt)); ctx.lineTo(V.x(RK.length), V.y(yFt)); ctx.stroke();
       }
     }
     if (ov === "house") {
@@ -2679,13 +2699,13 @@
     const w = ctx.measureText(i.text).width + 64;
     // Hug the top edge: this is a transient title, and lower down it can sit
     // over an A/B/C marker the player is trying to read.
-    roundRectPath(ctx, 550 - w / 2, 18, w, 44, 14);
+    roundRectPath(ctx, LOGICAL_W / 2 - w / 2, 18, w, 44, 14);
     ctx.fillStyle = "rgba(15, 42, 74, 0.82)";
     ctx.fill();
     ctx.fillStyle = "#ffd76a";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(i.text, 550, 40);
+    ctx.fillText(i.text, LOGICAL_W / 2, 40);
     ctx.restore();
   }
 
@@ -2711,7 +2731,7 @@
 
     ctx.save();
     ctx.globalAlpha = clamp(age / 160, 0, 1);
-    ctx.translate(550, 130);
+    ctx.translate(LOGICAL_W / 2, 130);
     ctx.scale(scale, scale);
     ctx.font = "bold 44px system-ui";
     const w = Math.max(360, ctx.measureText(b.text).width + 90);
@@ -2939,8 +2959,9 @@
     if (!activeDrag || !activeDrag.dragging) return;
     evt.preventDefault();
     const p = getPos(evt);
-    activeDrag.x = clamp(p.x, 50, 1050);
-    activeDrag.y = clamp(p.y, 50, 570);
+    const c = dragClamp(p.x, p.y);
+    activeDrag.x = c.x;
+    activeDrag.y = c.y;
   }
 
   function pointerUp() {
@@ -3006,6 +3027,10 @@
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
     liveReadRunning: () => liveRead.running,
+    // Geometry the bug sweep pinned down, exposed so it stays pinned.
+    slotFor: (side) => ({ ...slotFor(side) }),
+    dragClamp: (x, y) => dragClamp(x, y),
+    laneLinesFt: () => laneLinesFt(),
     // Selection weighting, exactly as buildScenario computes it.
     practiceFocus: () => practiceFocus(),
     renderReport: () => renderReport(),
