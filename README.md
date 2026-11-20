@@ -76,6 +76,11 @@ holds special teams back until U13.
   aimed at (the nearest one, within a fingertip-sized area that can never reach
   another answer), the rink says which position you're playing while you
   choose, and a phone turned sideways shows the whole rink and the question
+- **Built for testers** — "Something look wrong?" under the rink copies the
+  exact play (its id, which wing, the position, where each option was, the
+  answer and the coach's reason, the settings and the build's version) for
+  pasting into a message. It's shown before it's copied, leaves the player's
+  name out, and is never sent anywhere by the game
 - **Runs smoothly on a phone** — players and chips are pre-rendered rather than
   re-traced every frame, and the pixel buffer is sized to what the device can
   actually afford, so a slow phone gives up a little sharpness instead of
@@ -101,7 +106,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 133 end-to-end checks against a real browser
+npm test           # 141 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:

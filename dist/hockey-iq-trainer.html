@@ -188,6 +188,13 @@ th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
 }
 
 /* Coach box */
+#feedbackRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+#feedbackBtn { background: none; border: 0; box-shadow: none; padding: 6px 0; color: #5b6b7d; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+#versionStamp { color: #8193a6; font-size: 12px; }
+#feedbackPanel { margin-top: 8px; }
+#feedbackDone { background: #0f2a4a; color: #fff; }
+#feedbackPanel p { margin: 0 0 6px; font-size: 14px; }
+#feedbackText { width: 100%; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 8px; border-radius: 8px; border: 1px solid #cdd8e4; resize: vertical; }
 #coachBox { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; }
 #coachAvatar {
   position: relative;
@@ -465,6 +472,18 @@ canvas { margin-top: 6px; }
     </div>
   </div>
 
+  <!-- For testers. Copies the exact play to the clipboard so a report can say
+       which situation looked wrong; nothing is ever sent from here. -->
+  <div id="feedbackRow">
+    <button id="feedbackBtn" type="button">🐞 Something look wrong? Copy the details</button>
+    <span id="versionStamp"></span>
+  </div>
+  <div id="feedbackPanel" class="card" hidden>
+    <p id="feedbackMsg"></p>
+    <textarea id="feedbackText" readonly rows="9" aria-label="Details of this play"></textarea>
+    <div class="row"><button id="feedbackDone" type="button">Done</button></div>
+  </div>
+
   <!-- Closed by default. This used to open on load on anything wider than a
        phone, so the first thing a player met was ten dropdowns instead of the
        rink and a question. The defaults are the ones we want them to start on. -->
@@ -649,6 +668,12 @@ canvas { margin-top: 6px; }
    Keeping dead geometry around the thing that replaced it is how a wrong model
    comes back, so it was deleted and the parts still in use moved here. */
 window.HIQ = window.HIQ || {};
+
+/* Which build this is. Shown under the rink and put at the top of every
+   "something look wrong?" report, so a tester's note can be matched to the
+   code they were actually running. Bump it with every change that ships;
+   the test suite holds it equal to package.json's version. */
+HIQ.VERSION = "1.1.0";
 
 HIQ.util = {
   pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
@@ -3934,6 +3959,10 @@ HIQ.Sim = (() => {
   const practiceFocusEl = document.getElementById("practiceFocus");
   const historyEl = document.getElementById("historyBlock");
 
+  const feedbackBtn = document.getElementById("feedbackBtn");
+  const feedbackPanel = document.getElementById("feedbackPanel");
+  const feedbackText = document.getElementById("feedbackText");
+  const feedbackMsg = document.getElementById("feedbackMsg");
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
   const muteBtn = document.getElementById("muteBtn");
@@ -5311,6 +5340,79 @@ HIQ.Sim = (() => {
     return roll < 0.72 ? "miss" : "bad";
   }
 
+  /* --- "Something look wrong?" -----------------------------------------
+
+     Testers — a coach, a parent, a kid — will see things that look off, and
+     "the breakout one looked weird" can't be acted on. This copies exactly
+     what was on screen: the play's id, which side of the ice, the position,
+     the options and where they were, the answer and its reason, the
+     settings and the build. The text is shown as well as copied, so whoever
+     sends it can see every word of it first.
+
+     Nothing is sent anywhere. It goes to the clipboard and the person
+     decides where to paste it. The player's name is left out on purpose. */
+  let lastAnswer = null;
+  const ft = (p) => `${Math.round(HIQ.VIEW.ftX(p.x))} ft, ${Math.round(HIQ.VIEW.ftY(p.y))} ft`;
+  function feedbackReport() {
+    const s = scenario;
+    const lines = [`Hockey IQ Trainer v${HIQ.VERSION} — something looked wrong`];
+    lines.push(`When: ${new Date().toLocaleString()}`);
+    if (!s) { lines.push("No play on screen."); return lines.join("\n"); }
+    lines.push(`Play: ${s.id} — "${s.name}" (${s.phase}, ${s.fmt})`);
+    lines.push(`Side: ${s.mirrored ? "mirrored (other wing)" : "as written"}`);
+    lines.push(`Position: ${s.role}${s.job ? " — " + s.job : ""}${s.mode === "multi" ? " (controlling the whole team)" : ""}`);
+    const answered = lastAnswer && lastAnswer.scenario === s;
+    if (choice.options.length) {
+      // Which spot is right is only listed once the question is answered —
+      // this text is on screen, and it shouldn't give the answer away.
+      lines.push("Options: " + choice.options.map(o =>
+        `${o.label} at ${ft(o.pos)}${answered ? " = " + o.tier : ""}`).join(" | "));
+    }
+    if (answered) {
+      const a = lastAnswer;
+      const what = a.label ? `picked ${a.label}` : a.at ? `placed at ${ft(a.at)}` : "placed the team";
+      lines.push(`Answer: ${what} → ${a.grade}, score ${a.score}${a.principle ? ", idea: " + a.principle : ""}`);
+      if (a.why) lines.push(`Coach said: ${a.why}`);
+    } else {
+      lines.push("Answer: not answered yet");
+    }
+    const unit = planOn() ? `season plan, unit ${unitIndex() + 1} (${currentUnit().id})` : "free play";
+    lines.push(`Settings: age ${ageSel.value}, ${diffSel.options[diffSel.selectedIndex].text}, ` +
+      `${answerSel.value === "drag" ? "free drag" : "tap A/B/C"}, moving reads ${liveReadsOn() ? "on" : "off"}, ${unit}`);
+    const touch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    lines.push(`Screen: ${window.innerWidth}×${window.innerHeight}, ${window.devicePixelRatio || 1}x${touch ? ", touch" : ""}`);
+    lines.push("");
+    lines.push("What looked wrong:");
+    return lines.join("\n");
+  }
+  async function copyFeedback() {
+    const text = feedbackReport();
+    feedbackText.value = text;
+    feedbackPanel.hidden = false;
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch (e) { /* fall through to the selection copy */ }
+    if (!copied) {
+      try {
+        feedbackText.focus();
+        feedbackText.select();
+        copied = document.execCommand("copy");
+      } catch (e) { copied = false; }
+    }
+    feedbackMsg.innerHTML = copied
+      ? "<b>Copied.</b> Paste it in a message to whoever shared the game, and add a line about what looked wrong. Nothing has been sent."
+      : "<b>Select the text below and copy it,</b> then paste it in a message to whoever shared the game. Nothing has been sent.";
+    feedbackPanel.scrollIntoView({ block: "nearest" });
+    return copied;
+  }
+  feedbackBtn.addEventListener("click", () => { copyFeedback(); });
+  document.getElementById("feedbackDone").addEventListener("click", () => { feedbackPanel.hidden = true; });
+  document.getElementById("versionStamp").textContent = `v${HIQ.VERSION}`;
+
   function lockIn(chosen = null) {
     if (!scenario || HIQ.Sim.isRunning()) return;
     clearTimeout(pendingTimer);
@@ -5346,6 +5448,12 @@ HIQ.Sim = (() => {
       receiver = nearestTo(controlled.filter(p => p.role !== "G"), anchor.x, anchor.y) || controlled[0];
       reportRole = "TEAM";
     }
+
+    lastAnswer = {
+      scenario, grade, score, why, principle,
+      label: chosen ? chosen.label : null,
+      at: mode === "single" ? { x: controlled[0].x, y: controlled[0].y } : null,
+    };
 
     const ok = grade !== "wrong";
     const failures = ok ? [] : [{ key: grade, msg: why, pts: 100 - score }];
@@ -7028,6 +7136,7 @@ HIQ.Sim = (() => {
       markerDiameterCss: 2 * markerRadius() * cssPerWorldPx(),
     }),
     roleChipText: () => roleChipText(),
+    feedbackReport: () => feedbackReport(),
     roleChip: () => lastRoleChip,
     lastPicked: () => lastPickedLabel,
     // Geometry the bug sweep pinned down, exposed so it stays pinned.
