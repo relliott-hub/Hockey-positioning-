@@ -468,6 +468,13 @@ canvas { margin-top: 6px; }
         </select>
       </label>
 
+      <label>Moving reads
+        <select id="liveReads">
+          <option value="on" selected>On — watch the play develop</option>
+          <option value="off">Off — still picture</option>
+        </select>
+      </label>
+
       <label>Difficulty
         <select id="diff">
           <option value="easy">Beginner</option>
@@ -899,6 +906,29 @@ HIQ.PLAYS = [
       { x: 62, y: 66, label: "D1" },
       { x: 66, y: 26, label: "D2" },
     ],
+    /* Moving read (pilot). Their dump-in rolls round the boards into your corner;
+       your defenceman goes back for it with their first forechecker chasing,
+       and your partner swings behind the net for the D-to-D.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 34, y: 81 },
+      LD: { x: 24, y: 60 },
+      F1: { x: 38, y: 66 },
+      F2: { x: 46, y: 58 },
+      RD: { x: 18, y: 46 },
+      C: { x: 38, y: 50 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 15, y: 79 } },
+        { who: "LD", to: { x: 14, y: 68 } },
+        { who: "F1", to: { x: 25, y: 67 } },
+        { who: "F2", to: { x: 36, y: 60 } },
+        { who: "RD", to: { x: 11, y: 39 } },
+        { who: "C", to: { x: 32, y: 53 } },
+      ] },
+    ],
     reads: {
       LW: {
         best: { x: 33, y: 75, why: "Get to the wall at the hash marks. Short, safe pass up the boards, and you're already turned up the ice." },
@@ -970,6 +1000,29 @@ HIQ.PLAYS = [
       { x: 16, y: 66, label: "O3" },
       { x: 73, y: 64, label: "D1" },
       { x: 73, y: 26, label: "D2" },
+    ],
+    /* Moving read (pilot). Their winger carries the puck up the wall out of the
+       corner while a teammate rotates down behind him, and their point man
+       steps in to the blue line.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 12, y: 79 },
+      O1: { x: 12, y: 79 },
+      LD: { x: 14, y: 72 },
+      O3: { x: 24, y: 58 },
+      D1: { x: 82, y: 64 },
+      LW: { x: 78, y: 70 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 21, y: 78 } },
+        { who: "O1", to: { x: 21, y: 78 } },
+        { who: "LD", to: { x: 18, y: 68 } },
+        { who: "O3", to: { x: 20, y: 62 } },
+        { who: "D1", to: { x: 77, y: 64 } },
+        { who: "LW", to: { x: 75, y: 69 } },
+      ] },
     ],
     reads: {
       LD: {
@@ -1050,6 +1103,29 @@ HIQ.PLAYS = [
       { x: 131, y: 58, label: "F2" },
       { x: 131, y: 30, label: "F3" },
     ],
+    /* Moving read (pilot). Your winger takes the puck down the wall into their
+       corner with a defenceman on him, while your centre follows low and your
+       other winger heads for the net.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 176, y: 78 },
+      RW: { x: 176, y: 78 },
+      D1: { x: 182, y: 70 },
+      C: { x: 156, y: 64 },
+      LW: { x: 170, y: 40 },
+      F1: { x: 162, y: 52 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 186, y: 77 } },
+        { who: "RW", to: { x: 186, y: 77 } },
+        { who: "D1", to: { x: 187, y: 71 } },
+        { who: "C", to: { x: 164, y: 64 } },
+        { who: "LW", to: { x: 177, y: 43 } },
+        { who: "F1", to: { x: 167, y: 51 } },
+      ] },
+    ],
     reads: {
       C: {
         best: { x: 172, y: 64, why: "Low support on the wall side. Your winger can bump it back and you're facing the net when you get it." },
@@ -1120,6 +1196,39 @@ HIQ.PLAYS = [
       { x: 86, y: 56, label: "F1" },
       { x: 78, y: 28, label: "F2" },
       { x: 74, y: 44, label: "F3" },
+    ],
+    /* Moving read (pilot). Your centre carries it up through the neutral zone with
+       both wingers driving wide, their defence backing in and their forwards
+       chasing.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 78, y: 42 },
+      C: { x: 78, y: 42 },
+      RW: { x: 92, y: 72 },
+      LW: { x: 92, y: 14 },
+      RD: { x: 70, y: 52 },
+      LD: { x: 66, y: 34 },
+      D1: { x: 120, y: 52 },
+      D2: { x: 120, y: 33 },
+      F1: { x: 68, y: 62 },
+      F2: { x: 60, y: 26 },
+      F3: { x: 58, y: 44 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 88, y: 42 } },
+        { who: "C", to: { x: 88, y: 42 } },
+        { who: "RW", to: { x: 102, y: 71 } },
+        { who: "LW", to: { x: 102, y: 15 } },
+        { who: "RD", to: { x: 79, y: 52 } },
+        { who: "LD", to: { x: 75, y: 34 } },
+        { who: "D1", to: { x: 125, y: 52 } },
+        { who: "D2", to: { x: 125, y: 33 } },
+        { who: "F1", to: { x: 77, y: 59 } },
+        { who: "F2", to: { x: 69, y: 27 } },
+        { who: "F3", to: { x: 66, y: 44 } },
+      ] },
     ],
     reads: {
       RW: {
@@ -3448,6 +3557,20 @@ HIQ.varyPlay = function (play, opts = {}) {
       wrong: (r.wrong || []).map(t),
     };
   }
+  /* The pre-answer motion names pieces the same way the layout does — our
+     positions by role, theirs by label, and "puck" — so mirroring has to swap
+     our role names and flip every waypoint exactly as it flips the layout.
+     Otherwise a mirrored play would develop on one wing and freeze on the
+     other. */
+  if (play.preSteps) {
+    const who = (w) => (mirror ? (SWAP[w] || w) : w);
+    out.preFrom = {};
+    for (const [w, pt] of Object.entries(play.preFrom || {})) out.preFrom[who(w)] = t(pt);
+    out.preSteps = play.preSteps.map(st => ({
+      d: st.d,
+      movers: st.movers.map(m => ({ who: who(m.who), to: t(m.to) })),
+    }));
+  }
   return out;
 };
 
@@ -3468,6 +3591,7 @@ HIQ.playToPixels = function (play) {
     loose: !!play.loose,
     fmt: play.fmt || "5v5",
     jobs: play.jobs || null,
+    preSettle: play.preSettle || null,
     carrier: play.carrier,
     puck: p(play.puck),
     players: {},
@@ -3485,7 +3609,55 @@ HIQ.playToPixels = function (play) {
       wrong: (r.wrong || []).map(conv),
     };
   }
+  if (play.preSteps) {
+    out.preFrom = {};
+    for (const [w, pt] of Object.entries(play.preFrom || {})) out.preFrom[w] = p(pt);
+    out.preSteps = play.preSteps.map(st => ({
+      d: st.d,
+      movers: st.movers.map(m => ({ who: m.who, to: p(m.to) })),
+    }));
+  }
   return out;
+};
+
+/* Moving reads: the motion a play shows before it asks.
+
+   A play may carry `preFrom` (where the moving pieces were a couple of
+   seconds earlier) and `preSteps` (waypoints in the simulator's step format,
+   { d, movers: [{ who, to }] }). Pieces are named the way the layout names
+   them: our positions by role, theirs by label, and "puck".
+
+   The final step is NOT authored. It is always added here, and it takes every
+   piece that moved back onto its authored position — the exact layout the
+   reads were written against. An author can describe how a play develops but
+   cannot make it freeze anywhere else, so the game can never animate to one
+   layout and grade against another.
+
+   Works on feet or pixels: it reads positions from whichever play it is
+   given. Returns null for a play with no motion. */
+HIQ.preMotion = function (play) {
+  if (!play.preSteps || !play.preSteps.length) return null;
+  const authored = (w) => (w === "puck" ? play.puck
+    : (play.players[w] || play.opponents.find(o => o.label === w) || null));
+  const moved = [];
+  const note = (w) => { if (!moved.includes(w)) moved.push(w); };
+  Object.keys(play.preFrom || {}).forEach(note);
+  play.preSteps.forEach(st => st.movers.forEach(m => note(m.who)));
+
+  const steps = play.preSteps.map(st => ({
+    d: st.d,
+    movers: st.movers.map(m => ({ who: m.who, to: { x: m.to.x, y: m.to.y } })),
+  }));
+  steps.push({
+    d: play.preSettle || 1000,
+    movers: moved.map(w => {
+      const a = authored(w);
+      return { who: w, to: a ? { x: a.x, y: a.y } : null };
+    }),
+  });
+  const from = {};
+  for (const [w, pt] of Object.entries(play.preFrom || {})) from[w] = { x: pt.x, y: pt.y };
+  return { from, steps, moved, authored };
 };
 
 /* ---- js/audio.js ---- */
@@ -3705,6 +3877,7 @@ HIQ.Sim = (() => {
   const planBarEl = document.getElementById("planBar");
   const phaseFilterWrap = document.getElementById("phaseFilterWrap");
   const formatWrap = document.getElementById("formatWrap");
+  const liveReadSel = document.getElementById("liveReads");
 
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
@@ -4105,10 +4278,90 @@ HIQ.Sim = (() => {
     return ["\uD83C\uDFD2 " + reads.best.why];
   }
 
+  /* --- Moving reads -------------------------------------------------
+
+     A still picture asks a child to read a play that, in a game, is moving.
+     Plays that carry authored motion (see HIQ.preMotion in plays.js) now
+     develop for about two seconds, freeze, and only then ask A/B/C.
+
+     The rule this is built around: the frozen frame is the static frame.
+     The scenario is built exactly as it always was — same layout, same
+     spacing, same options, same grading — and that finished picture is
+     recorded before anything moves. The pieces are then wound back to where
+     the motion starts and played forward, and when the motion ends every
+     piece is put back on the recorded picture exactly, not "near" it. So
+     grading is never asked about a layout the reads weren't written for.
+
+     Waypoints are applied as offsets from the authored layout, so a piece
+     the spacing pass nudged for legibility still arrives at its nudged spot. */
+  const liveRead = { running: false, frozen: null, activeAfter: false, status: "", lockDisplay: "", lastFreeze: null };
+
+  function liveReadsOn() { return !liveReadSel || liveReadSel.value === "on"; }
+
+  function pieceIndex() {
+    const map = { puck };
+    for (const p of offense) if (p.role !== "G") map[p.role] = p;
+    for (const p of defense) if (p.role !== "G") map[p.role] = p;
+    return map;
+  }
+  const everyPiece = () => [...offense, ...defense, ...controlled, puck];
+
+  function startLiveRead(px) {
+    if (!liveReadsOn() || modeSel.value !== "single") return false;
+    const motion = HIQ.preMotion(px);
+    if (!motion) return false;
+
+    const who = pieceIndex();
+    // The finished picture, recorded before anything moves.
+    liveRead.frozen = everyPiece().map(obj => ({ obj, x: obj.x, y: obj.y }));
+    const finals = {};
+    for (const [name, obj] of Object.entries(who)) finals[name] = { x: obj.x, y: obj.y };
+    const at = (name, pt) => {
+      const a = motion.authored(name), f = finals[name];
+      return { x: f.x + (pt.x - a.x), y: f.y + (pt.y - a.y) };
+    };
+
+    for (const [name, pt] of Object.entries(motion.from)) {
+      if (!who[name]) continue;           // e.g. the position you're playing
+      const p = at(name, pt);
+      who[name].x = p.x;
+      who[name].y = p.y;
+    }
+    const steps = motion.steps.map(st => ({
+      d: st.d,
+      movers: st.movers.filter(m => who[m.who]).map(m => ({ obj: who[m.who], to: at(m.who, m.to) })),
+    }));
+
+    liveRead.activeAfter = choice.active;
+    liveRead.status = statusEl.innerHTML;
+    liveRead.lockDisplay = lockBtn.style.display;
+    choice.active = false;
+    lockBtn.style.display = "none";
+    liveRead.running = true;
+    statusEl.innerHTML = "\uD83D\uDC40 Watch the play develop\u2026 <span class=\"muted\">(tap to skip)</span>";
+    HIQ.Sim.run(steps, { onDone: freezeLiveRead });
+    return true;
+  }
+
+  // End the motion — naturally, or early on a tap — on the recorded picture.
+  function freezeLiveRead() {
+    if (!liveRead.running) return;
+    HIQ.Sim.cancel();
+    for (const f of liveRead.frozen) { f.obj.x = f.x; f.obj.y = f.y; }
+    liveRead.running = false;
+    choice.active = liveRead.activeAfter;
+    lockBtn.style.display = liveRead.lockDisplay;
+    statusEl.innerHTML = liveRead.status;
+    puckTrail.length = 0;
+    liveRead.lastFreeze = everyPiece().map(obj => ({ role: obj.role || "puck", x: obj.x, y: obj.y }));
+  }
+
   /* `force` builds one exact scenario — { id, mirror } — for review and
      tests. Gameplay never passes it. */
   function buildScenario(force = null) {
     if (HIQ.Sim.isRunning()) HIQ.Sim.cancel();
+    liveRead.running = false;
+    liveRead.frozen = null;
     clearTimeout(pendingTimer);
     setBanner(null);
     renderState.showGuidance = false;
@@ -4301,6 +4554,7 @@ HIQ.Sim = (() => {
     renderState.intro = { text: `${scenario.phase.toUpperCase()}  \u2022  ${scenario.name}`, at: performance.now() };
     HIQ.audio.play("faceoff");
     setCoach("think");
+    startLiveRead(px);
   }
 
   function spreadForClarity(keepClear) {
@@ -4438,9 +4692,11 @@ HIQ.Sim = (() => {
        skaters are around our net anyway, so it stays in frame regardless. */
     offense.forEach(p => { if (p.role !== "G") add(p); });
     defense.forEach(p => { if (p.role !== "G") add(p); });
-    if (!choice.active) controlled.forEach(add); // hidden while choosing
+    if (!choice.active && !liveRead.running) controlled.forEach(add); // hidden while choosing
     add(puck);
-    if (choice.active) choice.options.forEach(o => add(o.pos));
+    // During a moving read the options aren't drawn yet, but framing them from
+    // the start keeps the camera from lurching when they appear.
+    if (choice.active || liveRead.running) choice.options.forEach(o => add(o.pos));
     // Centre of the sheet. Was hardcoded to the middle of a canvas size the
     // game stopped using when the ice moved to regulation feet.
     if (!pts.length) return { x: LOGICAL_W / 2, y: LOGICAL_H / 2, scale: 1 };
@@ -5776,7 +6032,7 @@ HIQ.Sim = (() => {
        is closest is chasing it, not holding it. */
     if (scenario && (scenario.faceoff || scenario.loose)) return null;
 
-    const skaters = [...offense, ...defense, ...(choice.active ? [] : controlled)]
+    const skaters = [...offense, ...defense, ...((choice.active || liveRead.running) ? [] : controlled)]
       .filter(p => p.role !== "G");
     let carrier = null, best = Infinity;
     for (const p of skaters) {
@@ -5962,9 +6218,15 @@ HIQ.Sim = (() => {
     ctx.fillText(text, V.width / 2, 52);
   }
 
+  // Beginner shows the coaching circle up front — but never before the
+  // question has been asked, so not while a moving read is still playing.
+  function guidanceVisible() {
+    return (diffSel.value === "easy" && !choice.active && !liveRead.running) || renderState.showGuidance;
+  }
+
   function drawGuidance(t) {
     if (!scenario || scenario.mode !== "single") return;
-    const reveal = (diffSel.value === "easy" && !choice.active) || renderState.showGuidance;
+    const reveal = guidanceVisible();
     if (!reveal) return;
     ctx.save();
     ctx.globalAlpha = 0.14 + Math.sin(t / 500) * 0.03;
@@ -6145,7 +6407,7 @@ HIQ.Sim = (() => {
 
     // You — hidden while choosing. Before an answer you aren't anywhere yet, and
     // a stray token parked mid-ice reads as another player and clutters the read.
-    if (!choice.active) {
+    if (!choice.active && !liveRead.running) {
       controlled.forEach(p => drawSkater(p, { ...teamStyle(), isYou: true }, t));
     }
 
@@ -6287,6 +6549,9 @@ HIQ.Sim = (() => {
   }
 
   function pointerDown(evt) {
+    // A tap while the play is still developing skips to the freeze. It is
+    // never taken as an answer: nothing has been asked yet.
+    if (liveRead.running) { evt.preventDefault(); freezeLiveRead(); return; }
     if (!scenario || HIQ.Sim.isRunning()) return;
     const p = getPos(evt);
 
@@ -6362,7 +6627,7 @@ HIQ.Sim = (() => {
     if (scenario) buildScenario();
   }
 
-  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, overlaySel, planSel]
+  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, overlaySel, planSel, liveReadSel]
     .forEach(el => el && el.addEventListener("change", onSettingChange));
 
   // Debug/testing hooks (not used by gameplay)
@@ -6375,6 +6640,11 @@ HIQ.Sim = (() => {
     lock: () => lockIn(),
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
+    liveReadRunning: () => liveRead.running,
+    guidanceVisible: () => guidanceVisible(),
+    skipLiveRead: () => freezeLiveRead(),
+    // Every piece's position the instant the last moving read froze.
+    lastFreeze: () => liveRead.lastFreeze,
     getStats: () => stats,
     getPlan: () => ({
       on: planOn(),
@@ -6554,6 +6824,13 @@ HIQ.Sim = (() => {
   if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
+  /* Someone who has asked their device for less motion gets still pictures,
+     as they always did. They can still turn moving reads on. */
+  try {
+    if (liveReadSel && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      liveReadSel.value = "off";
+    }
+  } catch (e) { /* older browsers */ }
   syncPickersToPlan();
   renderPlanBar();
   /* The "turn your phone sideways" tip was permanent — in portrait it simply

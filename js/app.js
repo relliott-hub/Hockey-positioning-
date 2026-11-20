@@ -67,6 +67,7 @@
   const planBarEl = document.getElementById("planBar");
   const phaseFilterWrap = document.getElementById("phaseFilterWrap");
   const formatWrap = document.getElementById("formatWrap");
+  const liveReadSel = document.getElementById("liveReads");
 
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
@@ -467,10 +468,90 @@
     return ["\uD83C\uDFD2 " + reads.best.why];
   }
 
+  /* --- Moving reads -------------------------------------------------
+
+     A still picture asks a child to read a play that, in a game, is moving.
+     Plays that carry authored motion (see HIQ.preMotion in plays.js) now
+     develop for about two seconds, freeze, and only then ask A/B/C.
+
+     The rule this is built around: the frozen frame is the static frame.
+     The scenario is built exactly as it always was — same layout, same
+     spacing, same options, same grading — and that finished picture is
+     recorded before anything moves. The pieces are then wound back to where
+     the motion starts and played forward, and when the motion ends every
+     piece is put back on the recorded picture exactly, not "near" it. So
+     grading is never asked about a layout the reads weren't written for.
+
+     Waypoints are applied as offsets from the authored layout, so a piece
+     the spacing pass nudged for legibility still arrives at its nudged spot. */
+  const liveRead = { running: false, frozen: null, activeAfter: false, status: "", lockDisplay: "", lastFreeze: null };
+
+  function liveReadsOn() { return !liveReadSel || liveReadSel.value === "on"; }
+
+  function pieceIndex() {
+    const map = { puck };
+    for (const p of offense) if (p.role !== "G") map[p.role] = p;
+    for (const p of defense) if (p.role !== "G") map[p.role] = p;
+    return map;
+  }
+  const everyPiece = () => [...offense, ...defense, ...controlled, puck];
+
+  function startLiveRead(px) {
+    if (!liveReadsOn() || modeSel.value !== "single") return false;
+    const motion = HIQ.preMotion(px);
+    if (!motion) return false;
+
+    const who = pieceIndex();
+    // The finished picture, recorded before anything moves.
+    liveRead.frozen = everyPiece().map(obj => ({ obj, x: obj.x, y: obj.y }));
+    const finals = {};
+    for (const [name, obj] of Object.entries(who)) finals[name] = { x: obj.x, y: obj.y };
+    const at = (name, pt) => {
+      const a = motion.authored(name), f = finals[name];
+      return { x: f.x + (pt.x - a.x), y: f.y + (pt.y - a.y) };
+    };
+
+    for (const [name, pt] of Object.entries(motion.from)) {
+      if (!who[name]) continue;           // e.g. the position you're playing
+      const p = at(name, pt);
+      who[name].x = p.x;
+      who[name].y = p.y;
+    }
+    const steps = motion.steps.map(st => ({
+      d: st.d,
+      movers: st.movers.filter(m => who[m.who]).map(m => ({ obj: who[m.who], to: at(m.who, m.to) })),
+    }));
+
+    liveRead.activeAfter = choice.active;
+    liveRead.status = statusEl.innerHTML;
+    liveRead.lockDisplay = lockBtn.style.display;
+    choice.active = false;
+    lockBtn.style.display = "none";
+    liveRead.running = true;
+    statusEl.innerHTML = "\uD83D\uDC40 Watch the play develop\u2026 <span class=\"muted\">(tap to skip)</span>";
+    HIQ.Sim.run(steps, { onDone: freezeLiveRead });
+    return true;
+  }
+
+  // End the motion — naturally, or early on a tap — on the recorded picture.
+  function freezeLiveRead() {
+    if (!liveRead.running) return;
+    HIQ.Sim.cancel();
+    for (const f of liveRead.frozen) { f.obj.x = f.x; f.obj.y = f.y; }
+    liveRead.running = false;
+    choice.active = liveRead.activeAfter;
+    lockBtn.style.display = liveRead.lockDisplay;
+    statusEl.innerHTML = liveRead.status;
+    puckTrail.length = 0;
+    liveRead.lastFreeze = everyPiece().map(obj => ({ role: obj.role || "puck", x: obj.x, y: obj.y }));
+  }
+
   /* `force` builds one exact scenario — { id, mirror } — for review and
      tests. Gameplay never passes it. */
   function buildScenario(force = null) {
     if (HIQ.Sim.isRunning()) HIQ.Sim.cancel();
+    liveRead.running = false;
+    liveRead.frozen = null;
     clearTimeout(pendingTimer);
     setBanner(null);
     renderState.showGuidance = false;
@@ -663,6 +744,7 @@
     renderState.intro = { text: `${scenario.phase.toUpperCase()}  \u2022  ${scenario.name}`, at: performance.now() };
     HIQ.audio.play("faceoff");
     setCoach("think");
+    startLiveRead(px);
   }
 
   function spreadForClarity(keepClear) {
@@ -800,9 +882,11 @@
        skaters are around our net anyway, so it stays in frame regardless. */
     offense.forEach(p => { if (p.role !== "G") add(p); });
     defense.forEach(p => { if (p.role !== "G") add(p); });
-    if (!choice.active) controlled.forEach(add); // hidden while choosing
+    if (!choice.active && !liveRead.running) controlled.forEach(add); // hidden while choosing
     add(puck);
-    if (choice.active) choice.options.forEach(o => add(o.pos));
+    // During a moving read the options aren't drawn yet, but framing them from
+    // the start keeps the camera from lurching when they appear.
+    if (choice.active || liveRead.running) choice.options.forEach(o => add(o.pos));
     // Centre of the sheet. Was hardcoded to the middle of a canvas size the
     // game stopped using when the ice moved to regulation feet.
     if (!pts.length) return { x: LOGICAL_W / 2, y: LOGICAL_H / 2, scale: 1 };
@@ -2138,7 +2222,7 @@
        is closest is chasing it, not holding it. */
     if (scenario && (scenario.faceoff || scenario.loose)) return null;
 
-    const skaters = [...offense, ...defense, ...(choice.active ? [] : controlled)]
+    const skaters = [...offense, ...defense, ...((choice.active || liveRead.running) ? [] : controlled)]
       .filter(p => p.role !== "G");
     let carrier = null, best = Infinity;
     for (const p of skaters) {
@@ -2324,9 +2408,15 @@
     ctx.fillText(text, V.width / 2, 52);
   }
 
+  // Beginner shows the coaching circle up front — but never before the
+  // question has been asked, so not while a moving read is still playing.
+  function guidanceVisible() {
+    return (diffSel.value === "easy" && !choice.active && !liveRead.running) || renderState.showGuidance;
+  }
+
   function drawGuidance(t) {
     if (!scenario || scenario.mode !== "single") return;
-    const reveal = (diffSel.value === "easy" && !choice.active) || renderState.showGuidance;
+    const reveal = guidanceVisible();
     if (!reveal) return;
     ctx.save();
     ctx.globalAlpha = 0.14 + Math.sin(t / 500) * 0.03;
@@ -2507,7 +2597,7 @@
 
     // You — hidden while choosing. Before an answer you aren't anywhere yet, and
     // a stray token parked mid-ice reads as another player and clutters the read.
-    if (!choice.active) {
+    if (!choice.active && !liveRead.running) {
       controlled.forEach(p => drawSkater(p, { ...teamStyle(), isYou: true }, t));
     }
 
@@ -2649,6 +2739,9 @@
   }
 
   function pointerDown(evt) {
+    // A tap while the play is still developing skips to the freeze. It is
+    // never taken as an answer: nothing has been asked yet.
+    if (liveRead.running) { evt.preventDefault(); freezeLiveRead(); return; }
     if (!scenario || HIQ.Sim.isRunning()) return;
     const p = getPos(evt);
 
@@ -2724,7 +2817,7 @@
     if (scenario) buildScenario();
   }
 
-  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, overlaySel, planSel]
+  [ageSel, formatSel, modeSel, roleSel, diffSel, answerSel, phaseFilterSel, overlaySel, planSel, liveReadSel]
     .forEach(el => el && el.addEventListener("change", onSettingChange));
 
   // Debug/testing hooks (not used by gameplay)
@@ -2737,6 +2830,11 @@
     lock: () => lockIn(),
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
+    liveReadRunning: () => liveRead.running,
+    guidanceVisible: () => guidanceVisible(),
+    skipLiveRead: () => freezeLiveRead(),
+    // Every piece's position the instant the last moving read froze.
+    lastFreeze: () => liveRead.lastFreeze,
     getStats: () => stats,
     getPlan: () => ({
       on: planOn(),
@@ -2916,6 +3014,13 @@
   if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
+  /* Someone who has asked their device for less motion gets still pictures,
+     as they always did. They can still turn moving reads on. */
+  try {
+    if (liveReadSel && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      liveReadSel.value = "off";
+    }
+  } catch (e) { /* older browsers */ }
   syncPickersToPlan();
   renderPlanBar();
   /* The "turn your phone sideways" tip was permanent — in portrait it simply

@@ -58,6 +58,29 @@ HIQ.PLAYS = [
       { x: 62, y: 66, label: "D1" },
       { x: 66, y: 26, label: "D2" },
     ],
+    /* Moving read (pilot). Their dump-in rolls round the boards into your corner;
+       your defenceman goes back for it with their first forechecker chasing,
+       and your partner swings behind the net for the D-to-D.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 34, y: 81 },
+      LD: { x: 24, y: 60 },
+      F1: { x: 38, y: 66 },
+      F2: { x: 46, y: 58 },
+      RD: { x: 18, y: 46 },
+      C: { x: 38, y: 50 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 15, y: 79 } },
+        { who: "LD", to: { x: 14, y: 68 } },
+        { who: "F1", to: { x: 25, y: 67 } },
+        { who: "F2", to: { x: 36, y: 60 } },
+        { who: "RD", to: { x: 11, y: 39 } },
+        { who: "C", to: { x: 32, y: 53 } },
+      ] },
+    ],
     reads: {
       LW: {
         best: { x: 33, y: 75, why: "Get to the wall at the hash marks. Short, safe pass up the boards, and you're already turned up the ice." },
@@ -129,6 +152,29 @@ HIQ.PLAYS = [
       { x: 16, y: 66, label: "O3" },
       { x: 73, y: 64, label: "D1" },
       { x: 73, y: 26, label: "D2" },
+    ],
+    /* Moving read (pilot). Their winger carries the puck up the wall out of the
+       corner while a teammate rotates down behind him, and their point man
+       steps in to the blue line.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 12, y: 79 },
+      O1: { x: 12, y: 79 },
+      LD: { x: 14, y: 72 },
+      O3: { x: 24, y: 58 },
+      D1: { x: 82, y: 64 },
+      LW: { x: 78, y: 70 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 21, y: 78 } },
+        { who: "O1", to: { x: 21, y: 78 } },
+        { who: "LD", to: { x: 18, y: 68 } },
+        { who: "O3", to: { x: 20, y: 62 } },
+        { who: "D1", to: { x: 77, y: 64 } },
+        { who: "LW", to: { x: 75, y: 69 } },
+      ] },
     ],
     reads: {
       LD: {
@@ -209,6 +255,29 @@ HIQ.PLAYS = [
       { x: 131, y: 58, label: "F2" },
       { x: 131, y: 30, label: "F3" },
     ],
+    /* Moving read (pilot). Your winger takes the puck down the wall into their
+       corner with a defenceman on him, while your centre follows low and your
+       other winger heads for the net.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 176, y: 78 },
+      RW: { x: 176, y: 78 },
+      D1: { x: 182, y: 70 },
+      C: { x: 156, y: 64 },
+      LW: { x: 170, y: 40 },
+      F1: { x: 162, y: 52 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 186, y: 77 } },
+        { who: "RW", to: { x: 186, y: 77 } },
+        { who: "D1", to: { x: 187, y: 71 } },
+        { who: "C", to: { x: 164, y: 64 } },
+        { who: "LW", to: { x: 177, y: 43 } },
+        { who: "F1", to: { x: 167, y: 51 } },
+      ] },
+    ],
     reads: {
       C: {
         best: { x: 172, y: 64, why: "Low support on the wall side. Your winger can bump it back and you're facing the net when you get it." },
@@ -279,6 +348,39 @@ HIQ.PLAYS = [
       { x: 86, y: 56, label: "F1" },
       { x: 78, y: 28, label: "F2" },
       { x: 74, y: 44, label: "F3" },
+    ],
+    /* Moving read (pilot). Your centre carries it up through the neutral zone with
+       both wingers driving wide, their defence backing in and their forwards
+       chasing.
+       Only the waypoints are written here; the freeze back onto the
+       positions above is added by HIQ.preMotion, so it cannot drift. */
+    preFrom: {
+      puck: { x: 78, y: 42 },
+      C: { x: 78, y: 42 },
+      RW: { x: 92, y: 72 },
+      LW: { x: 92, y: 14 },
+      RD: { x: 70, y: 52 },
+      LD: { x: 66, y: 34 },
+      D1: { x: 120, y: 52 },
+      D2: { x: 120, y: 33 },
+      F1: { x: 68, y: 62 },
+      F2: { x: 60, y: 26 },
+      F3: { x: 58, y: 44 },
+    },
+    preSteps: [
+      { d: 1000, movers: [
+        { who: "puck", to: { x: 88, y: 42 } },
+        { who: "C", to: { x: 88, y: 42 } },
+        { who: "RW", to: { x: 102, y: 71 } },
+        { who: "LW", to: { x: 102, y: 15 } },
+        { who: "RD", to: { x: 79, y: 52 } },
+        { who: "LD", to: { x: 75, y: 34 } },
+        { who: "D1", to: { x: 125, y: 52 } },
+        { who: "D2", to: { x: 125, y: 33 } },
+        { who: "F1", to: { x: 77, y: 59 } },
+        { who: "F2", to: { x: 69, y: 27 } },
+        { who: "F3", to: { x: 66, y: 44 } },
+      ] },
     ],
     reads: {
       RW: {
@@ -2607,6 +2709,20 @@ HIQ.varyPlay = function (play, opts = {}) {
       wrong: (r.wrong || []).map(t),
     };
   }
+  /* The pre-answer motion names pieces the same way the layout does — our
+     positions by role, theirs by label, and "puck" — so mirroring has to swap
+     our role names and flip every waypoint exactly as it flips the layout.
+     Otherwise a mirrored play would develop on one wing and freeze on the
+     other. */
+  if (play.preSteps) {
+    const who = (w) => (mirror ? (SWAP[w] || w) : w);
+    out.preFrom = {};
+    for (const [w, pt] of Object.entries(play.preFrom || {})) out.preFrom[who(w)] = t(pt);
+    out.preSteps = play.preSteps.map(st => ({
+      d: st.d,
+      movers: st.movers.map(m => ({ who: who(m.who), to: t(m.to) })),
+    }));
+  }
   return out;
 };
 
@@ -2627,6 +2743,7 @@ HIQ.playToPixels = function (play) {
     loose: !!play.loose,
     fmt: play.fmt || "5v5",
     jobs: play.jobs || null,
+    preSettle: play.preSettle || null,
     carrier: play.carrier,
     puck: p(play.puck),
     players: {},
@@ -2644,5 +2761,53 @@ HIQ.playToPixels = function (play) {
       wrong: (r.wrong || []).map(conv),
     };
   }
+  if (play.preSteps) {
+    out.preFrom = {};
+    for (const [w, pt] of Object.entries(play.preFrom || {})) out.preFrom[w] = p(pt);
+    out.preSteps = play.preSteps.map(st => ({
+      d: st.d,
+      movers: st.movers.map(m => ({ who: m.who, to: p(m.to) })),
+    }));
+  }
   return out;
+};
+
+/* Moving reads: the motion a play shows before it asks.
+
+   A play may carry `preFrom` (where the moving pieces were a couple of
+   seconds earlier) and `preSteps` (waypoints in the simulator's step format,
+   { d, movers: [{ who, to }] }). Pieces are named the way the layout names
+   them: our positions by role, theirs by label, and "puck".
+
+   The final step is NOT authored. It is always added here, and it takes every
+   piece that moved back onto its authored position — the exact layout the
+   reads were written against. An author can describe how a play develops but
+   cannot make it freeze anywhere else, so the game can never animate to one
+   layout and grade against another.
+
+   Works on feet or pixels: it reads positions from whichever play it is
+   given. Returns null for a play with no motion. */
+HIQ.preMotion = function (play) {
+  if (!play.preSteps || !play.preSteps.length) return null;
+  const authored = (w) => (w === "puck" ? play.puck
+    : (play.players[w] || play.opponents.find(o => o.label === w) || null));
+  const moved = [];
+  const note = (w) => { if (!moved.includes(w)) moved.push(w); };
+  Object.keys(play.preFrom || {}).forEach(note);
+  play.preSteps.forEach(st => st.movers.forEach(m => note(m.who)));
+
+  const steps = play.preSteps.map(st => ({
+    d: st.d,
+    movers: st.movers.map(m => ({ who: m.who, to: { x: m.to.x, y: m.to.y } })),
+  }));
+  steps.push({
+    d: play.preSettle || 1000,
+    movers: moved.map(w => {
+      const a = authored(w);
+      return { who: w, to: a ? { x: a.x, y: a.y } : null };
+    }),
+  });
+  const from = {};
+  for (const [w, pt] of Object.entries(play.preFrom || {})) from[w] = { x: pt.x, y: pt.y };
+  return { from, steps, moved, authored };
 };

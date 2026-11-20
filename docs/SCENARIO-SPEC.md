@@ -92,6 +92,8 @@ someone who already knows the game.
 
 Your defenceman has retrieved the puck in the corner, below your own goal line, with a forechecker closing. The team needs to get out of the zone.
 
+**Moving read** — the play develops for 2.0 seconds before the question, then freezes on exactly the positions below. Pieces that move: puck, LD, F1, F2, RD, C.
+
 **Puck:** behind your own net, tight to the near boards (8 ft from the nearest end boards, 31 ft near of centre)  
 **Carried by:** LD  
 **Attacking:** left to right
@@ -185,6 +187,8 @@ Your defenceman has retrieved the puck in the corner, below your own goal line, 
 *Defend · 5v5 · `dzone_halfwall_coverage`*
 
 The other team has the puck on the half-wall in your end, with both their defencemen up at your blue line. They're looking for a play to the slot.
+
+**Moving read** — the play develops for 2.0 seconds before the question, then freezes on exactly the positions below. Pieces that move: puck, O1, LD, O3, D1, LW.
 
 **Puck:** in your defensive zone, tight to the near boards (30 ft from the nearest end boards, 34 ft near of centre)  
 **Carried by:** an opponent  
@@ -285,6 +289,8 @@ The other team has the puck on the half-wall in your end, with both their defenc
 
 Your winger has the puck in the corner below their goal line and is protecting it on the wall. Keep possession and create a scoring chance.
 
+**Moving read** — the play develops for 2.0 seconds before the question, then freezes on exactly the positions below. Pieces that move: puck, RW, D1, C, LW, F1.
+
 **Puck:** in the offensive zone, tight to the near boards (5 ft from the nearest end boards, 31 ft near of centre)  
 **Carried by:** RW  
 **Attacking:** left to right
@@ -378,6 +384,8 @@ Your winger has the puck in the corner below their goal line and is protecting i
 *Rush · 5v5 · `rush_three_on_two`*
 
 Your centre is carrying the puck through the neutral zone with numbers. Two defenders are back and their forwards are behind the play.
+
+**Moving read** — the play develops for 2.0 seconds before the question, then freezes on exactly the positions below. Pieces that move: puck, C, RW, LW, RD, LD, D1, D2, F1, F2, F3.
 
 **Puck:** in the neutral zone, in the middle of the ice (98 ft from the nearest end boards, 1 ft far of centre)  
 **Carried by:** C  

@@ -98,6 +98,13 @@ const section = (t) => console.log(`\n${t}`);
   await page.selectOption("#plan", "free");
   await page.waitForTimeout(300);
 
+  /* Moving reads are on by default for the plays that have them. The checks
+     below are about the still picture each play is graded against, so they
+     run with motion off and measure exactly what they always measured; the
+     motion has its own section, which compares it to these still pictures. */
+  await page.selectOption("#liveReads", "off");
+  await page.waitForTimeout(150);
+
   section("Core gameplay loop");
   let sc = await page.evaluate(() => HIQ.debug.getScenario());
   check(!!sc && !!sc.id, "a scenario is built on load", sc && sc.id);
@@ -871,6 +878,194 @@ const section = (t) => console.log(`\n${t}`);
      650 operations a frame to draw figures that had not changed. The frame
      interval is also checked, with a generous bound, because a number that
      depends on the host's spare capacity should not fail a build on its own. */
+  /* ------------------------------------------------------- moving reads
+
+     A play that develops for two seconds before it asks is a different
+     picture from a still one, and the danger is obvious: animate to one
+     layout, grade against another. So the motion is checked against the
+     still picture, not against itself — the same exact scenario is built
+     with motion off and with it on, and the frozen frame has to be the same
+     frame, position for position, with the same options graded the same way. */
+  section("Moving reads");
+
+  const motionData = await page.evaluate(() => {
+    const Z = HIQ.zones, R = HIQ.RINK;
+    const ROLES = ["C", "LW", "RW", "LD", "RD"];
+    const out = { plays: [], problems: [] };
+    for (const base of HIQ.PLAYS.filter(p => p.preSteps)) {
+      out.plays.push(base.id);
+      // Name clashes would make "who" ambiguous.
+      for (const o of base.opponents) {
+        if (ROLES.includes(o.label)) out.problems.push(`${base.id}: opponent label ${o.label} clashes with a position`);
+      }
+      for (const mirror of [false, true]) {
+        const play = HIQ.varyPlay(base, { mirror });
+        const m = HIQ.preMotion(play);
+        const tag = `${base.id}${mirror ? " (mirrored)" : ""}`;
+        const total = m.steps.reduce((a, st) => a + st.d, 0);
+        if (total < 1500 || total > 2600) out.problems.push(`${tag}: lasts ${total}ms`);
+
+        // Replay the motion on the authored layout.
+        const pos = { puck: { ...play.puck } };
+        for (const [r, pt] of Object.entries(play.players)) pos[r] = { ...pt };
+        for (const o of play.opponents) pos[o.label] = { x: o.x, y: o.y };
+        for (const [w, pt] of Object.entries(m.from)) {
+          if (!pos[w]) { out.problems.push(`${tag}: unknown piece "${w}"`); continue; }
+          if (!Z.onIce(pt)) out.problems.push(`${tag}: ${w} starts off the ice`);
+          pos[w] = { ...pt };
+        }
+        const puckPath = [{ ...pos.puck }];
+        for (const st of m.steps) {
+          for (const mv of st.movers) {
+            if (!pos[mv.who] || !mv.to) { out.problems.push(`${tag}: unknown piece "${mv.who}"`); continue; }
+            if (!Z.onIce(mv.to)) out.problems.push(`${tag}: ${mv.who} goes off the ice`);
+            pos[mv.who] = { ...mv.to };
+          }
+          puckPath.push({ ...pos.puck });
+        }
+        // Every piece ends exactly — not approximately — where it was authored.
+        const want = { puck: play.puck };
+        for (const [r, pt] of Object.entries(play.players)) want[r] = pt;
+        for (const o of play.opponents) want[o.label] = o;
+        for (const [w, pt] of Object.entries(want)) {
+          if (pos[w].x !== pt.x || pos[w].y !== pt.y) {
+            out.problems.push(`${tag}: ${w} freezes at ${pos[w].x},${pos[w].y}, authored at ${pt.x},${pt.y}`);
+          }
+        }
+        // The motion is a simulation too: it may never show the pass across
+        // the front of your own net.
+        if (!play.isDefense) {
+          for (let i = 1; i < puckPath.length; i++) {
+            if (Z.laneCrossesSlot(puckPath[i - 1], puckPath[i], play.ourNet)) {
+              out.problems.push(`${tag}: the puck crosses the front of our own net`);
+            }
+          }
+        }
+      }
+    }
+    return out;
+  });
+  check(motionData.plays.length >= 3, "a pilot set of plays develops before asking",
+    motionData.plays.join(", "));
+  check(motionData.problems.length === 0,
+    "replayed on the authored layout, every motion freezes exactly on it (both sides of the ice)",
+    motionData.problems.slice(0, 4).join(" | ") || "every piece exact, on the ice, ~2 seconds");
+
+  // The real thing: same exact scenario, motion off vs on.
+  const frozen = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const sel = document.getElementById("liveReads");
+    const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+    // Keyed by piece and sorted, so the two sides compare position for
+    // position regardless of the order each list happens to be kept in.
+    const keyed = (list) => list.filter(q => q[0] !== "G").sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    const picture = () => {
+      const pc = HIQ.debug.getPieces();
+      return keyed([...pc.controlled, ...pc.offense, ...pc.defense].map(q => [q.role, q.x, q.y])
+        .concat([["puck", pc.puck.x, pc.puck.y]]));
+    };
+    const options = () => HIQ.debug.getChoices()
+      .map(o => { const g = HIQ.debug.gradeAt(HIQ.debug.getScenario().role, o.pos.x, o.pos.y);
+        return [o.tier, o.pos.x, o.pos.y, g.tier, g.score]; })
+      .sort((a, b) => (a[1] - b[1]) || (a[2] - b[2]));
+    const res = { combos: 0, natural: 0, bad: [], askedEarly: 0, guidanceEarly: 0, noMotion: 0 };
+    document.getElementById("diff").value = "easy";
+    for (const play of HIQ.PLAYS.filter(p => p.preSteps)) {
+      for (const mirror of [false, true]) {
+        let first = true;
+        for (const role of ["C", "LW", "RW", "LD", "RD"]) {
+          const src = mirror ? SWAP[role] : role;
+          if (!play.reads[src] || play.carrier === src) continue;
+          sel.value = "off";
+          HIQ.debug.buildExact(play.id, role, mirror);
+          const still = JSON.stringify(picture()), stillOpts = JSON.stringify(options());
+
+          sel.value = "on";
+          HIQ.debug.buildExact(play.id, role, mirror);
+          res.combos++;
+          if (!HIQ.debug.liveReadRunning()) { res.noMotion++; continue; }
+          if (HIQ.debug.choiceActive()) res.askedEarly++;
+          if (HIQ.debug.guidanceVisible()) res.guidanceEarly++;
+          if (JSON.stringify(picture()) === still) res.bad.push(`${play.id}/${role}: nothing moved`);
+          // One per play and side runs to its natural end; the rest are skipped
+          // to the freeze, which is the same code path.
+          if (first) {
+            first = false;
+            const t0 = performance.now();
+            while (HIQ.debug.liveReadRunning() && performance.now() - t0 < 4000) await sleep(50);
+            res.natural++;
+          } else {
+            HIQ.debug.skipLiveRead();
+          }
+          const tag = `${play.id}/${role}${mirror ? " mirrored" : ""}`;
+          if (HIQ.debug.liveReadRunning()) { res.bad.push(`${tag}: never froze`); continue; }
+          if (!HIQ.debug.choiceActive()) res.bad.push(`${tag}: no question after the freeze`);
+          const fz = keyed(HIQ.debug.lastFreeze().map(q => [q.role, q.x, q.y]));
+          const sameFreeze = JSON.stringify(fz) === still;
+          if (!sameFreeze) res.bad.push(`${tag}: frozen frame differs from the still picture`);
+          if (JSON.stringify(options()) !== stillOpts) res.bad.push(`${tag}: options or grading differ`);
+        }
+      }
+    }
+    document.getElementById("diff").value = "med";
+    sel.value = "off";
+    return res;
+  });
+  check(frozen.noMotion === 0 && frozen.combos > 0, "with moving reads on, those plays really do move first",
+    `${frozen.combos} play/position/side combinations`);
+  check(frozen.bad.length === 0,
+    "the frozen frame is the still picture exactly, with the same options graded the same way",
+    frozen.bad.slice(0, 3).join(" | ") || `${frozen.combos} compared, ${frozen.natural} run to their natural end`);
+  check(frozen.askedEarly === 0, "nothing is asked until the play has frozen");
+  check(frozen.guidanceEarly === 0, "Beginner's coaching circle isn't shown before the question");
+
+  // Tapping during the motion skips to the freeze and is never an answer;
+  // then the question works exactly as it always has.
+  await page.selectOption("#liveReads", "on");
+  await page.waitForTimeout(150);
+  const liveBefore = await page.evaluate(() => {
+    HIQ.debug.buildExact("rush_three_on_two", "RW", false);
+    const best = HIQ.debug.getChoices().find(o => o.tier === "best");
+    return { running: HIQ.debug.liveReadRunning(), x: best.pos.x, y: best.pos.y, xp: HIQ.debug.getStats().xp };
+  });
+  await tapCanvas(liveBefore.x, liveBefore.y);
+  await page.waitForTimeout(120);
+  const afterTap = await page.evaluate(() => ({
+    running: HIQ.debug.liveReadRunning(), asked: HIQ.debug.choiceActive(),
+    sim: HIQ.debug.simRunning(), xp: HIQ.debug.getStats().xp,
+  }));
+  check(liveBefore.running && !afterTap.running && afterTap.asked && !afterTap.sim && afterTap.xp === liveBefore.xp,
+    "a tap during the motion skips to the question without answering it");
+  await tapCanvas(liveBefore.x, liveBefore.y);
+  await settle();
+  const liveStatus = await page.locator("#status").innerText();
+  check(/BEST READ/.test(liveStatus), "after the freeze, A/B/C works exactly as before", liveStatus.slice(0, 40));
+  await page.waitForTimeout(2300);
+
+  const quiet = await page.evaluate(() => {
+    const sel = document.getElementById("liveReads");
+    const r = {};
+    sel.value = "off";
+    HIQ.debug.buildExact("rush_three_on_two", "RW", false);
+    r.off = HIQ.debug.liveReadRunning() || !HIQ.debug.choiceActive();
+    sel.value = "on";
+    const still = HIQ.PLAYS.find(p => !p.preSteps && p.reads.C && p.carrier !== "C");
+    HIQ.debug.buildExact(still.id, "C", false);
+    r.noData = HIQ.debug.liveReadRunning();
+    document.getElementById("mode").value = "multi";
+    HIQ.debug.buildExact("rush_three_on_two", "RW", false);
+    r.multi = HIQ.debug.liveReadRunning();
+    document.getElementById("mode").value = "single";
+    sel.value = "off";
+    HIQ.debug.newPlay();
+    return r;
+  });
+  check(!quiet.off, "with moving reads off, the question is asked straight away");
+  check(!quiet.noData && !quiet.multi,
+    "plays without authored motion, and whole-team mode, stay still pictures");
+  await page.selectOption("#liveReads", "off");
+  await page.waitForTimeout(150);
+
   section("Rendering cost");
 
   const frameOps = await page.evaluate(() => new Promise(resolve => {

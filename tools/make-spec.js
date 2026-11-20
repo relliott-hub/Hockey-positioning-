@@ -140,6 +140,13 @@ for (const play of HIQ.PLAYS) {
   w();
   w(play.situation);
   w();
+  if (play.preSteps) {
+    const m = HIQ.preMotion(play);
+    const secs = (m.steps.reduce((a, st) => a + st.d, 0) / 1000).toFixed(1);
+    w(`**Moving read** — the play develops for ${secs} seconds before the question, ` +
+      `then freezes on exactly the positions below. Pieces that move: ${m.moved.join(", ")}.`);
+    w();
+  }
   if (play.jobs) {
     w("**Jobs** — on special teams the job matters more than the position, and the");
     w("game names it, because that is the vocabulary a coach uses at a whiteboard.");
