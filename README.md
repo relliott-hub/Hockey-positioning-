@@ -57,6 +57,10 @@ holds special teams back until U13.
   penalty kill (box), with each player told the job they're doing: the point,
   the half-wall, the bumper, net front
 - **Every position** — C, LW, RW, LD, RD, each with its own correct read
+- **Moving reads** (pilot) — four plays develop for about two seconds before
+  the question, then freeze on exactly the picture the answers are graded
+  against. Turn it off in settings; it starts off for anyone whose device asks
+  for reduced motion
 - **Two answer styles** — tap A/B/C, or free-drag your player anywhere (advanced)
 - **Make it yours** — name, jersey number, and team colour on your player
 - **Progression** — XP, levels, streaks, and 12 trophies to unlock
@@ -87,7 +91,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 88 end-to-end checks against a real browser
+npm test           # 98 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
