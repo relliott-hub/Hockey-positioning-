@@ -788,32 +788,36 @@ const section = (t) => console.log(`\n${t}`);
      sit under an A/B/C marker. It used to go above or below on a fixed rule,
      and when the right answer was close to the puck, as it is in a pinch or
      the race to a dump-in, the label was hidden by that answer's own marker. */
+  /* Every (play, position, side of the ice) combination, not a random
+     sample. A sample once let a label sit a fraction of a pixel inside a
+     marker on a single offensive-zone faceoff, and it passed or failed
+     depending on which scenarios the dice picked. */
   const tags = await page.evaluate(async () => {
     const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const fmtSel = document.getElementById("format"), roleSel = document.getElementById("role");
-    const keep = [fmtSel.value, roleSel.value];
+    const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+    const keepRole = document.getElementById("role").value;
     let n = 0, hidden = 0, worst = Infinity, who = "";
-    for (const fmt of ["5v5", "5v4", "4v5"]) {
-      fmtSel.value = fmt;
-      for (const role of ["C", "LW", "RW", "LD", "RD"]) {
-        roleSel.value = role;
-        for (let i = 0; i < 8; i++) {
-          HIQ.debug.newPlay();
+    for (const play of HIQ.PLAYS) {
+      for (const mirror of [false, true]) {
+        for (const role of ["C", "LW", "RW", "LD", "RD"]) {
+          const src = mirror ? SWAP[role] : role;
+          if (!play.reads[src] || play.carrier === src) continue;
+          HIQ.debug.buildExact(play.id, role, mirror);
           await frame();
           const t = HIQ.debug.puckTag();
-          if (!t) continue;
+          if (!t || !HIQ.debug.choiceActive()) continue;
           n++;
           if (t.clearance < 0) hidden++;
-          if (t.clearance < worst) { worst = t.clearance; who = HIQ.debug.getScenario().id; }
+          if (t.clearance < worst) { worst = t.clearance; who = `${play.id}/${role}${mirror ? " mirrored" : ""}`; }
         }
       }
     }
-    fmtSel.value = keep[0]; roleSel.value = keep[1];
+    document.getElementById("role").value = keepRole;
     HIQ.debug.newPlay();
     return { n, hidden, worst: Math.round(worst), who };
   });
   check(tags.hidden === 0, "the possession label is never hidden under an A/B/C marker",
-    `${tags.n} labels checked, tightest ${tags.worst}px clear (${tags.who})`);
+    `every combination checked (${tags.n}), tightest ${tags.worst}px clear (${tags.who})`);
 
   check(vis.youHadPuck === 0, "you are never assigned the position that is carrying the puck",
     `${vis.youHadPuck} such plays`);
@@ -971,7 +975,48 @@ const section = (t) => console.log(`\n${t}`);
   await openSettings();
   await page.waitForTimeout(150);
   await page.evaluate(() => HIQ.debug.resetPlan());
-  await page.selectOption("#plan", "season");
+
+  /* The format and phase pickers belong to free play. They used to be hidden
+     only when a scenario was built and were never disabled, so a hidden
+     picker held a live, stale value. They must follow the plan selector the
+     instant it changes — checked in the same tick as the change event, with
+     no waiting for a rebuild or a frame. */
+  await page.selectOption("#plan", "free");
+  await page.waitForTimeout(150);
+  const pickers = await page.evaluate(() => {
+    const state = () => ({
+      fmtShown: document.getElementById("formatWrap").style.display !== "none",
+      phaseShown: document.getElementById("phaseFilterWrap").style.display !== "none",
+      fmtDisabled: document.getElementById("format").disabled,
+      phaseDisabled: document.getElementById("phaseFilter").disabled,
+    });
+    const free = state();
+    const sel = document.getElementById("plan");
+    sel.value = "season";
+    sel.dispatchEvent(new Event("change"));
+    const season = state();
+    // The review hook flips the plan to free play and back internally.
+    HIQ.debug.forceTemplate(HIQ.CURRICULUM[0].plays[0]);
+    const afterForce = state();
+    const bar = document.getElementById("planBar");
+    return { free, season, afterForce, barShown: bar.style.display !== "none", barText: bar.textContent };
+  });
+  check(pickers.free.fmtShown && pickers.free.phaseShown && !pickers.free.fmtDisabled && !pickers.free.phaseDisabled,
+    "in free play the format and phase pickers are shown and usable");
+  check(!pickers.season.fmtShown && !pickers.season.phaseShown && pickers.season.fmtDisabled && pickers.season.phaseDisabled,
+    "turning the plan on hides and disables the format and phase pickers immediately",
+    JSON.stringify(pickers.season));
+  check(!pickers.afterForce.fmtShown && pickers.afterForce.fmtDisabled && pickers.barShown,
+    "calling up a scenario for review leaves the pickers and plan bar matching the plan");
+
+  const stUnit = await page.evaluate(() => HIQ.CURRICULUM.findIndex(u => u.plays.some(id => {
+    const p = HIQ.PLAYS.find(q => q.id === id);
+    return p && (p.fmt || "5v5") !== "5v5";
+  })) + 1);
+  check(stUnit > 1 && pickers.barText.includes(`Special teams arrive in Unit ${stUnit}`),
+    "the plan bar says which unit brings special teams, worked out from the plan itself",
+    `Unit ${stUnit}`);
+
   await page.waitForTimeout(250);
 
   const planShape = await page.evaluate(() => {

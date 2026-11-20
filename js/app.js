@@ -408,6 +408,38 @@
     return finished;
   }
 
+  /* The format and phase pickers only mean anything in free play; in the
+     season plan the unit decides both. They used to be hidden only when a
+     scenario was built, from inside buildScenario, and never disabled — so a
+     hidden picker kept a live, stale value, and anything that switched the
+     plan without rebuilding left them showing while the plan was on. Their
+     state now follows the plan selector directly, every time it changes. */
+  function syncPickersToPlan() {
+    const onPlan = planOn();
+    for (const [wrap, sel] of [[formatWrap, formatSel], [phaseFilterWrap, phaseFilterSel]]) {
+      if (wrap) {
+        wrap.style.display = onPlan ? "none" : "";
+        wrap.setAttribute("aria-hidden", onPlan ? "true" : "false");
+      }
+      if (sel) sel.disabled = onPlan;
+    }
+  }
+
+  // Which unit first puts a player on special teams, worked out from the plan
+  // and the plays themselves so it stays right when either changes. Computed
+  // once, from the full library.
+  const SPECIAL_TEAMS_UNIT = HIQ.CURRICULUM.findIndex(u => u.plays.some(id => {
+    const p = HIQ.PLAYS.find(q => q.id === id);
+    return p && (p.fmt || "5v5") !== "5v5";
+  }));
+
+  function planNote() {
+    let note = "The plan chooses the situation, so the format and phase settings are off.";
+    if (SPECIAL_TEAMS_UNIT > unitIndex()) note += ` Special teams arrive in Unit ${SPECIAL_TEAMS_UNIT + 1}.`;
+    else if (SPECIAL_TEAMS_UNIT === unitIndex()) note += " This unit is special teams.";
+    return note;
+  }
+
   function renderPlanBar() {
     if (!planBarEl) return;
     if (!planOn()) { planBarEl.style.display = "none"; return; }
@@ -420,7 +452,8 @@
       `<b>Unit ${unitIndex() + 1} of ${HIQ.CURRICULUM.length} — ${unit.name}</b>` +
       `<span class="planGoal">${unit.goal}</span>` +
       `<span class="planCount">${got} / ${need} reads learned${last && got >= need ? " — plan complete" : ""}</span>` +
-      `<span class="planTrack"><i style="width:${need ? Math.round((got / need) * 100) : 0}%"></i></span>`;
+      `<span class="planTrack"><i style="width:${need ? Math.round((got / need) * 100) : 0}%"></i></span>` +
+      `<span class="planNote">${planNote()}</span>`;
   }
 
   function isChoiceMode() {
@@ -434,7 +467,9 @@
     return ["\uD83C\uDFD2 " + reads.best.why];
   }
 
-  function buildScenario() {
+  /* `force` builds one exact scenario — { id, mirror } — for review and
+     tests. Gameplay never passes it. */
+  function buildScenario(force = null) {
     if (HIQ.Sim.isRunning()) HIQ.Sim.cancel();
     clearTimeout(pendingTimer);
     setBanner(null);
@@ -452,11 +487,12 @@
        find the setting. The format and phase pickers are hidden rather than
        silently ignored. */
     const onPlan = planOn();
-    if (formatWrap) formatWrap.style.display = onPlan ? "none" : "";
-    if (phaseFilterWrap) phaseFilterWrap.style.display = onPlan ? "none" : "";
+    syncPickersToPlan();
 
     let candidates;
-    if (onPlan) {
+    if (force && force.id) {
+      candidates = HIQ.PLAYS.filter(p => p.id === force.id);
+    } else if (onPlan) {
       const unit = currentUnit();
       candidates = HIQ.PLAYS.filter(p => unit.plays.includes(p.id));
     } else {
@@ -485,6 +521,7 @@
         const sourceRole = mirror ? (SWAP[role] || role) : role;
         if (!cand.reads[sourceRole]) continue;   // this play doesn't coach it
         if (cand.carrier === sourceRole) continue; // you'd be carrying the puck
+        if (force && typeof force.mirror === "boolean" && mirror !== force.mirror) continue;
         combos.push({ cand, mirror });
       }
     }
@@ -2182,7 +2219,17 @@
       place(cx - w / 2, cy - 42),       // further above, clear of a crowd
       place(cx - w / 2, cy + 76),       // further below
     ]);
-    let pick = candidates[0];
+    /* If none of the usual spots is clear, search outward in rings around
+       the puck. Sampling scenarios at random once let a label sit a fraction
+       of a pixel inside a marker on one offensive-zone faceoff; the suite now
+       checks every scenario, so the search has to find a clear spot every time. */
+    for (const rad of [56, 84, 112]) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        candidates.push(place(cx + Math.cos(a) * rad - w / 2, cy + Math.sin(a) * rad));
+      }
+    }
+    let pick = candidates.find(c => clearance(c.x, c.y) >= 0) || candidates[0];
     if (clearance(pick.x, pick.y) < 0) {
       for (const c of candidates) {
         if (clearance(c.x, c.y) > clearance(pick.x, pick.y)) pick = c;
@@ -2641,7 +2688,7 @@
   window.addEventListener("touchend", pointerUp);
 
   // --- Controls
-  newBtn.addEventListener("click", buildScenario);
+  newBtn.addEventListener("click", () => buildScenario());
   lockBtn.addEventListener("click", () => lockIn());
   muteBtn.addEventListener("click", () => {
     HIQ.audio.setMuted(!HIQ.audio.isMuted());
@@ -2670,6 +2717,9 @@
   });
 
   function onSettingChange() {
+    // Pickers first, before anything that might not run: their state belongs
+    // to the plan selector, not to whether a scenario happens to rebuild.
+    syncPickersToPlan();
     renderPlanBar();
     if (scenario) buildScenario();
   }
@@ -2773,33 +2823,26 @@
     // Auditing hooks: score an arbitrary spot, and force a specific scenario
     scoreAt: (role, x, y) => scorePlacement(role, { x, y }, scenario),
     /* Build one named play on demand, so a specific situation can be reviewed
-       or tested without re-rolling until it comes up. It used to filter the
-       old TEMPLATES_EVEN list, which stopped driving the game when the
-       authored plays replaced it — so it quietly did nothing at all. It now
-       pins HIQ.PLAYS, and it restores the full set and the chosen format
-       whichever way it exits. */
+       or tested without re-rolling until it comes up.
+
+       This used to empty HIQ.PLAYS down to the one play, flip the plan to
+       free play, build, then put both back. Flipping the plan without its
+       change event left the format and phase pickers showing and the plan
+       bar hidden while the plan was on. buildScenario now takes an exact
+       target, so nothing is mutated and there is nothing to restore. */
     forceTemplate: (id, role) => {
-      const play = HIQ.PLAYS.find(p => p.id === id);
-      if (!play) return null;
+      if (!HIQ.PLAYS.some(p => p.id === id)) return null;
       if (role) roleSel.value = role;
-      const savedPlays = HIQ.PLAYS.slice();
-      const savedPlan = planSel ? planSel.value : null;
-      const savedFmt = formatSel.value;
-      try {
-        // A play only gets served if the format matches the strength it is
-        // authored at, and the plan would restrict it to the current unit.
-        if (planSel) planSel.value = "free";
-        formatSel.value = play.fmt || "5v5";
-        HIQ.PLAYS.length = 0;
-        HIQ.PLAYS.push(play);
-        buildScenario();
-      } finally {
-        HIQ.PLAYS.length = 0;
-        savedPlays.forEach(p => HIQ.PLAYS.push(p));
-        if (planSel && savedPlan !== null) planSel.value = savedPlan;
-        formatSel.value = savedFmt;
-      }
+      buildScenario({ id });
       return scenario.id;
+    },
+    // The same, pinned to one side of the ice too, so a test can walk every
+    // (play, position, mirror) combination instead of sampling at random.
+    buildExact: (id, role, mirror) => {
+      if (!HIQ.PLAYS.some(p => p.id === id)) return null;
+      if (role) roleSel.value = role;
+      buildScenario({ id, mirror });
+      return { id: scenario.id, role: scenario.role, mirrored: scenario.mirrored };
     }
   };
 
@@ -2873,6 +2916,7 @@
   if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
+  syncPickersToPlan();
   renderPlanBar();
   /* The "turn your phone sideways" tip was permanent — in portrait it simply
      sat above the rink forever, which is a nag, not a tip. Show it once, let a
