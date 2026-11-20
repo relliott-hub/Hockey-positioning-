@@ -172,8 +172,11 @@ docs/APP-STORE-GUIDE.md how to ship to the App Store and Google Play
 
 ## Deployment
 
-Pushing to `main` publishes to GitHub Pages automatically via
-`.github/workflows/pages.yml`. Nothing else to do.
+Pushing to `main` publishes to GitHub Pages automatically — the repo's Pages
+source is the `main` branch, and GitHub's built-in "pages build and deployment"
+publishes each push. Nothing else to do. `.github/workflows/pages.yml` is a
+manual fallback only; it used to run on every push as well, raced the built-in
+publisher and sent false failure emails.
 
 ## Roadmap
 
