@@ -1,10 +1,12 @@
 name: Deploy to GitHub Pages
 
-# Publishes the game to a public URL on every push to main, so testers always
-# get the latest build with no login and nothing to install.
+# Manual only. The repo's Pages source is "Deploy from a branch" (main, root),
+# so GitHub's built-in "pages build and deployment" already publishes every
+# push to main. This workflow ran alongside it on each push, raced it, and
+# intermittently failed ("No artifacts named github-pages"), sending failure
+# emails for deploys that had in fact succeeded. Kept for a manual re-publish
+# from the Actions tab if the Pages source is ever switched to GitHub Actions.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
