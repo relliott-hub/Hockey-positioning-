@@ -68,7 +68,9 @@ holds special teams back until U13.
 - **Two answer styles** — tap A/B/C, or free-drag your player anywhere (advanced)
 - **Make it yours** — name, jersey number, and team colour on your player
 - **Progression** — XP, levels, streaks, and 12 trophies to unlock
-- **Coach report** — tracks your session and shows your most common mistakes
+- **Coach report** — this session's results and most common mistakes, plus a
+  week-by-week view per idea (improving, steady or slipping) kept on the device
+  only: one capped localStorage key, no account, nothing sent anywhere
 - **Plays offline** — install it to your home screen and it works at the rink
 - **Runs smoothly on a phone** — players and chips are pre-rendered rather than
   re-traced every frame, and the pixel buffer is sized to what the device can
@@ -95,7 +97,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 105 end-to-end checks against a real browser
+npm test           # 114 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
