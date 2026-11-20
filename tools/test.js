@@ -1659,6 +1659,188 @@ const section = (t) => console.log(`\n${t}`);
   check(planPersist === 1, "plan progress survives a reload", `${planPersist} read remembered`);
   await page.evaluate(() => HIQ.debug.resetPlan());
 
+  // ---------------------------------------------------------------- phones
+  /* Most kids will play this on a phone, often a parent's, often held
+     sideways at the rink. Measured before this section existed, the A/B/C
+     markers there were 18-22px across and the tappable area 24-30px — half
+     what a fingertip needs — and a phone turned sideways (which the game asks
+     for) showed only the top of the rink. These run the real page under touch
+     emulation at the sizes that matter. */
+  section("Phones");
+  const openPhone = async (width, height) => {
+    const pctx = await browser.newContext({ viewport: { width, height }, isMobile: true, hasTouch: true });
+    await pctx.addInitScript(() => { try { localStorage.setItem("hiq.seenTutorial", "1"); } catch (e) { /* private */ } });
+    const pp = await pctx.newPage();
+    pp.on("pageerror", e => errors.push(`PAGEERROR (${width}x${height}): ` + e.message));
+    pp.on("console", m => { if (m.type() === "error") errors.push(`CONSOLE (${width}x${height}): ` + m.text()); });
+    pp.on("request", r => { const u = r.url(); if (!/^(file|data|blob|about):/.test(u)) offDevice.push(u); });
+    await pp.goto(URL);
+    await pp.waitForTimeout(500);
+    // Still pictures, any play: these checks are about the screen, not the plan.
+    await pp.evaluate(() => {
+      for (const [id, v] of [["liveReads", "off"], ["plan", "free"]]) {
+        const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    await pp.waitForTimeout(150);
+    return { pctx, pp };
+  };
+  // Rink coords -> page coords on this phone, through the camera.
+  const phonePoint = async (pp, x, y) => {
+    const box = await pp.locator("#rink").boundingBox();
+    const c = await pp.evaluate(({ x, y }) => HIQ.debug.worldToScreen(x, y), { x, y });
+    return { x: box.x + c.x * (box.width / 1152), y: box.y + c.y * (box.height / 520) };
+  };
+  const tapNewPlay = async (pp) => {
+    const b = await pp.locator("#newBtn").boundingBox();
+    if (b.y < 0 || b.y + b.height > pp.viewportSize().height) await pp.locator("#newBtn").scrollIntoViewIfNeeded();
+    const b2 = await pp.locator("#newBtn").boundingBox();
+    await pp.touchscreen.tap(b2.x + b2.width / 2, b2.y + b2.height / 2);
+    await pp.waitForTimeout(250);
+  };
+
+  const phoneSizes = [["phone 320x568", 320, 568], ["phone 360x740", 360, 740],
+                      ["phone 390x844", 390, 844], ["phone sideways 844x390", 844, 390]];
+  const overflow = [], targets = [];
+  for (const [label, w, h] of phoneSizes) {
+    const { pctx, pp } = await openPhone(w, h);
+    const m = await pp.evaluate(() => ({ sw: document.scrollingElement.scrollWidth, iw: innerWidth, t: HIQ.debug.touchTargets() }));
+    if (m.sw > m.iw) overflow.push(`${label}: ${m.sw}px wide`);
+    targets.push({ label, ...m.t });
+    await pctx.close();
+  }
+  check(overflow.length === 0, "no sideways scrolling on any phone size, upright or turned",
+    overflow.join(", ") || phoneSizes.map(s => s[0].split(" ").pop()).join(", "));
+  const small = targets.filter(t => !(t.hitDiameterCss >= 43.9 || t.hitRadius >= t.hitMax - 0.01));
+  check(small.length === 0, "every answer has a fingertip-sized tap area (44px, or as much as spacing allows)",
+    small.map(t => `${t.label}: ${t.hitDiameterCss.toFixed(0)}px`).join(", ") ||
+    targets.map(t => `${t.label.split(" ").pop()}: ${t.hitDiameterCss.toFixed(0)}px` +
+      (t.hitRadius >= t.hitMax - 0.01 && t.hitDiameterCss < 43.9 ? " (spacing cap)" : "")).join(", "));
+  const tooBig = targets.filter(t => t.hitRadius > t.hitMax + 1e-6);
+  check(tooBig.length === 0, "no tap area reaches past half the closest two answers can ever be, so no tap is ambiguous",
+    tooBig.map(t => t.label).join(", ") || `cap ${targets[0].hitMax}px of rink = half of 20 ft`);
+
+  {
+    const { pctx, pp } = await openPhone(390, 844);
+    // Everything an answer could be tapped against: the options really are
+    // twice the tap radius apart, on every play, every position, both wings.
+    const spacing = await pp.evaluate(() => {
+      const r = HIQ.debug.touchTargets().hitMax;
+      let worst = Infinity, at = "";
+      for (const play of HIQ.PLAYS) for (const role of ["C", "LW", "RW", "LD", "RD"]) for (const mirror of [false, true]) {
+        if (!HIQ.debug.buildExact(play.id, role, mirror)) continue;
+        const o = HIQ.debug.getChoices();
+        for (let i = 0; i < o.length; i++) for (let j = i + 1; j < o.length; j++) {
+          const d = Math.hypot(o[i].pos.x - o[j].pos.x, o[i].pos.y - o[j].pos.y);
+          if (d < worst) { worst = d; at = `${play.id} ${role}${mirror ? " mirrored" : ""}`; }
+        }
+      }
+      return { worst, r, at };
+    });
+    check(spacing.worst >= 2 * spacing.r - 1e-6, "tap areas never overlap on any play",
+      `closest answers ${spacing.worst.toFixed(0)}px apart (${spacing.at}); tap areas ${(2 * spacing.r).toFixed(0)}px across`);
+
+    // A real finger tap, off-centre towards the nearest wrong answer — the worst
+    // case — still picks the answer it was aimed at.
+    await tapNewPlay(pp);
+    await pp.evaluate(() => document.getElementById("rink").scrollIntoView({ block: "center" }));
+    const aim = await pp.evaluate(() => {
+      const o = HIQ.debug.getChoices(), r = HIQ.debug.touchTargets().hitRadius;
+      const best = o.find(x => x.tier === "best") || o[0];
+      const other = o.filter(x => x !== best).sort((a, b) =>
+        Math.hypot(a.pos.x - best.pos.x, a.pos.y - best.pos.y) - Math.hypot(b.pos.x - best.pos.x, b.pos.y - best.pos.y))[0];
+      const d = Math.hypot(other.pos.x - best.pos.x, other.pos.y - best.pos.y);
+      const k = (0.9 * r) / d;
+      return { label: best.label, x: best.pos.x + (other.pos.x - best.pos.x) * k, y: best.pos.y + (other.pos.y - best.pos.y) * k,
+               miss: { x: best.pos.x - (other.pos.x - best.pos.x) * (1.5 * r / d), y: best.pos.y - (other.pos.y - best.pos.y) * (1.5 * r / d) } };
+    });
+    // First a tap well clear of every answer: nothing happens.
+    const far = await pp.evaluate(({ x, y }) => {
+      const o = HIQ.debug.getChoices();
+      return Math.min(...o.map(q => Math.hypot(q.pos.x - x, q.pos.y - y))) > HIQ.debug.touchTargets().hitRadius;
+    }, aim.miss);
+    if (far) {
+      const pm = await phonePoint(pp, aim.miss.x, aim.miss.y);
+      await pp.touchscreen.tap(pm.x, pm.y);
+      await pp.waitForTimeout(150);
+    }
+    const stillOpen = await pp.evaluate(() => HIQ.debug.lastPicked() === null && HIQ.debug.getChoices().length === 3);
+    check(!far || stillOpen, "a tap nowhere near an answer is not taken as one", far ? "question still open" : "no clear spot on this play");
+    const pt = await phonePoint(pp, aim.x, aim.y);
+    await pp.touchscreen.tap(pt.x, pt.y);
+    await pp.waitForTimeout(150);
+    const picked = await pp.evaluate(() => HIQ.debug.lastPicked());
+    check(picked === aim.label, "a sloppy finger tap, leaning towards the wrong answer, still picks the one aimed at",
+      `aimed ${aim.label}, picked ${picked}`);
+    await pp.waitForFunction(() => !HIQ.debug.simRunning(), null, { timeout: 15000 }).catch(() => {});
+    const status = await pp.evaluate(() => document.getElementById("status").textContent.trim());
+    check(status.length > 0, "a touch tap answers the question and the coach responds", status.slice(0, 40));
+
+    // Your position, on the rink, while you choose — and never on top of an answer.
+    const chips = await pp.evaluate(async () => {
+      const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const bad = [], wrong = [];
+      let n = 0;
+      for (const play of HIQ.PLAYS) for (const role of ["C", "LW", "RW", "LD", "RD"]) for (const mirror of [false, true]) {
+        if (!HIQ.debug.buildExact(play.id, role, mirror)) continue;
+        await frame();
+        const sc = HIQ.debug.getScenario(), chip = HIQ.debug.roleChip(), text = HIQ.debug.roleChipText();
+        n++;
+        if (!chip || !text.includes(sc.role)) wrong.push(`${play.id} ${role}: "${text}"`);
+        else if (chip.clearance < 0) bad.push(`${play.id} ${role}${mirror ? " m" : ""} (${chip.clearance.toFixed(0)})`);
+      }
+      return { n, bad, wrong };
+    });
+    check(chips.wrong.length === 0, "while you choose, the rink itself says which position you're playing",
+      chips.wrong.slice(0, 3).join(", ") || `${chips.n} plays`);
+    check(chips.bad.length === 0, "the position label never covers an answer, the puck or who has it",
+      chips.bad.slice(0, 4).join(", ") || `${chips.n} plays, all clear`);
+
+    // Changing a setting must not yank the page back up to the rink.
+    await pp.evaluate(() => { document.getElementById("settingsPanel").open = true; });
+    await pp.evaluate(() => document.getElementById("diff").scrollIntoView({ block: "center" }));
+    await pp.waitForTimeout(100);
+    const before = await pp.evaluate(() => scrollY);
+    await pp.selectOption("#diff", "hard");
+    await pp.waitForTimeout(300);
+    const after = await pp.evaluate(() => scrollY);
+    check(before > 0 && after === before, "changing a setting leaves the page where it was", `scroll ${before} → ${after}`);
+    await pctx.close();
+  }
+
+  {
+    // Turned sideways: New Play brings the whole rink — and the question, when
+    // both fit — onto the screen.
+    const { pctx, pp } = await openPhone(844, 390);
+    await pp.evaluate(() => window.scrollTo(0, 0));
+    await tapNewPlay(pp);
+    const v = await pp.evaluate(() => {
+      const r = document.getElementById("rink").getBoundingClientRect();
+      const q = document.getElementById("prompt").getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, h: r.height, vh: innerHeight, qTop: q.top, fits: r.bottom - q.top <= innerHeight };
+    });
+    check(v.top >= 0 && v.bottom <= v.vh + 0.5, "turned sideways, a new play shows the whole rink",
+      `rink ${Math.round(v.top)}–${Math.round(v.bottom)} of a ${v.vh}px screen`);
+    check(!v.fits || v.qTop >= -0.5, "…with the question above it when there's room for both",
+      v.fits ? `question at ${Math.round(v.qTop)}px` : "question too long to fit with the rink");
+
+    // After an answer, the next play only scrolls if you were watching the rink:
+    // a parent reading the coach report below isn't pulled away from it.
+    const best = await pp.evaluate(() => HIQ.debug.getChoices().find(x => x.tier === "best").pos);
+    const bp = await phonePoint(pp, best.x, best.y);
+    await pp.touchscreen.tap(bp.x, bp.y);
+    await pp.waitForTimeout(100);
+    await pp.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight));
+    const parked = await pp.evaluate(() => scrollY);
+    const firstId = await pp.evaluate(() => HIQ.debug.getScenario().id + HIQ.debug.getScenario().role);
+    await pp.waitForFunction(() => !HIQ.debug.simRunning(), null, { timeout: 15000 }).catch(() => {});
+    await pp.waitForFunction(() => HIQ.debug.getChoices().length === 3 && !HIQ.debug.simRunning(), null, { timeout: 8000 }).catch(() => {});
+    await pp.waitForTimeout(300);
+    const later = await pp.evaluate(() => scrollY);
+    check(later === parked, "reading below the rink, the next play doesn't scroll you away", `scroll ${parked} → ${later}`);
+    await pctx.close();
+  }
+
   // ---------------------------------------------------------------- results
   section("Runtime health");
   check(errors.length === 0, "no console errors or exceptions", errors.slice(0, 3).join(" | ") || "clean");

@@ -72,6 +72,10 @@ holds special teams back until U13.
   week-by-week view per idea (improving, steady or slipping) kept on the device
   only: one capped localStorage key, no account, nothing sent anywhere
 - **Plays offline** — install it to your home screen and it works at the rink
+- **Made for fingers** — on a phone a sloppy tap still picks the answer it was
+  aimed at (the nearest one, within a fingertip-sized area that can never reach
+  another answer), the rink says which position you're playing while you
+  choose, and a phone turned sideways shows the whole rink and the question
 - **Runs smoothly on a phone** — players and chips are pre-rendered rather than
   re-traced every frame, and the pixel buffer is sized to what the device can
   actually afford, so a slow phone gives up a little sharpness instead of
@@ -97,7 +101,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 120 end-to-end checks against a real browser
+npm test           # 133 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
@@ -120,6 +124,8 @@ the **coaching correctness invariants**:
 - the season plan serves one unit at a time and only a best read advances it
 - nobody is ever pushed off the ice by the spacing pass
 - a frame costs a sane number of canvas operations, and frames don't stall
+- on phone-sized screens: no sideways scrolling, fingertip-sized tap areas that
+  never overlap, and the whole rink in view when a play starts
 
 Each of these exists because something was found to be wrong. An audit found
 the game marking *perfect* placements as turnovers; a third of option pairs

@@ -386,3 +386,29 @@ canvas { margin-top: 6px; }
 #historyBlock .hist-up { color: #0b6b3a; font-weight: 600; }
 #historyBlock .hist-down { color: #b42318; font-weight: 600; }
 #historyBlock .hist-steady, #historyBlock .hist-new { color: #5b6b7d; }
+
+/* A phone turned sideways — which the game itself asks for — is wide but only
+   ~390px tall. The desktop layout stacked a header, scorebar, plan bar and
+   question above the rink, leaving most of the rink below the bottom of the
+   screen. Compact all of that, and size the rink to the screen's height. */
+@media (orientation: landscape) and (max-height: 500px) {
+  header { padding: 6px 14px; }
+  header h1 { font-size: 16px; }
+  header .tag { display: none; }
+  #wrap { padding: 6px 10px; }
+  #scorebar { margin-bottom: 2px; gap: 6px; }
+  .pill { font-size: 11.5px; padding: 3px 8px; }
+  #xpwrap { width: 90px; }
+  #planBar { padding: 5px 10px; font-size: 12.5px; margin-bottom: 4px; }
+  #planBar .planGoal, #planBar .planNote { display: none; }
+  #practiceFocus { padding: 4px 10px; font-size: 12px; margin-bottom: 4px; }
+  #prompt { font-size: 14px; margin: 4px 0 2px; }
+  #hint { font-size: 12.5px; margin-bottom: 4px; }
+  #rotateHint { display: none; }
+  canvas {
+    width: min(100%, calc((100vh - 44px) * 2.2154));
+    width: min(100%, calc((100dvh - 44px) * 2.2154));
+    margin: 4px auto 0;
+  }
+  #actionRow button { padding: 9px 12px; font-size: 14px; }
+}
