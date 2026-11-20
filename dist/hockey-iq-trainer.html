@@ -391,6 +391,32 @@ canvas { margin-top: 6px; }
 #historyBlock .hist-down { color: #b42318; font-weight: 600; }
 #historyBlock .hist-steady, #historyBlock .hist-new { color: #5b6b7d; }
 
+/* A phone turned sideways — which the game itself asks for — is wide but only
+   ~390px tall. The desktop layout stacked a header, scorebar, plan bar and
+   question above the rink, leaving most of the rink below the bottom of the
+   screen. Compact all of that, and size the rink to the screen's height. */
+@media (orientation: landscape) and (max-height: 500px) {
+  header { padding: 6px 14px; }
+  header h1 { font-size: 16px; }
+  header .tag { display: none; }
+  #wrap { padding: 6px 10px; }
+  #scorebar { margin-bottom: 2px; gap: 6px; }
+  .pill { font-size: 11.5px; padding: 3px 8px; }
+  #xpwrap { width: 90px; }
+  #planBar { padding: 5px 10px; font-size: 12.5px; margin-bottom: 4px; }
+  #planBar .planGoal, #planBar .planNote { display: none; }
+  #practiceFocus { padding: 4px 10px; font-size: 12px; margin-bottom: 4px; }
+  #prompt { font-size: 14px; margin: 4px 0 2px; }
+  #hint { font-size: 12.5px; margin-bottom: 4px; }
+  #rotateHint { display: none; }
+  canvas {
+    width: min(100%, calc((100vh - 44px) * 2.2154));
+    width: min(100%, calc((100dvh - 44px) * 2.2154));
+    margin: 4px auto 0;
+  }
+  #actionRow button { padding: 9px 12px; font-size: 14px; }
+}
+
 </style>
 
 <header>
@@ -4108,6 +4134,9 @@ HIQ.Sim = (() => {
   };
   // Distances judged in feet, so "ten feet of room" means the same in any direction.
   const feetBetween = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by) / V.PX_PER_FT;
+  // The closest any two answers on screen may be. Shared by the choice
+  // generator and by tap detection, which relies on it to stay unambiguous.
+  const ANSWER_MIN_SEP_FT = 20;
   function netFor(side) { return side === "left" ? PXLM.leftNet : PXLM.rightNet; }
   /* The slot the simulation aims plays at. This was 125px out from the net
      at y=310 — numbers from the old 1100x620 canvas, which on this sheet put
@@ -4892,7 +4921,7 @@ HIQ.Sim = (() => {
        flip with consequences. Whatever the authored pool contains, the three
        shown must be far enough apart to read as three different decisions, so
        pick the combination with the widest minimum separation. */
-    const MIN_SEP_FT = 20;
+    const MIN_SEP_FT = ANSWER_MIN_SEP_FT;
     const sepFt = (a, b) => feetBetween(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
 
     let picked = null, pickedSpread = -1;
@@ -5406,13 +5435,13 @@ HIQ.Sim = (() => {
             ? "You got to the right spot and it ended in a goal!"
             : "You got to the right spot and kept the play alive — the chance was there.";
           statusEl.innerHTML = `<b>BEST READ \u2705</b> ${outcome}${prLine}`;
-          pendingTimer = setTimeout(buildScenario, 1700);
+          pendingTimer = setTimeout(() => nextPlay(true), 1700);
 
         } else if (grade === "acceptable") {
           // The whole point: this works, and the coach still shows you better.
           statusEl.innerHTML = `<b>THAT WORKS \uD83D\uDC4D</b> ${why}` +
             (better ? `<br/><span class="muted">Even better: ${better.why}</span>` : "") + prLine;
-          pendingTimer = setTimeout(buildScenario, 2600);
+          pendingTimer = setTimeout(() => nextPlay(true), 2600);
 
         } else {
           const alwaysReveal = (ageSel.value === "6-8" || diffSel.value === "easy");
@@ -6470,11 +6499,112 @@ HIQ.Sim = (() => {
     }
   }
 
+  /* --- Sized for fingers ----------------------------------------------
+
+     Answers are drawn and hit-tested in rink pixels, and a rink pixel on a
+     phone held upright is about a third of a screen pixel. Measured there,
+     the A/B/C markers were 18-22px across and the tappable area 24-30px —
+     half the ~44px a fingertip needs, which on a phone feels like the game
+     ignoring you.
+
+     A tap now picks the NEAREST answer within a 44px-wide finger target,
+     never less than the old radius and never more than half the closest two
+     answers can ever be (they are always at least ANSWER_MIN_SEP_FT apart).
+     So a sloppy tap still lands, and no tap can be read as the wrong answer.
+     Markers also draw a little larger where the screen is small. */
+  const ANSWER_HIT_MIN = 34;
+  const ANSWER_HIT_MAX = (ANSWER_MIN_SEP_FT * HIQ.VIEW.PX_PER_FT) / 2;
+  let canvasCssWidth = 0;
+  function measureCanvas() { canvasCssWidth = canvas.getBoundingClientRect().width; }
+  function cssPerWorldPx() {
+    if (!canvasCssWidth) measureCanvas();
+    return (canvasCssWidth / LOGICAL_W) * (camera.scale || 1);
+  }
+  function answerHitRadius() {
+    const k = cssPerWorldPx();
+    return clamp(k > 0 ? 22 / k : ANSWER_HIT_MIN, ANSWER_HIT_MIN, ANSWER_HIT_MAX);
+  }
+  function markerRadius() {
+    const k = cssPerWorldPx();
+    return clamp(k > 0 ? 13 / k : 25, 25, 32);
+  }
+
+  /* "You: LW" on the rink itself while a question is open. Your own token is
+     hidden while you choose, so on a phone — where the question text has
+     scrolled off above the rink — nothing on screen said which position you
+     were playing. Sized in screen pixels so it stays readable there. */
+  function roleChipText() {
+    if (!scenario || scenario.mode !== "single") return "";
+    if (!choice.active && !liveRead.running) return "";
+    return `YOU: ${scenario.role}${scenario.job ? " \u2014 " + scenario.job : ""}`;
+  }
+  let lastRoleChip = null;
+  function worldToScreenPt(x, y) {
+    return { x: (x - camera.x) * camera.scale + LOGICAL_W / 2,
+             y: (y - camera.y) * camera.scale + LOGICAL_H / 2 };
+  }
+  /* Corners in order of preference; the first that keeps clear of every
+     marker and the puck wins. Sized for a phone the chip is ~11 ft tall, and a
+     winger's answer can sit right on the top boards — the chip must never be
+     the thing that hides an answer. */
+  function placeRoleChip(w, h, pad) {
+    const corners = [
+      [pad, pad], [LOGICAL_W - pad - w, pad],
+      [pad, LOGICAL_H - pad - h], [LOGICAL_W - pad - w, LOGICAL_H - pad - h],
+    ];
+    const things = choice.options.map(o => ({ ...worldToScreenPt(o.pos.x, o.pos.y), r: (markerRadius() + 6) * camera.scale }));
+    things.push({ ...worldToScreenPt(puck.x, puck.y), r: (puck.r + 6) * camera.scale });
+    // The possession tag too: it names who has the puck, and the chip first
+    // landed right on top of it whenever the puck was in a top corner.
+    const rects = [];
+    if (choice.active && lastPuckTag) {
+      const a = worldToScreenPt(lastPuckTag.x, lastPuckTag.y);
+      rects.push({ x: a.x - 4, y: a.y - 4, w: lastPuckTag.w * camera.scale + 8, h: lastPuckTag.h * camera.scale + 8 });
+    }
+    const clearance = (x, y) => Math.min(
+      ...things.map(t => {
+        const dx = Math.max(x - t.x, 0, t.x - (x + w)), dy = Math.max(y - t.y, 0, t.y - (y + h));
+        return Math.hypot(dx, dy) - t.r;
+      }),
+      ...rects.map(q => {
+        const dx = Math.max(q.x - (x + w), x - (q.x + q.w)), dy = Math.max(q.y - (y + h), y - (q.y + q.h));
+        return dx < 0 && dy < 0 ? Math.max(dx, dy) : Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
+      }));
+    let best = null;
+    for (const [x, y] of corners) {
+      const c = clearance(x, y);
+      if (c >= 0) return { x, y, w, h, clearance: c };
+      if (!best || c > best.clearance) best = { x, y, w, h, clearance: c };
+    }
+    return best;
+  }
+  function drawRoleChipOverlay() {
+    const text = roleChipText();
+    if (!text) { lastRoleChip = null; return; }
+    const cssPerLogical = (canvasCssWidth || LOGICAL_W) / LOGICAL_W;
+    const font = Math.max(16, 12 / cssPerLogical);
+    ctx.save();
+    ctx.font = `800 ${Math.round(font)}px system-ui`;
+    const w = ctx.measureText(text).width + font * 1.1, h = font * 1.7;
+    const spot = placeRoleChip(w, h, font * 0.5);
+    const x = spot.x, y = spot.y;
+    lastRoleChip = { ...spot, text };
+    roundRectPath(ctx, x, y, w, h, h / 2);
+    ctx.fillStyle = "rgba(250, 204, 21, 0.95)";
+    ctx.fill();
+    ctx.fillStyle = "#1f2937";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x + font * 0.55, y + h / 2 + 1);
+    ctx.restore();
+  }
+
   function drawChoices(t) {
     if (!choice.active) return;
     for (const o of choice.options) {
       const pulse = Math.sin(t / 280 + o.label.charCodeAt(0)) * 2.5;
-      const r = 25 + pulse;
+      const base = markerRadius();
+      const r = base + pulse;
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.3)";
       ctx.shadowBlur = 7;
@@ -6497,7 +6627,7 @@ HIQ.Sim = (() => {
       ctx.arc(o.pos.x, o.pos.y, r, 0, Math.PI * 2);
       ctx.stroke();
       ctx.fillStyle = "#b45309";
-      ctx.font = "bold 22px system-ui";
+      ctx.font = `bold ${Math.round(22 * base / 25)}px system-ui`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(o.label, o.pos.x, o.pos.y);
@@ -6650,6 +6780,7 @@ HIQ.Sim = (() => {
     ctx.save();
     ctx.translate(shx, shy);
     drawIntro(t);
+    drawRoleChipOverlay();
     drawBanner(t);
     ctx.restore();
   }
@@ -6759,8 +6890,10 @@ HIQ.Sim = (() => {
 
   let activeDrag = null;
 
+  let lastPickedLabel = null;
   function chooseOption(opt) {
     if (HIQ.Sim.isRunning()) return;
+    lastPickedLabel = opt.label;
     takeSnapshot();
     choice.active = false;
     const you = controlled[0];
@@ -6778,12 +6911,14 @@ HIQ.Sim = (() => {
     const p = getPos(evt);
 
     if (choice.active) {
+      let nearest = null, nearestD = Infinity;
       for (const o of choice.options) {
-        if (dist(p.x, p.y, o.pos.x, o.pos.y) <= 34) {
-          evt.preventDefault();
-          chooseOption(o);
-          return;
-        }
+        const d = dist(p.x, p.y, o.pos.x, o.pos.y);
+        if (d < nearestD) { nearestD = d; nearest = o; }
+      }
+      if (nearest && nearestD <= answerHitRadius()) {
+        evt.preventDefault();
+        chooseOption(nearest);
       }
       return;
     }
@@ -6814,7 +6949,29 @@ HIQ.Sim = (() => {
   window.addEventListener("touchend", pointerUp);
 
   // --- Controls
-  newBtn.addEventListener("click", () => buildScenario());
+  /* On a short screen — a phone turned sideways, as the game itself asks —
+     the rink could sit mostly below the bottom of the screen when a play
+     began. Bring it into view when a play starts: always for New Play and
+     the first load, but after an answer only if you were already watching
+     the rink, so reading the coach report below isn't yanked away. Never on
+     a settings change, so the setting you're editing stays put. */
+  function ensureRinkVisible(onlyIfWatching) {
+    const r = canvas.getBoundingClientRect(), vh = window.innerHeight;
+    // The question goes with the rink when both fit: a rink with no question
+    // above it is only half of the read.
+    const q = promptEl.getBoundingClientRect();
+    const top = q.height && r.bottom - q.top <= vh ? q.top : r.top;
+    if (top >= 0 && r.bottom <= vh) return;
+    if (onlyIfWatching && !(r.bottom > 0 && r.top < vh)) return;
+    if (top >= 0 && r.bottom > vh) window.scrollBy(0, Math.min(top, r.bottom - vh));
+    else window.scrollBy(0, top);
+  }
+  function nextPlay(onlyIfWatching) {
+    buildScenario();
+    ensureRinkVisible(onlyIfWatching);
+  }
+
+  newBtn.addEventListener("click", () => nextPlay(false));
   lockBtn.addEventListener("click", () => lockIn());
   muteBtn.addEventListener("click", () => {
     HIQ.audio.setMuted(!HIQ.audio.isMuted());
@@ -6864,6 +7021,15 @@ HIQ.Sim = (() => {
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
     liveReadRunning: () => liveRead.running,
+    // Finger-sized targets, measured on whatever screen this is.
+    touchTargets: () => ({
+      hitRadius: answerHitRadius(), hitMax: ANSWER_HIT_MAX, markerRadius: markerRadius(),
+      hitDiameterCss: 2 * answerHitRadius() * cssPerWorldPx(),
+      markerDiameterCss: 2 * markerRadius() * cssPerWorldPx(),
+    }),
+    roleChipText: () => roleChipText(),
+    roleChip: () => lastRoleChip,
+    lastPicked: () => lastPickedLabel,
     // Geometry the bug sweep pinned down, exposed so it stays pinned.
     slotFor: (side) => ({ ...slotFor(side) }),
     dragClamp: (x, y) => dragClamp(x, y),
@@ -7110,13 +7276,16 @@ HIQ.Sim = (() => {
       pacing.step = 0;
       pacing.slowWindows = 0;
       applyRenderScale(resolutionFor(0));
+      measureCanvas();
     }, 150);
   };
   window.addEventListener("resize", onViewportChange);
   window.addEventListener("orientationchange", onViewportChange);
 
   buildRinkLayer();
+  measureCanvas();
   buildScenario();
+  if (seenTutorial) ensureRinkVisible(false);
   requestAnimationFrame(tick);
 })();
 
