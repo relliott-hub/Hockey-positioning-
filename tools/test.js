@@ -1651,6 +1651,77 @@ const section = (t) => console.log(`\n${t}`);
   await page.selectOption("#plan", "season");
   await page.waitForTimeout(200);
 
+  /* A child who never opens settings must be able to finish the season.
+     "You play" defaulted to Centre and the plan kept it, while credit counts
+     once per position in a situation — so Unit 1 (two plays, six reads
+     needed) could never be finished, and served the same two plays for ever.
+     Walk the whole season on defaults, answering every served play with its
+     best read: every unit must close in exactly the reads it asks for. */
+  const season = await page.evaluate(() => {
+    const plan = document.getElementById("plan"); plan.value = "season"; plan.dispatchEvent(new Event("change", { bubbles: true }));
+    const mode = document.getElementById("mode"); mode.value = "single"; mode.dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("role").value = "C";
+    HIQ.debug.resetPlan();
+    const perUnit = [];
+    let unit = HIQ.debug.getPlan().index, answers = 0, wasted = 0;
+    for (let i = 0; i < 200 && perUnit.length < HIQ.CURRICULUM.length - 1; i++) {
+      document.getElementById("newBtn").click();
+      const sc = HIQ.debug.getScenario();
+      const before = HIQ.debug.getPlan().done.length;
+      HIQ.debug.creditPlan(sc.id, sc.role);
+      answers++;
+      const p = HIQ.debug.getPlan();
+      if (p.index === unit && p.done.length === before) wasted++;
+      if (p.index !== unit) { perUnit.push({ unit: HIQ.CURRICULUM[unit].id, answers }); unit = p.index; answers = 0; }
+    }
+    const needs = HIQ.CURRICULUM.slice(0, -1).map(u => Math.min(u.need, HIQ.unitSize(u)));
+    return { perUnit, needs, wasted };
+  });
+  check(season.perUnit.length === season.needs.length,
+    "on default settings, every unit of the season can be finished",
+    `${season.perUnit.length}/${season.needs.length} units closed` + (season.perUnit.length < season.needs.length ? ` — stuck in ${season.perUnit.length + 1}` : ""));
+  check(season.wasted === 0 && season.perUnit.every((u, i) => u.answers === season.needs[i]),
+    "…and every best read the plan serves counts toward it — none are repeats of one already earned",
+    season.perUnit.map(u => `${u.unit} ${u.answers}`).join(", "));
+
+  // Never the same play twice running, and the position moves around.
+  const rotation = await page.evaluate(() => {
+    HIQ.debug.resetPlan();
+    const seen = [];
+    for (let i = 0; i < 40; i++) {
+      document.getElementById("newBtn").click();
+      const sc = HIQ.debug.getScenario();
+      seen.push({ id: sc.id, role: sc.role, m: sc.mirrored });
+    }
+    const repeats = seen.filter((s, i) => i && s.id === seen[i - 1].id).length;
+    return { repeats, roles: [...new Set(seen.map(s => s.role))], sides: new Set(seen.map(s => s.m)).size,
+             ids: [...new Set(seen.map(s => s.id))] };
+  });
+  check(rotation.repeats === 0, "in the season plan, the same play never comes up twice in a row",
+    `40 plays from a ${rotation.ids.length}-play unit, ${rotation.repeats} back-to-back`);
+  check(rotation.roles.length >= 4 && rotation.sides === 2, "…and it moves you between positions and both sides of the ice",
+    `positions ${rotation.roles.join(" ")}`);
+  const pickerHidden = await page.evaluate(() => {
+    const w = document.getElementById("roleWrap"), r = document.getElementById("role");
+    return w.style.display === "none" && r.disabled;
+  });
+  check(pickerHidden, "the 'You play' picker is off while the plan is choosing the position");
+
+  const freeRot = await page.evaluate(() => {
+    const plan = document.getElementById("plan"); plan.value = "free"; plan.dispatchEvent(new Event("change", { bubbles: true }));
+    const visible = document.getElementById("roleWrap").style.display !== "none" && !document.getElementById("role").disabled;
+    const ids = [];
+    for (let i = 0; i < 60; i++) { document.getElementById("newBtn").click(); ids.push(HIQ.debug.getScenario().id); }
+    const r = document.getElementById("role").value;
+    const roles = new Set();
+    for (let i = 0; i < 20; i++) { document.getElementById("newBtn").click(); roles.add(HIQ.debug.getScenario().role); }
+    plan.value = "season"; plan.dispatchEvent(new Event("change", { bubbles: true }));
+    HIQ.debug.resetPlan();
+    return { visible, repeats: ids.filter((id, i) => i && id === ids[i - 1]).length, keptRole: roles.size === 1 && roles.has(r) };
+  });
+  check(freeRot.repeats === 0, "in free play, the same play never comes up twice in a row", `60 plays, ${freeRot.repeats} back-to-back`);
+  check(freeRot.visible && freeRot.keptRole, "in free play you choose your position and it stays yours");
+
   // Progress is persisted — a child does not restart the season every session.
   await page.evaluate(() => { HIQ.debug.resetPlan(); HIQ.debug.creditPlan(HIQ.CURRICULUM[0].plays[0], "C"); });
   await page.reload();

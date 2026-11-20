@@ -37,7 +37,10 @@ end → move it up the ice → own the neutral zone → take it back → keep it
 their end → create the chance → get back → special teams. A unit
 opens the next one only when its reads are landing, and credit counts once per
 position in a situation, so repeating the one read you find easy gets you
-nowhere. Free play serves anything, for someone who already knows the game.
+nowhere. The plan moves the player through all five positions, always serving
+a situation and position they haven't earned yet, and never the same play twice
+in a row. Free play serves anything, from the position you pick, for someone
+who already knows the game.
 
 The order isn't invented — it follows Hockey Canada's "skills before tactics;
 tactics before structure", which introduces defensive-zone positioning first and
@@ -111,7 +114,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 153 end-to-end checks against a real browser
+npm test           # 160 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
@@ -132,6 +135,8 @@ the **coaching correctness invariants**:
 - the simulation never shows a pass across the front of your own net
 - every situation's wording matches where things actually are on the ice
 - the season plan serves one unit at a time and only a best read advances it
+- on default settings every unit can be finished, and no play comes up twice
+  in a row
 - nobody is ever pushed off the ice by the spacing pass
 - a frame costs a sane number of canvas operations, and frames don't stall
 - a fault injected at each point in the engine never leaves the game frozen

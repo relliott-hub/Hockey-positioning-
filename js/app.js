@@ -67,6 +67,7 @@
   const planBarEl = document.getElementById("planBar");
   const phaseFilterWrap = document.getElementById("phaseFilterWrap");
   const formatWrap = document.getElementById("formatWrap");
+  const roleWrap = document.getElementById("roleWrap");
   const liveReadSel = document.getElementById("liveReads");
   const practiceFocusEl = document.getElementById("practiceFocus");
   const historyEl = document.getElementById("historyBlock");
@@ -442,7 +443,7 @@
      state now follows the plan selector directly, every time it changes. */
   function syncPickersToPlan() {
     const onPlan = planOn();
-    for (const [wrap, sel] of [[formatWrap, formatSel], [phaseFilterWrap, phaseFilterSel]]) {
+    for (const [wrap, sel] of [[formatWrap, formatSel], [phaseFilterWrap, phaseFilterSel], [roleWrap, roleSel]]) {
       if (wrap) {
         wrap.style.display = onPlan ? "none" : "";
         wrap.setAttribute("aria-hidden", onPlan ? "true" : "false");
@@ -460,7 +461,7 @@
   }));
 
   function planNote() {
-    let note = "The plan chooses the situation, so the format and phase settings are off.";
+    let note = "The plan chooses the situation and moves you through every position, so those settings are off \u2014 pick one position in free play.";
     if (SPECIAL_TEAMS_UNIT > unitIndex()) note += ` Special teams arrive in Unit ${SPECIAL_TEAMS_UNIT + 1}.`;
     else if (SPECIAL_TEAMS_UNIT === unitIndex()) note += " This unit is special teams.";
     return note;
@@ -494,6 +495,33 @@
   }
 
   /* Every (play, mirrored?) combination this position can be coached in. */
+  /* Every (play, side, position) the plan could serve from this unit,
+     narrowed to the ones not yet credited — so each best read is progress —
+     until none are left, after which anything in the unit can come up. */
+  const PLAN_ROLES = ["C", "LW", "RW", "LD", "RD"];
+  function planCombos(candidates) {
+    const done = new Set(unitDoneKeys(currentUnit()));
+    const all = [];
+    for (const r of PLAN_ROLES) {
+      for (const c of eligibleCombos(candidates, r)) all.push({ ...c, role: r });
+    }
+    const open = all.filter(c => !done.has(`${c.cand.id}/${c.role}`));
+    return open.length ? open : all;
+  }
+
+  /* Never the same play twice running when there's another to give. With
+     only two or three plays in a unit, a plain random pick served the same
+     one three and four times in a row, which reads as the game being stuck.
+     If only one play is left, at least change the side or the position. */
+  let lastServed = null;
+  function avoidRepeat(combos) {
+    if (!lastServed || combos.length < 2) return combos;
+    const otherPlay = combos.filter(c => c.cand.id !== lastServed.id);
+    if (otherPlay.length) return otherPlay;
+    const otherPicture = combos.filter(c => c.mirror !== lastServed.mirror || (c.role && c.role !== lastServed.role));
+    return otherPicture.length ? otherPicture : combos;
+  }
+
   function eligibleCombos(candidates, role, force = null) {
     const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
     const combos = [];
@@ -659,7 +687,7 @@
 
     const fmt = formatSel.value;
     const mode = modeSel.value;
-    const role = roleSel.value;
+    let role = roleSel.value;
     const diff = diffSel.value;
 
     /* In plan mode the unit decides what you see — including the strength, so
@@ -694,7 +722,12 @@
        so rejection sampling quietly favours one orientation and the play lands
        on the same side of the ice about twice as often. Enumerating first keeps
        both wings equally represented. */
-    const combos = eligibleCombos(candidates, role, force);
+    /* In the season plan the plan also picks the position. It used to keep
+       whatever "You play" said — Centre by default — but credit counts once
+       per position in a situation, so a Centre could earn 2 of the 6 reads
+       Unit 1 needs and was served the same two plays for ever. */
+    const planPicksRole = onPlan && !force;
+    const combos = avoidRepeat(planPicksRole ? planCombos(candidates) : eligibleCombos(candidates, role, force));
     // Uniform until there's a real signal, then gently toward what's missed.
     const focus = practiceFocus();
     renderPracticeFocus(focus);
@@ -702,6 +735,7 @@
     let play;
     if (combos.length) {
       const chosen = weightedPick(combos, practiceWeights(combos, focus));
+      if (chosen.role) role = chosen.role;
       play = HIQ.varyPlay(chosen.cand, { mirror: chosen.mirror });
     } else {
       // Nothing coaches this position — fall back and reassign below.
@@ -744,6 +778,7 @@
     };
     /* Naming the job is the whole point of the special-teams vocabulary: a kid
        who knows what "the bumper" means can follow a coach at a whiteboard. */
+    lastServed = { id: play.id, mirror: !!play.mirrored, role: playRole };
     const who = scenario.job ? `you are ${playRole} — ${scenario.job}` : `you are ${playRole}`;
     scenario.prompt = `${play.name} — ${who}. ${play.situation}`;
     if (playRole !== role) {
