@@ -376,3 +376,13 @@ canvas { margin-top: 6px; }
 @media (max-width: 760px) and (orientation: portrait) {
   #rotateHint { display: block; }
 }
+
+/* Coach report — week by week, per principle */
+#historyBlock { margin-top: 14px; }
+#historyBlock .hist-head { font-weight: 700; color: #0f2a4a; margin-bottom: 2px; }
+#historyBlock .hist-scroll { overflow-x: auto; margin-top: 6px; }
+#historyBlock table.hist { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+#historyBlock table.hist th, #historyBlock table.hist td { padding: 4px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid #e4ebf3; }
+#historyBlock .hist-up { color: #0b6b3a; font-weight: 600; }
+#historyBlock .hist-down { color: #b42318; font-weight: 600; }
+#historyBlock .hist-steady, #historyBlock .hist-new { color: #5b6b7d; }

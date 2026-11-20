@@ -69,6 +69,7 @@
   const formatWrap = document.getElementById("formatWrap");
   const liveReadSel = document.getElementById("liveReads");
   const practiceFocusEl = document.getElementById("practiceFocus");
+  const historyEl = document.getElementById("historyBlock");
 
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
@@ -1501,6 +1502,8 @@
       const bucket = stats.byPrinciple[principle] || { good: 0, missed: 0 };
       if (grade === "wrong") bucket.missed += 1; else bucket.good += 1;
       stats.byPrinciple[principle] = bucket;
+      recordHistory(principle, grade !== "wrong");
+      renderHistory();
     }
     stats.bestStreak = Math.max(stats.bestStreak, streak);
     awardXP(grade === "best" ? 100 : grade === "acceptable" ? 55 : 15);
@@ -1578,6 +1581,116 @@
         }
       }
     });
+  }
+
+  /* --- Progress a parent can see ------------------------------------
+
+     The coach report covers this session only. This keeps a small running
+     record on the device — one entry per day, a good/missed count per
+     principle, the same counts the principle totals already use — and shows
+     it week by week, so a parent can see whether an idea is landing over a
+     month and not just over the last ten minutes.
+
+     Nothing leaves the device: it is one localStorage key, no account, no
+     server. It is capped at HISTORY_MAX_DAYS days of play, oldest dropped
+     first, so it can't grow without bound. */
+  const HISTORY_KEY = "hiq_history";
+  const HISTORY_MAX_DAYS = 180;
+  const HISTORY_WEEKS_SHOWN = 6;
+
+  function loadHistory() {
+    const h = loadStore(HISTORY_KEY, { v: 1, days: [] });
+    // Anything malformed is dropped rather than allowed to break the page.
+    const days = Array.isArray(h.days) ? h.days.filter(d =>
+      d && typeof d.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d.d) && d.p && typeof d.p === "object") : [];
+    return { v: 1, days };
+  }
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const dayKey = (dt) => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+  const parseDay = (key) => { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d); };
+  // Weeks start on Monday, in the player's own time zone.
+  function weekKey(key) {
+    const dt = parseDay(key);
+    dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    return dayKey(dt);
+  }
+
+  function recordHistory(principle, good, when = new Date()) {
+    if (!HIQ.PRINCIPLES[principle]) return;
+    const h = loadHistory();
+    const key = typeof when === "string" ? when : dayKey(when);
+    let day = h.days.find(d => d.d === key);
+    if (!day) {
+      day = { d: key, p: {} };
+      h.days.push(day);
+      h.days.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+      while (h.days.length > HISTORY_MAX_DAYS) h.days.shift();
+    }
+    const c = Array.isArray(day.p[principle]) ? day.p[principle] : [0, 0];
+    if (good) c[0] += 1; else c[1] += 1;
+    day.p[principle] = c;
+    saveStore(HISTORY_KEY, h);
+  }
+
+  // { weeks: [weekKey...], rows: [{ key, cells: [{good, total}|null], trend }] }
+  function historyByWeek() {
+    const h = loadHistory();
+    const weeks = {};
+    for (const day of h.days) {
+      const wk = weekKey(day.d);
+      weeks[wk] = weeks[wk] || {};
+      for (const [k, c] of Object.entries(day.p)) {
+        if (!Array.isArray(c)) continue;
+        const cell = weeks[wk][k] || { good: 0, total: 0 };
+        cell.good += c[0] | 0;
+        cell.total += (c[0] | 0) + (c[1] | 0);
+        weeks[wk][k] = cell;
+      }
+    }
+    const shown = Object.keys(weeks).sort().slice(-HISTORY_WEEKS_SHOWN);
+    const rows = [];
+    for (const key of Object.keys(HIQ.PRINCIPLES)) {
+      const cells = shown.map(wk => (weeks[wk][key] && weeks[wk][key].total ? weeks[wk][key] : null));
+      const filled = cells.filter(Boolean);
+      if (!filled.length) continue;
+      let trend = "new";
+      if (filled.length >= 2) {
+        const pct = (c) => c.good / c.total;
+        const diff = pct(filled[filled.length - 1]) - pct(filled[filled.length - 2]);
+        trend = diff >= 0.1 ? "up" : diff <= -0.1 ? "down" : "steady";
+      }
+      rows.push({ key, cells, trend });
+    }
+    return { weeks: shown, rows };
+  }
+
+  function renderHistory() {
+    if (!historyEl) return;
+    const { weeks, rows } = historyByWeek();
+    if (!rows.length) {
+      historyEl.innerHTML = `<div class="hist-head">Week by week</div>` +
+        `<div class="muted">Play a few situations and each week's results will build up here. ` +
+        `Kept on this device only.</div>`;
+      return;
+    }
+    const label = (wk) => parseDay(wk).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const TREND = {
+      up: ["\u25B2", "improving"], down: ["\u25BC", "slipping"],
+      steady: ["\u2192", "steady"], new: ["\u00B7", "first week"],
+    };
+    const head = `<tr><th>Idea</th>${weeks.map(w => `<th>Week of ${label(w)}</th>`).join("")}<th>Trend</th></tr>`;
+    const body = rows.map(r => {
+      const p = HIQ.PRINCIPLES[r.key];
+      const cells = r.cells.map(c => c
+        ? `<td class="hist-cell"><b>${Math.round((c.good / c.total) * 100)}%</b> <span class="muted">(${c.total})</span></td>`
+        : `<td class="hist-cell muted">\u2014</td>`).join("");
+      const [mark, word] = TREND[r.trend];
+      return `<tr data-principle="${r.key}" data-trend="${r.trend}"><td>${p.name}</td>${cells}` +
+        `<td class="hist-trend hist-${r.trend}">${mark} ${word}</td></tr>`;
+    }).join("");
+    historyEl.innerHTML = `<div class="hist-head">Week by week</div>` +
+      `<div class="muted">Good reads each week, per idea. Kept on this device only.</div>` +
+      `<div class="hist-scroll"><table class="hist">${head}${body}</table></div>`;
   }
 
   // --- Reporting
@@ -2896,6 +3009,11 @@
     // Selection weighting, exactly as buildScenario computes it.
     practiceFocus: () => practiceFocus(),
     renderReport: () => renderReport(),
+    // Week-by-week history: record an answer on a given day ("YYYY-MM-DD"),
+    // read it back, and redraw it.
+    recordHistory: (principle, good, day) => { recordHistory(principle, good, day); renderHistory(); },
+    historyByWeek: () => historyByWeek(),
+    historyLimit: () => HISTORY_MAX_DAYS,
     weightsFor: (role, focus, ids) => {
       const pool = HIQ.PLAYS.filter(p => !ids || ids.includes(p.id));
       const combos = eligibleCombos(pool, role);
@@ -3085,6 +3203,7 @@
   if (howToBtn) howToBtn.addEventListener("click", openTutorial);
 
   // Init
+  renderHistory();
   /* Someone who has asked their device for less motion gets still pictures,
      as they always did. They can still turn moving reads on. */
   try {

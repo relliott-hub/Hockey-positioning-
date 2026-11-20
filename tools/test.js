@@ -50,6 +50,15 @@ const section = (t) => console.log(`\n${t}`);
 
   const errors = [];
   page.on("pageerror", e => errors.push("PAGEERROR: " + e.message));
+  /* Nothing leaves the device. The game is static files plus localStorage;
+     any request to anywhere else — an analytics ping, a font, a sync call —
+     is a promise to parents broken. Every request the page makes, for the
+     whole run, is checked at the end. */
+  const offDevice = [];
+  page.on("request", r => {
+    const u = r.url();
+    if (!/^(file|data|blob|about):/.test(u)) offDevice.push(u);
+  });
   page.on("console", m => { if (m.type() === "error") errors.push("CONSOLE: " + m.text()); });
   const dataWarnings = [];
   page.on("console", m => { if (m.type() === "warning" && m.text().includes("[HIQ]")) dataWarnings.push(m.text()); });
@@ -1266,6 +1275,112 @@ const section = (t) => console.log(`\n${t}`);
   check(after.s.xp === before.s.xp && typeof after.s.xp === "number",
     "XP survives a reload", `xp=${after.s.xp}`);
 
+  /* --------------------------------------------------- progress over weeks
+
+     The session report forgets everything when the tab closes. A parent
+     needs to see whether an idea is landing over weeks, so each day's
+     results are appended to one capped localStorage key and shown week by
+     week. */
+  section("Progress over weeks");
+  await page.evaluate(() => { localStorage.removeItem("hiq_history"); HIQ.debug.newPlay(); });
+  const todayKey = await page.evaluate(() => {
+    const d = new Date(), p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  });
+  const answerOnce = async () => {
+    const pr = await page.evaluate(() => {
+      const best = HIQ.debug.getChoices().find(o => o.tier === "best");
+      HIQ.debug.choose(best);
+      return best.principle;
+    });
+    await settle();
+    await page.waitForTimeout(2300);
+    return pr;
+  };
+  const firstPrinciple = await answerOnce();
+  const afterOne = await page.evaluate(() => JSON.parse(localStorage.getItem("hiq_history") || "null"));
+  const todayEntry = afterOne && afterOne.days.find(d => d.d === todayKey);
+  check(!!todayEntry && Array.isArray(todayEntry.p[firstPrinciple]) && todayEntry.p[firstPrinciple][0] === 1,
+    "a real answer is added to today's entry, under the principle it taught",
+    todayEntry ? `${todayKey}: ${JSON.stringify(todayEntry.p)}` : "nothing stored");
+  await answerOnce();
+  const afterTwo = await page.evaluate(() => JSON.parse(localStorage.getItem("hiq_history") || "null"));
+  const todays = afterTwo.days.filter(d => d.d === todayKey);
+  const todayTotal = todays.length ? Object.values(todays[0].p).reduce((a, c) => a + c[0] + c[1], 0) : 0;
+  check(todays.length === 1 && todayTotal === 2, "answers on the same day go into one entry, not one each",
+    `${todays.length} entry, ${todayTotal} answers`);
+
+  await page.reload();
+  await page.waitForTimeout(600);
+  const shownAfterReload = await page.evaluate(() => {
+    const el = document.getElementById("historyBlock");
+    return { rows: el.querySelectorAll("tr[data-principle]").length, text: el.textContent };
+  });
+  check(shownAfterReload.rows >= 1, "the week-by-week view survives a reload, before any new answer",
+    `${shownAfterReload.rows} idea(s) shown`);
+
+  // Known weeks in, known trend out. Weeks start on Monday.
+  const weekly = await page.evaluate(() => {
+    localStorage.removeItem("hiq_history");
+    const add = (pr, good, missed, day) => {
+      for (let i = 0; i < good; i++) HIQ.debug.recordHistory(pr, true, day);
+      for (let i = 0; i < missed; i++) HIQ.debug.recordHistory(pr, false, day);
+    };
+    add("above", 1, 1, "2026-11-02"); add("above", 0, 2, "2026-11-04");   // week of Nov 2: 1 of 4
+    add("above", 2, 2, "2026-11-09");                                      // week of Nov 9: 2 of 4
+    add("above", 2, 0, "2026-11-16"); add("above", 2, 0, "2026-11-22");   // Sunday is still that week: 4 of 4
+    add("weakside", 4, 0, "2026-11-09"); add("weakside", 1, 3, "2026-11-16");
+    add("middle", 3, 1, "2026-11-16");
+    const view = HIQ.debug.historyByWeek();
+    const row = (k) => view.rows.find(r => r.key === k);
+    const pct = (k) => row(k).cells.map(c => (c ? Math.round((c.good / c.total) * 100) : null));
+    const dom = document.querySelector('#historyBlock tr[data-principle="above"]');
+    return {
+      weeks: view.weeks, above: pct("above"), weakside: pct("weakside"),
+      trends: { above: row("above").trend, weakside: row("weakside").trend, middle: row("middle").trend },
+      domTrend: dom && dom.dataset.trend, domText: dom && dom.textContent,
+    };
+  });
+  check(weekly.weeks.join() === "2026-11-02,2026-11-09,2026-11-16" &&
+        JSON.stringify(weekly.above) === "[25,50,100]" && JSON.stringify(weekly.weakside) === "[null,100,25]",
+    "days are grouped into Monday-to-Sunday weeks and scored per idea",
+    `above ${weekly.above.join("/")}, weak side ${weekly.weakside.map(v => v ?? "-").join("/")}`);
+  check(weekly.trends.above === "up" && weekly.trends.weakside === "down" && weekly.trends.middle === "new",
+    "each idea shows whether it is improving, slipping, or too new to tell", JSON.stringify(weekly.trends));
+  check(weekly.domTrend === "up" && /25%.*50%.*100%/.test(weekly.domText || ""),
+    "the coach report shows those weeks in order", (weekly.domText || "").replace(/\s+/g, " ").slice(0, 80));
+
+  const capped = await page.evaluate(() => {
+    localStorage.removeItem("hiq_history");
+    const start = new Date(2025, 0, 1), p = (n) => String(n).padStart(2, "0");
+    let last = "";
+    for (let i = 0; i < 400; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      last = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      HIQ.debug.recordHistory("support", true, last);
+    }
+    const h = JSON.parse(localStorage.getItem("hiq_history"));
+    return { n: h.days.length, limit: HIQ.debug.historyLimit(), newest: h.days[h.days.length - 1].d, last,
+      bytes: localStorage.getItem("hiq_history").length };
+  });
+  check(capped.n === capped.limit && capped.newest === capped.last,
+    "the history is capped, dropping the oldest days first",
+    `400 days in, ${capped.n} kept, ${Math.round(capped.bytes / 1024)} KB`);
+
+  await page.evaluate(() => localStorage.setItem("hiq_history", "{not json"));
+  await page.reload();
+  await page.waitForTimeout(500);
+  await page.evaluate(() => localStorage.setItem("hiq_history", JSON.stringify({ days: "nonsense" })));
+  await page.reload();
+  await page.waitForTimeout(500);
+  const survived = await page.evaluate(() => ({
+    text: document.getElementById("historyBlock").textContent,
+    built: !!HIQ.debug.getScenario(),
+  }));
+  check(survived.built && /Week by week/.test(survived.text),
+    "a damaged history is ignored rather than breaking the game");
+  await page.evaluate(() => localStorage.removeItem("hiq_history"));
+
   /* ------------------------------------------------------------ season plan
 
      The plan is the game's answer to "what should a kid work on first?", and
@@ -1458,6 +1573,8 @@ const section = (t) => console.log(`\n${t}`);
   // ---------------------------------------------------------------- results
   section("Runtime health");
   check(errors.length === 0, "no console errors or exceptions", errors.slice(0, 3).join(" | ") || "clean");
+  check(offDevice.length === 0, "nothing the game does ever leaves the device",
+    offDevice.slice(0, 3).join(" | ") || "every request was a local file");
   check(dataWarnings.length === 0, "no scenario data self-check warnings",
     [...new Set(dataWarnings)].slice(0, 3).join(" | ") || "clean");
 
