@@ -1714,6 +1714,99 @@ const section = (t) => console.log(`\n${t}`);
     const n = document.getElementById("pName"); n.value = ""; n.dispatchEvent(new Event("change", { bubbles: true }));
   });
 
+  // ------------------------------------------------------------ never stuck
+  /* A bug mid-play must cost a child one play, not the game. Each of these
+     arms a fault at a real point in the engine — drawing a frame, the play
+     animation, grading, building the next play, a tap handler — and checks
+     the game comes back on its own with a question to answer. */
+  section("Never stuck");
+  const questionOpen = () => page.evaluate(() =>
+    HIQ.debug.getChoices().length === 3 && !HIQ.debug.simRunning() && !!HIQ.debug.getScenario());
+  const healthNow = () => page.evaluate(() => HIQ.debug.health());
+  await page.evaluate(() => {
+    const l = document.getElementById("liveReads"); l.value = "off"; l.dispatchEvent(new Event("change", { bubbles: true }));
+    HIQ.debug.buildExact("dzone_behind_net", "C", false);
+  });
+  await page.waitForTimeout(200);
+
+  // Drawing a frame throws.
+  const h0 = await healthNow();
+  await page.evaluate(() => HIQ.debug.failNext("draw"));
+  await page.waitForTimeout(400);
+  const h1 = await healthNow();
+  check(h1.lastError && h1.lastError.where === "draw" && h1.frames > h0.frames + 5 && await questionOpen(),
+    "a frame that fails to draw: the rink keeps animating and a new play is up",
+    `${h1.frames - h0.frames} frames since; ${h1.lastError && h1.lastError.message}`);
+  check(/snag/.test(await page.locator("#status").innerText()), "…and the coach says the play hit a snag, not nothing");
+
+  // Grading the answer throws.
+  await page.evaluate(() => HIQ.debug.failNext("answer"));
+  const nsBest = await page.evaluate(() => HIQ.debug.getChoices().find(o => o.tier === "best").pos);
+  await tapCanvas(nsBest.x, nsBest.y);
+  await page.waitForTimeout(800);
+  const h2 = await healthNow();
+  check(h2.lastError.where === "answer" && await questionOpen(), "an answer that fails to grade: a fresh question, not a dead screen",
+    h2.lastError.message);
+
+  // A play-animation callback throws. Before, the engine stayed "running"
+  // forever and every tap was ignored.
+  await page.evaluate(() => HIQ.Sim.run([{ d: 60, movers: [] }, { d: 60, movers: [] }],
+    { onStep: (st) => { if (st.d === 60 && HIQ.Sim.isRunning()) throw new Error("injected fault: sim"); } }));
+  await page.waitForTimeout(500);
+  const h3 = await healthNow();
+  check(h3.lastError.where === "sim" && await questionOpen(), "an animation that throws mid-play doesn't leave the game stuck 'running'",
+    `running: ${await page.evaluate(() => HIQ.debug.simRunning())}`);
+
+  // A tap handler throws while a question is open: nothing to recover — the
+  // same question stays, and the next tap answers it.
+  const tapScenario = await page.evaluate(() => HIQ.debug.getScenario());
+  await page.evaluate(() => HIQ.debug.failNext("tap"));
+  const tapBest = await page.evaluate(() => HIQ.debug.getChoices().find(o => o.tier === "best").pos);
+  await tapCanvas(tapBest.x, tapBest.y);
+  await page.waitForTimeout(150);
+  const sameQuestion = await page.evaluate((s) => {
+    const n = HIQ.debug.getScenario();
+    return n.id === s.id && n.role === s.role && n.mirrored === s.mirrored && HIQ.debug.getChoices().length === 3;
+  }, { id: tapScenario.id, role: tapScenario.role, mirrored: tapScenario.mirrored });
+  check(sameQuestion && (await healthNow()).lastError.where === "event", "a tap that throws leaves the question as it was");
+  await tapCanvas(tapBest.x, tapBest.y);
+  await settle();
+  check((await page.locator("#status").innerText()).includes("BEST READ"), "…and the next tap answers it");
+
+  // Building the next play throws: it tries again.
+  await page.evaluate(() => HIQ.debug.failNext("build", 2));
+  await page.click("#newBtn");
+  await page.waitForTimeout(200);
+  check(await questionOpen() && (await healthNow()).lastError.where === "build", "a play that fails to build is skipped for one that works");
+
+  // Nothing builds at all: say so, and New Play works once it can.
+  await page.evaluate(() => HIQ.debug.failNext("build", 3));
+  await page.click("#newBtn");
+  await page.waitForTimeout(200);
+  check(/Tap New Play/.test(await page.locator("#status").innerText()), "if no play will build, the coach says to tap New Play");
+  await page.click("#newBtn");
+  await page.waitForTimeout(200);
+  check(await questionOpen(), "…and New Play then brings one up");
+
+  // A fault on every frame: it stops retrying instead of looping, and the
+  // page stays usable.
+  const stormBefore = (await healthNow()).recovered;
+  await page.evaluate(() => { HIQ.debug.resetRecoveryWindow(); HIQ.debug.failNext("draw", 1e9); });
+  await page.waitForTimeout(1500);
+  const storm = await healthNow();
+  check(storm.gaveUp && storm.recovered - stormBefore === 3, "a fault on every frame: three recoveries, then it stops and says so instead of looping",
+    `${storm.recovered - stormBefore} recoveries`);
+  await page.evaluate(() => HIQ.debug.clearFaults());
+  const fStorm = (await healthNow()).frames;
+  await page.click("#newBtn");
+  await page.waitForTimeout(400);
+  const restarted = await healthNow();
+  check(!restarted.gaveUp && await questionOpen() && restarted.frames > fStorm + 5, "…and once it clears, New Play gets the game going again");
+
+  const errReport = await page.evaluate(() => HIQ.debug.feedbackReport());
+  check(/Last error: draw — injected fault: draw/.test(errReport), "the tester report carries the last error",
+    errReport.split("\n").find(l => l.startsWith("Last error")));
+
   // ---------------------------------------------------------------- phones
   /* Most kids will play this on a phone, often a parent's, often held
      sideways at the rink. Measured before this section existed, the A/B/C
@@ -1898,7 +1991,9 @@ const section = (t) => console.log(`\n${t}`);
 
   // ---------------------------------------------------------------- results
   section("Runtime health");
-  check(errors.length === 0, "no console errors or exceptions", errors.slice(0, 3).join(" | ") || "clean");
+  // Faults the recovery tests armed on purpose are expected; nothing else is.
+  const realErrors = errors.filter(e => !e.includes("injected fault"));
+  check(realErrors.length === 0, "no console errors or exceptions", realErrors.slice(0, 3).join(" | ") || "clean");
   check(offDevice.length === 0, "nothing the game does ever leaves the device",
     offDevice.slice(0, 3).join(" | ") || "every request was a local file");
   check(dataWarnings.length === 0, "no scenario data self-check warnings",

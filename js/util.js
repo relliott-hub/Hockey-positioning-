@@ -15,7 +15,7 @@ window.HIQ = window.HIQ || {};
    "something look wrong?" report, so a tester's note can be matched to the
    code they were actually running. Bump it with every change that ships;
    the test suite holds it equal to package.json's version. */
-HIQ.VERSION = "1.1.0";
+HIQ.VERSION = "1.2.0";
 
 HIQ.util = {
   pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },

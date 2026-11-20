@@ -673,7 +673,7 @@ window.HIQ = window.HIQ || {};
    "something look wrong?" report, so a tester's note can be matched to the
    code they were actually running. Bump it with every change that ships;
    the test suite holds it equal to package.json's version. */
-HIQ.VERSION = "1.1.0";
+HIQ.VERSION = "1.2.0";
 
 HIQ.util = {
   pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
@@ -3845,7 +3845,21 @@ HIQ.Sim = (() => {
     cancelled = false;
     let i = 0, t0 = null, starts = null, banner = null;
 
+    /* A callback that throws must not leave the engine "running". Every
+       input checks isRunning(), so one exception here used to freeze the game
+       for good: no taps, no New Play effect, nothing. The error is handed on
+       instead, and the caller decides how to recover. */
     function frame(now) {
+      try { step(now); } catch (e) {
+        running = false;
+        cancelAnimationFrame(raf);
+        if (opts.onError) opts.onError(e);
+        else if (HIQ.onError) HIQ.onError(e, "sim");
+        else throw e;
+      }
+    }
+
+    function step(now) {
       if (cancelled) { running = false; return; }
       if (i >= steps.length) {
         running = false;
@@ -4534,10 +4548,12 @@ HIQ.Sim = (() => {
   /* `force` builds one exact scenario — { id, mirror } — for review and
      tests. Gameplay never passes it. */
   function buildScenario(force = null) {
+    faultPoint("build");
     if (HIQ.Sim.isRunning()) HIQ.Sim.cancel();
     liveRead.running = false;
     liveRead.frozen = null;
     clearTimeout(pendingTimer);
+    pendingTimer = null;
     setBanner(null);
     renderState.showGuidance = false;
     puckTrail.length = 0;
@@ -5340,6 +5356,92 @@ HIQ.Sim = (() => {
     return roll < 0.72 ? "miss" : "bad";
   }
 
+  /* --- Never stuck ---------------------------------------------------
+
+     A child who hits a bug mid-play should get a new play, not a frozen
+     rink. Anything that throws while the game is running — drawing a frame,
+     the play animation, grading an answer, building the next play — lands
+     here: the half-finished play is dropped and a fresh one is built.
+
+     Three recoveries inside ten seconds means something is wrong with more
+     than one play; it stops trying, says so, and waits for New Play rather
+     than looping. The last error is kept for the "Something look wrong?"
+     report, so a tester's note carries it. */
+  const health = { lastError: null, recovered: 0, recentRecoveries: [], gaveUp: false, faults: {}, frames: 0 };
+  HIQ.onError = (e, where) => recover(e, where || "sim");
+
+  function faultPoint(kind) {
+    const n = health.faults[kind];
+    if (n > 0) {
+      health.faults[kind] = n - 1;
+      throw new Error(`injected fault: ${kind}`);
+    }
+  }
+  function noteError(e, where) {
+    const message = String((e && e.message) || e || "unknown error");
+    const repeat = health.lastError && health.lastError.message === message && Date.now() - health.lastError.at < 1000;
+    health.lastError = { where, message, at: Date.now() };
+    if (!repeat) console.warn(`[HIQ recovered] ${where}: ${message}`);
+  }
+  // Timers that move the game on. A throw inside one is caught here, and
+  // pendingTimer is cleared when it fires so "something is coming" is true.
+  function later(fn, ms) {
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => {
+      pendingTimer = null;
+      try { fn(); } catch (e) { recover(e, "timer"); }
+    }, ms);
+  }
+  function dropPlayInProgress() {
+    try { HIQ.Sim.cancel(); } catch (e) { /* already stopped */ }
+    clearTimeout(pendingTimer);
+    pendingTimer = null;
+    liveRead.running = false;
+    choice.active = false;
+    setBanner(null);
+  }
+  function stuckMessage() {
+    statusEl.innerHTML = "<b>Something went wrong with that play.</b> Tap <b>New Play</b> to keep going.";
+  }
+  // A new play, retried a couple of times in case one play is the problem.
+  function freshPlay() {
+    for (let i = 0; i < 3; i++) {
+      try { buildScenario(); return true; } catch (e) { noteError(e, "build"); dropPlayInProgress(); }
+    }
+    stuckMessage();
+    return false;
+  }
+  function recover(e, where) {
+    noteError(e, where);
+    const now = Date.now();
+    health.recentRecoveries = health.recentRecoveries.filter(t => now - t < 10000);
+    dropPlayInProgress();
+    if (health.recentRecoveries.length >= 3) {
+      health.gaveUp = true;
+      stuckMessage();
+      return;
+    }
+    health.recentRecoveries.push(now);
+    health.recovered++;
+    if (freshPlay()) {
+      statusEl.innerHTML = "<b>Oops \u2014 that play hit a snag,</b> so here's a fresh one.";
+    }
+  }
+  /* Anything thrown outside those paths — an input handler, say. If a
+     question is open, or something is already on its way (an animation, the
+     next play), the game is still moving and is left alone. Only an idle game
+     with nothing to answer and nothing coming is stuck. */
+  function onUncaught(e) {
+    if (HIQ.Sim.isRunning() || pendingTimer !== null || choice.active || liveRead.running ||
+        (scenario && !isChoiceMode())) {
+      noteError(e, "event");
+      return;
+    }
+    recover(e, "event");
+  }
+  window.addEventListener("error", (ev) => onUncaught(ev.error || ev.message));
+  window.addEventListener("unhandledrejection", (ev) => onUncaught(ev.reason));
+
   /* --- "Something look wrong?" -----------------------------------------
 
      Testers — a coach, a parent, a kid — will see things that look off, and
@@ -5381,6 +5483,10 @@ HIQ.Sim = (() => {
       `${answerSel.value === "drag" ? "free drag" : "tap A/B/C"}, moving reads ${liveReadsOn() ? "on" : "off"}, ${unit}`);
     const touch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     lines.push(`Screen: ${window.innerWidth}×${window.innerHeight}, ${window.devicePixelRatio || 1}x${touch ? ", touch" : ""}`);
+    if (health.lastError) {
+      const e = health.lastError, ago = Math.round((Date.now() - e.at) / 1000);
+      lines.push(`Last error: ${e.where} — ${e.message} (${ago}s ago${health.recovered ? `, recovered ${health.recovered}x` : ""})`);
+    }
     lines.push("");
     lines.push("What looked wrong:");
     return lines.join("\n");
@@ -5414,8 +5520,13 @@ HIQ.Sim = (() => {
   document.getElementById("versionStamp").textContent = `v${HIQ.VERSION}`;
 
   function lockIn(chosen = null) {
+    try { lockInUnguarded(chosen); } catch (e) { recover(e, "answer"); }
+  }
+  function lockInUnguarded(chosen) {
     if (!scenario || HIQ.Sim.isRunning()) return;
+    faultPoint("answer");
     clearTimeout(pendingTimer);
+    pendingTimer = null;
     renderState.showGuidance = false;
 
     const mode = scenario.mode;
@@ -5543,13 +5654,13 @@ HIQ.Sim = (() => {
             ? "You got to the right spot and it ended in a goal!"
             : "You got to the right spot and kept the play alive — the chance was there.";
           statusEl.innerHTML = `<b>BEST READ \u2705</b> ${outcome}${prLine}`;
-          pendingTimer = setTimeout(() => nextPlay(true), 1700);
+          later(() => nextPlay(true), 1700);
 
         } else if (grade === "acceptable") {
           // The whole point: this works, and the coach still shows you better.
           statusEl.innerHTML = `<b>THAT WORKS \uD83D\uDC4D</b> ${why}` +
             (better ? `<br/><span class="muted">Even better: ${better.why}</span>` : "") + prLine;
-          pendingTimer = setTimeout(() => nextPlay(true), 2600);
+          later(() => nextPlay(true), 2600);
 
         } else {
           const alwaysReveal = (ageSel.value === "6-8" || diffSel.value === "easy");
@@ -5561,7 +5672,7 @@ HIQ.Sim = (() => {
               (better ? `<br/><span class="muted">Where you wanted to be: ${better.why}</span>` : "") + prLine
             : `<b>NOT THIS TIME \u274C</b> ${why}<br/><span class="muted">Have another look \u2014 where should you be?</span>${prLine}`;
 
-          pendingTimer = setTimeout(() => {
+          later(() => {
             restoreSnapshot();
             setBanner(null);
             if (isChoiceMode() && choice.options.length) choice.active = true;
@@ -6960,12 +7071,24 @@ HIQ.Sim = (() => {
     const raw = lastTick ? t - lastTick : 16.7;
     const dt = Math.min(0.05, raw / 1000);
     lastTick = t;
-    updateHeadings(dt);
-    updateGoalies(dt);
-    updatePuckTrail();
-    updateParticles(dt);
-    updateCamera();
-    draw(t);
+    // An exception here used to end the frame loop: the rink froze on
+    // whatever it last drew and never moved again. Catch it, and always ask
+    // for the next frame.
+    try {
+      faultPoint("draw");
+      updateHeadings(dt);
+      updateGoalies(dt);
+      updatePuckTrail();
+      updateParticles(dt);
+      updateCamera();
+      draw(t);
+    } catch (e) {
+      // A throw mid-draw leaves saved canvas states behind; start clean.
+      if (ctx.reset) ctx.reset(); else canvas.width = canvas.width;
+      if (!health.gaveUp) recover(e, "draw");
+      else noteError(e, "draw");
+    }
+    health.frames++;
 
     // A tab in the background gets no frames at all; that is not slowness.
     if (raw < 200) {
@@ -7016,6 +7139,7 @@ HIQ.Sim = (() => {
     // never taken as an answer: nothing has been asked yet.
     if (liveRead.running) { evt.preventDefault(); freezeLiveRead(); return; }
     if (!scenario || HIQ.Sim.isRunning()) return;
+    faultPoint("tap");
     const p = getPos(evt);
 
     if (choice.active) {
@@ -7075,8 +7199,8 @@ HIQ.Sim = (() => {
     else window.scrollBy(0, top);
   }
   function nextPlay(onlyIfWatching) {
-    buildScenario();
-    ensureRinkVisible(onlyIfWatching);
+    health.gaveUp = false;
+    if (freshPlay()) ensureRinkVisible(onlyIfWatching);
   }
 
   newBtn.addEventListener("click", () => nextPlay(false));
@@ -7136,6 +7260,13 @@ HIQ.Sim = (() => {
       markerDiameterCss: 2 * markerRadius() * cssPerWorldPx(),
     }),
     roleChipText: () => roleChipText(),
+    // Fault injection for the recovery tests: the next `times` passes through
+    // a fault point of this kind throw. Never armed in normal play.
+    failNext: (kind, times = 1) => { health.faults[kind] = times; },
+    clearFaults: () => { health.faults = {}; },
+    resetRecoveryWindow: () => { health.recentRecoveries = []; },
+    health: () => ({ lastError: health.lastError, recovered: health.recovered, gaveUp: health.gaveUp,
+                     frames: health.frames, pending: pendingTimer !== null }),
     feedbackReport: () => feedbackReport(),
     roleChip: () => lastRoleChip,
     lastPicked: () => lastPickedLabel,
@@ -7393,8 +7524,7 @@ HIQ.Sim = (() => {
 
   buildRinkLayer();
   measureCanvas();
-  buildScenario();
-  if (seenTutorial) ensureRinkVisible(false);
+  if (freshPlay() && seenTutorial) ensureRinkVisible(false);
   requestAnimationFrame(tick);
 })();
 
