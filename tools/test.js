@@ -689,6 +689,115 @@ const section = (t) => console.log(`\n${t}`);
 
   // ------------------------------------------------------------ readability
   // A play you can't read teaches nothing, so these are correctness checks too.
+  /* ------------------------------------------------- practice what you miss
+
+     Selection leans toward situations whose best read teaches one of the
+     player's two weakest principles. The thing that must never happen is a
+     scenario being starved out of the rotation, so that is checked
+     exhaustively rather than by sampling: every possible focus, every pool a
+     player can draw from, every position. */
+  section("Practice what you miss");
+  const savedPrinciples = await page.evaluate(() => JSON.stringify(HIQ.debug.getStats().byPrinciple || {}));
+
+  const starve = await page.evaluate(() => {
+    const keys = Object.keys(HIQ.PRINCIPLES);
+    const focuses = [[]];
+    keys.forEach((a, i) => { focuses.push([a]); keys.slice(i + 1).forEach(b => focuses.push([a, b])); });
+    const pools = [];
+    for (const fmt of ["5v5", "5v4", "4v5"]) pools.push(HIQ.PLAYS.filter(p => (p.fmt || "5v5") === fmt).map(p => p.id));
+    for (const u of HIQ.CURRICULUM) pools.push(u.plays.slice());
+    let checked = 0, starved = 0, overBias = 0, worstShare = Infinity;
+    for (const focus of focuses) {
+      for (const ids of pools) {
+        for (const role of ["C", "LW", "RW", "LD", "RD"]) {
+          const rows = HIQ.debug.weightsFor(role, focus, ids);
+          if (!rows.length) continue;
+          const total = rows.reduce((a, r) => a + r.w, 0);
+          for (const r of rows) {
+            checked++;
+            if (!(r.w > 0)) starved++;
+            if (r.w > 2 || r.w < 1) overBias++;
+            // Its chance relative to a uniform draw.
+            worstShare = Math.min(worstShare, (r.w / total) * rows.length);
+          }
+        }
+      }
+    }
+    return { checked, starved, overBias, worstShare: +worstShare.toFixed(3), focuses: focuses.length, pools: pools.length };
+  });
+  check(starve.starved === 0 && starve.worstShare >= 0.5,
+    "weighting can never starve a scenario: each keeps at least half its uniform chance",
+    `${starve.checked} scenario chances across ${starve.focuses} possible focuses and ${starve.pools} pools, ` +
+    `worst ${starve.worstShare}x uniform`);
+  check(starve.overBias === 0, "the lean toward what's missed is capped at 2x");
+
+  // Below the threshold, selection stays uniform and nothing claims a focus.
+  const early = await page.evaluate(() => {
+    const st = HIQ.debug.getStats();
+    st.byPrinciple = { above: { good: 0, missed: 4 }, middle: { good: 4, missed: 0 } };
+    HIQ.debug.newPlay();
+    const w = HIQ.debug.weightsFor("C", HIQ.debug.practiceFocus());
+    const el = document.getElementById("practiceFocus");
+    return { focus: HIQ.debug.practiceFocus(), uniform: w.every(r => r.w === 1), shown: el.style.display !== "none" };
+  });
+  check(early.focus.length === 0 && early.uniform && !early.shown,
+    "with only a few answers, selection stays uniform and no focus is shown");
+
+  // With a real signal: the same two the coach report names, and a visible line.
+  await page.selectOption("#role", "C");
+  await page.selectOption("#format", "5v5");
+  await page.waitForTimeout(120);
+  const lean = await page.evaluate(() => {
+    const st = HIQ.debug.getStats();
+    /* Chosen so 14 of the centre's 38 scenarios carry the focus — enough on
+       both sides of the split for the measured ratio to be steady. */
+    st.byPrinciple = {
+      support: { good: 1, missed: 7 }, yourjob: { good: 2, missed: 6 },
+      middle: { good: 8, missed: 0 }, above: { good: 7, missed: 1 },
+    };
+    const focus = HIQ.debug.practiceFocus();
+    HIQ.debug.renderReport();
+    const report = document.getElementById("reportSummary").innerHTML;
+    const workBlock = (report.split("Work on this")[1] || "").split("Going well")[0];
+    const named = focus.every(k => workBlock.includes(HIQ.PRINCIPLES[k].name));
+
+    // The pool free play actually draws from at 5v5.
+    const pool = HIQ.PLAYS.filter(p => (p.fmt || "5v5") === "5v5").map(p => p.id);
+    const rows = HIQ.debug.weightsFor("C", focus, pool);
+    const counts = {};
+    for (const r of rows) counts[`${r.id}|${r.mirror}`] = 0;
+    for (let i = 0; i < 900; i++) {
+      HIQ.debug.newPlay();
+      const sc = HIQ.debug.getScenario();
+      const k = `${sc.id}|${sc.mirrored}`;
+      if (k in counts) counts[k]++;
+    }
+    const heavy = rows.filter(r => r.w === 2), light = rows.filter(r => r.w === 1);
+    const mean = (list) => list.reduce((a, r) => a + counts[`${r.id}|${r.mirror}`], 0) / Math.max(1, list.length);
+    const el = document.getElementById("practiceFocus");
+    return {
+      focus, named, line: el.style.display !== "none" ? el.textContent : "",
+      neverServed: Object.entries(counts).filter(([, n]) => n === 0).map(([k]) => k),
+      ratio: light.length && heavy.length ? +(mean(heavy) / mean(light)).toFixed(2) : null,
+      heavy: heavy.length, light: light.length, combos: rows.length,
+    };
+  });
+  check(lean.focus.join() === "support,yourjob" && lean.named,
+    "the focus is the same two principles the coach report says to work on", lean.focus.join(", "));
+  check(/Working on: Support the puck/.test(lean.line) && /Do your own job/.test(lean.line),
+    "a 'Working on' line names them", lean.line);
+  check(lean.neverServed.length === 0,
+    "in 900 real draws with a focus set, every eligible scenario still comes up",
+    lean.neverServed.join(", ") || `${lean.combos} scenarios all served`);
+  check(lean.ratio !== null && lean.ratio > 1.3 && lean.ratio < 2.8,
+    "focus scenarios really do come up more often — about twice as often, not more",
+    `${lean.ratio}x (${lean.heavy} focus, ${lean.light} other)`);
+
+  await page.evaluate((saved) => {
+    HIQ.debug.getStats().byPrinciple = JSON.parse(saved);
+    HIQ.debug.newPlay();
+  }, savedPrinciples);
+
   section("Readability");
   const vis = await page.evaluate(() => {
     let faceoffs = 0, races = 0, falseCarrier = 0, overlaps = 0, markerClash = 0, plays = 0, minGap = Infinity, minMarker = Infinity;

@@ -68,6 +68,7 @@
   const phaseFilterWrap = document.getElementById("phaseFilterWrap");
   const formatWrap = document.getElementById("formatWrap");
   const liveReadSel = document.getElementById("liveReads");
+  const practiceFocusEl = document.getElementById("practiceFocus");
 
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
@@ -468,6 +469,78 @@
     return ["\uD83C\uDFD2 " + reads.best.why];
   }
 
+  /* Every (play, mirrored?) combination this position can be coached in. */
+  function eligibleCombos(candidates, role, force = null) {
+    const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
+    const combos = [];
+    for (const cand of candidates) {
+      for (const mirror of [false, true]) {
+        const sourceRole = mirror ? (SWAP[role] || role) : role;
+        if (!cand.reads[sourceRole]) continue;   // this play doesn't coach it
+        if (cand.carrier === sourceRole) continue; // you'd be carrying the puck
+        if (force && typeof force.mirror === "boolean" && mirror !== force.mirror) continue;
+        combos.push({ cand, mirror, src: sourceRole });
+      }
+    }
+    return combos;
+  }
+
+  /* --- Practice what you miss -----------------------------------------
+
+     Every read carries the principle it teaches, and the game already keeps
+     a good/missed count per principle. Selection used to ignore it. It now
+     leans gently toward situations whose best read teaches one of the
+     player's two weakest principles — the same two the coach report puts
+     under "Work on this", from the same function, so the two can't disagree.
+
+     Three limits keep it from turning into a rut:
+       - nothing changes until there are enough answers to mean something;
+       - a focus play is at most twice as likely as any other — the weights
+         are 1 or 2, never more and never 0;
+       - so nothing is ever excluded: every eligible situation stays in the
+         draw at no less than half its uniform chance. */
+  const PRACTICE_MIN_ANSWERS = 12;
+  const PRACTICE_BIAS = 2;
+
+  // Principles with at least two answers, weakest first.
+  function principleRows() {
+    const by = stats.byPrinciple || {};
+    return Object.entries(by)
+      .map(([key, v]) => ({ key, ...v, total: v.good + v.missed }))
+      .filter(r => r.total >= 2)
+      .sort((a, b) => (a.good / a.total) - (b.good / b.total));
+  }
+  // The two the coach report calls "Work on this".
+  function weakestTwo(rows) {
+    return rows.filter(r => r.good / r.total < 0.7).slice(0, 2);
+  }
+  function practiceFocus() {
+    const answered = Object.values(stats.byPrinciple || {}).reduce((a, v) => a + v.good + v.missed, 0);
+    if (answered < PRACTICE_MIN_ANSWERS) return [];
+    return weakestTwo(principleRows()).map(r => r.key).filter(k => HIQ.PRINCIPLES[k]);
+  }
+  function practiceWeights(combos, focus) {
+    return combos.map(c => {
+      const best = c.cand.reads[c.src] && c.cand.reads[c.src].best;
+      return best && focus.includes(best.principle) ? PRACTICE_BIAS : 1;
+    });
+  }
+  function weightedPick(items, weights) {
+    let r = Math.random() * weights.reduce((a, w) => a + w, 0);
+    for (let i = 0; i < items.length; i++) {
+      r -= weights[i];
+      if (r < 0) return items[i];
+    }
+    return items[items.length - 1];
+  }
+  function renderPracticeFocus(focus) {
+    if (!practiceFocusEl) return;
+    if (!focus.length) { practiceFocusEl.style.display = "none"; practiceFocusEl.textContent = ""; return; }
+    practiceFocusEl.style.display = "";
+    practiceFocusEl.textContent = "\uD83C\uDFAF Working on: " +
+      focus.map(k => HIQ.PRINCIPLES[k].name).join(" \u00B7 ");
+  }
+
   /* --- Moving reads -------------------------------------------------
 
      A still picture asks a child to read a play that, in a game, is moving.
@@ -595,21 +668,14 @@
        so rejection sampling quietly favours one orientation and the play lands
        on the same side of the ice about twice as often. Enumerating first keeps
        both wings equally represented. */
-    const combos = [];
-    for (const cand of candidates) {
-      for (const mirror of [false, true]) {
-        const SWAP = { LW: "RW", RW: "LW", LD: "RD", RD: "LD", C: "C" };
-        const sourceRole = mirror ? (SWAP[role] || role) : role;
-        if (!cand.reads[sourceRole]) continue;   // this play doesn't coach it
-        if (cand.carrier === sourceRole) continue; // you'd be carrying the puck
-        if (force && typeof force.mirror === "boolean" && mirror !== force.mirror) continue;
-        combos.push({ cand, mirror });
-      }
-    }
+    const combos = eligibleCombos(candidates, role, force);
+    // Uniform until there's a real signal, then gently toward what's missed.
+    const focus = practiceFocus();
+    renderPracticeFocus(focus);
 
     let play;
     if (combos.length) {
-      const chosen = pick(combos);
+      const chosen = weightedPick(combos, practiceWeights(combos, focus));
       play = HIQ.varyPlay(chosen.cand, { mirror: chosen.mirror });
     } else {
       // Nothing coaches this position — fall back and reassign below.
@@ -1524,11 +1590,7 @@
   /* What a parent or coach actually wants to know: not "68% correct", but which
      ideas have landed and which keep costing them. */
   function principleSummary() {
-    const by = stats.byPrinciple || {};
-    const rows = Object.entries(by)
-      .map(([key, v]) => ({ key, ...v, total: v.good + v.missed }))
-      .filter(r => r.total >= 2)
-      .sort((a, b) => (a.good / a.total) - (b.good / b.total));
+    const rows = principleRows();
     if (!rows.length) return "";
 
     const line = (r, cls) => {
@@ -1539,7 +1601,7 @@
              `<span class="muted">${p.kid}</span></div>`;
     };
 
-    const weakest = rows.filter(r => r.good / r.total < 0.7).slice(0, 2);
+    const weakest = weakestTwo(rows);
     const strongest = rows.slice().reverse().filter(r => r.good / r.total >= 0.7).slice(0, 2);
 
     let html = `<div class="pr-block">`;
@@ -2831,6 +2893,15 @@
     newPlay: () => buildScenario(),
     simRunning: () => HIQ.Sim.isRunning(),
     liveReadRunning: () => liveRead.running,
+    // Selection weighting, exactly as buildScenario computes it.
+    practiceFocus: () => practiceFocus(),
+    renderReport: () => renderReport(),
+    weightsFor: (role, focus, ids) => {
+      const pool = HIQ.PLAYS.filter(p => !ids || ids.includes(p.id));
+      const combos = eligibleCombos(pool, role);
+      const w = practiceWeights(combos, focus);
+      return combos.map((c, i) => ({ id: c.cand.id, mirror: c.mirror, w: w[i] }));
+    },
     guidanceVisible: () => guidanceVisible(),
     skipLiveRead: () => freezeLiveRead(),
     // Every piece's position the instant the last moving read froze.
