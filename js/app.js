@@ -71,6 +71,10 @@
   const practiceFocusEl = document.getElementById("practiceFocus");
   const historyEl = document.getElementById("historyBlock");
 
+  const feedbackBtn = document.getElementById("feedbackBtn");
+  const feedbackPanel = document.getElementById("feedbackPanel");
+  const feedbackText = document.getElementById("feedbackText");
+  const feedbackMsg = document.getElementById("feedbackMsg");
   const newBtn = document.getElementById("newBtn");
   const lockBtn = document.getElementById("lockBtn");
   const muteBtn = document.getElementById("muteBtn");
@@ -1448,6 +1452,79 @@
     return roll < 0.72 ? "miss" : "bad";
   }
 
+  /* --- "Something look wrong?" -----------------------------------------
+
+     Testers — a coach, a parent, a kid — will see things that look off, and
+     "the breakout one looked weird" can't be acted on. This copies exactly
+     what was on screen: the play's id, which side of the ice, the position,
+     the options and where they were, the answer and its reason, the
+     settings and the build. The text is shown as well as copied, so whoever
+     sends it can see every word of it first.
+
+     Nothing is sent anywhere. It goes to the clipboard and the person
+     decides where to paste it. The player's name is left out on purpose. */
+  let lastAnswer = null;
+  const ft = (p) => `${Math.round(HIQ.VIEW.ftX(p.x))} ft, ${Math.round(HIQ.VIEW.ftY(p.y))} ft`;
+  function feedbackReport() {
+    const s = scenario;
+    const lines = [`Hockey IQ Trainer v${HIQ.VERSION} — something looked wrong`];
+    lines.push(`When: ${new Date().toLocaleString()}`);
+    if (!s) { lines.push("No play on screen."); return lines.join("\n"); }
+    lines.push(`Play: ${s.id} — "${s.name}" (${s.phase}, ${s.fmt})`);
+    lines.push(`Side: ${s.mirrored ? "mirrored (other wing)" : "as written"}`);
+    lines.push(`Position: ${s.role}${s.job ? " — " + s.job : ""}${s.mode === "multi" ? " (controlling the whole team)" : ""}`);
+    const answered = lastAnswer && lastAnswer.scenario === s;
+    if (choice.options.length) {
+      // Which spot is right is only listed once the question is answered —
+      // this text is on screen, and it shouldn't give the answer away.
+      lines.push("Options: " + choice.options.map(o =>
+        `${o.label} at ${ft(o.pos)}${answered ? " = " + o.tier : ""}`).join(" | "));
+    }
+    if (answered) {
+      const a = lastAnswer;
+      const what = a.label ? `picked ${a.label}` : a.at ? `placed at ${ft(a.at)}` : "placed the team";
+      lines.push(`Answer: ${what} → ${a.grade}, score ${a.score}${a.principle ? ", idea: " + a.principle : ""}`);
+      if (a.why) lines.push(`Coach said: ${a.why}`);
+    } else {
+      lines.push("Answer: not answered yet");
+    }
+    const unit = planOn() ? `season plan, unit ${unitIndex() + 1} (${currentUnit().id})` : "free play";
+    lines.push(`Settings: age ${ageSel.value}, ${diffSel.options[diffSel.selectedIndex].text}, ` +
+      `${answerSel.value === "drag" ? "free drag" : "tap A/B/C"}, moving reads ${liveReadsOn() ? "on" : "off"}, ${unit}`);
+    const touch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    lines.push(`Screen: ${window.innerWidth}×${window.innerHeight}, ${window.devicePixelRatio || 1}x${touch ? ", touch" : ""}`);
+    lines.push("");
+    lines.push("What looked wrong:");
+    return lines.join("\n");
+  }
+  async function copyFeedback() {
+    const text = feedbackReport();
+    feedbackText.value = text;
+    feedbackPanel.hidden = false;
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch (e) { /* fall through to the selection copy */ }
+    if (!copied) {
+      try {
+        feedbackText.focus();
+        feedbackText.select();
+        copied = document.execCommand("copy");
+      } catch (e) { copied = false; }
+    }
+    feedbackMsg.innerHTML = copied
+      ? "<b>Copied.</b> Paste it in a message to whoever shared the game, and add a line about what looked wrong. Nothing has been sent."
+      : "<b>Select the text below and copy it,</b> then paste it in a message to whoever shared the game. Nothing has been sent.";
+    feedbackPanel.scrollIntoView({ block: "nearest" });
+    return copied;
+  }
+  feedbackBtn.addEventListener("click", () => { copyFeedback(); });
+  document.getElementById("feedbackDone").addEventListener("click", () => { feedbackPanel.hidden = true; });
+  document.getElementById("versionStamp").textContent = `v${HIQ.VERSION}`;
+
   function lockIn(chosen = null) {
     if (!scenario || HIQ.Sim.isRunning()) return;
     clearTimeout(pendingTimer);
@@ -1483,6 +1560,12 @@
       receiver = nearestTo(controlled.filter(p => p.role !== "G"), anchor.x, anchor.y) || controlled[0];
       reportRole = "TEAM";
     }
+
+    lastAnswer = {
+      scenario, grade, score, why, principle,
+      label: chosen ? chosen.label : null,
+      at: mode === "single" ? { x: controlled[0].x, y: controlled[0].y } : null,
+    };
 
     const ok = grade !== "wrong";
     const failures = ok ? [] : [{ key: grade, msg: why, pts: 100 - score }];
@@ -3165,6 +3248,7 @@
       markerDiameterCss: 2 * markerRadius() * cssPerWorldPx(),
     }),
     roleChipText: () => roleChipText(),
+    feedbackReport: () => feedbackReport(),
     roleChip: () => lastRoleChip,
     lastPicked: () => lastPickedLabel,
     // Geometry the bug sweep pinned down, exposed so it stays pinned.

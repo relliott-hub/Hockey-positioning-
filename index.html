@@ -61,6 +61,18 @@
     </div>
   </div>
 
+  <!-- For testers. Copies the exact play to the clipboard so a report can say
+       which situation looked wrong; nothing is ever sent from here. -->
+  <div id="feedbackRow">
+    <button id="feedbackBtn" type="button">🐞 Something look wrong? Copy the details</button>
+    <span id="versionStamp"></span>
+  </div>
+  <div id="feedbackPanel" class="card" hidden>
+    <p id="feedbackMsg"></p>
+    <textarea id="feedbackText" readonly rows="9" aria-label="Details of this play"></textarea>
+    <div class="row"><button id="feedbackDone" type="button">Done</button></div>
+  </div>
+
   <!-- Closed by default. This used to open on load on anything wider than a
        phone, so the first thing a player met was ten dropdowns instead of the
        rink and a question. The defaults are the ones we want them to start on. -->

@@ -11,6 +11,12 @@
    comes back, so it was deleted and the parts still in use moved here. */
 window.HIQ = window.HIQ || {};
 
+/* Which build this is. Shown under the rink and put at the top of every
+   "something look wrong?" report, so a tester's note can be matched to the
+   code they were actually running. Bump it with every change that ships;
+   the test suite holds it equal to package.json's version. */
+HIQ.VERSION = "1.1.0";
+
 HIQ.util = {
   pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
   clamp(v, min, max) { return Math.max(min, Math.min(max, v)); },

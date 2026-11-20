@@ -1659,6 +1659,61 @@ const section = (t) => console.log(`\n${t}`);
   check(planPersist === 1, "plan progress survives a reload", `${planPersist} read remembered`);
   await page.evaluate(() => HIQ.debug.resetPlan());
 
+  // ------------------------------------------------------- tester feedback
+  /* A tester's "that one looked wrong" is only useful if it says which one.
+     The report must name the exact play, side and position, never give the
+     answer away before it's been answered, leave the player's name out, and
+     never be sent anywhere (the off-device check at the end covers that). */
+  section("Tester feedback");
+  const pkgVersion = require(path.join(ROOT, "package.json")).version;
+  const stamp = await page.evaluate(() => ({ shown: document.getElementById("versionStamp").textContent, v: HIQ.VERSION }));
+  check(stamp.v === pkgVersion && stamp.shown === `v${pkgVersion}`, "the build's version is shown, and matches package.json",
+    `shown ${stamp.shown}, package ${pkgVersion}`);
+
+  await page.evaluate(() => {
+    const n = document.getElementById("pName"); n.value = "Zelda"; n.dispatchEvent(new Event("input", { bubbles: true }));
+    n.dispatchEvent(new Event("change", { bubbles: true }));
+    const l = document.getElementById("liveReads"); l.value = "off"; l.dispatchEvent(new Event("change", { bubbles: true }));
+    HIQ.debug.buildExact("ozone_pinch", "LW", true);
+  });
+  const fbBefore = await page.evaluate(() => ({ text: HIQ.debug.feedbackReport(), sc: HIQ.debug.getScenario() }));
+  const namesPlay = fbBefore.text.includes(fbBefore.sc.id) && fbBefore.text.includes("Position: " + fbBefore.sc.role) &&
+    /Side: mirrored/.test(fbBefore.text) && fbBefore.text.includes(`v${pkgVersion}`);
+  check(namesPlay, "the report names the exact play, side of the ice, position and build",
+    fbBefore.text.split("\n").slice(2, 5).join(" / "));
+  check(/Answer: not answered yet/.test(fbBefore.text) && !/= (best|acceptable|wrong)/.test(fbBefore.text),
+    "before an answer, the report doesn't give the right spot away");
+  check(!fbBefore.text.includes("Zelda"), "the player's name is never in the report");
+
+  try { await ctx.grantPermissions(["clipboard-read", "clipboard-write"]); } catch (e) { /* file:// may not take it */ }
+  await page.evaluate(() => document.getElementById("feedbackBtn").scrollIntoView({ block: "center" }));
+  await page.click("#feedbackBtn");
+  await page.waitForTimeout(250);
+  const fbPanel = await page.evaluate(async () => {
+    let clip = null;
+    try { clip = await navigator.clipboard.readText(); } catch (e) { /* not readable here */ }
+    return { open: !document.getElementById("feedbackPanel").hidden, shown: document.getElementById("feedbackText").value,
+             msg: document.getElementById("feedbackMsg").textContent, clip };
+  });
+  check(fbPanel.open && fbPanel.shown.includes(fbBefore.sc.id), "tapping it shows exactly what will be shared",
+    fbPanel.shown.split("\n")[2]);
+  check(fbPanel.clip === null ? /Nothing has been sent/.test(fbPanel.msg) : fbPanel.clip === fbPanel.shown,
+    "…and copies it to the clipboard, saying plainly that nothing was sent",
+    fbPanel.clip === null ? "clipboard not readable in this browser; manual-copy fallback shown" : "clipboard holds the same text");
+  await page.click("#feedbackDone");
+  check(await page.evaluate(() => document.getElementById("feedbackPanel").hidden), "Done puts it away");
+
+  const fbBest = await page.evaluate(() => HIQ.debug.getChoices().find(o => o.tier === "best"));
+  await tapCanvas(fbBest.pos.x, fbBest.pos.y);
+  await settle();
+  const fbAfter = await page.evaluate(() => HIQ.debug.feedbackReport());
+  check(fbAfter.includes(`Answer: picked ${fbBest.label} → best`) && fbAfter.includes(`${fbBest.label} at `) && /= best/.test(fbAfter),
+    "after an answer, the report has what was picked, how it graded and every option's tier",
+    fbAfter.split("\n").find(l => l.startsWith("Answer")));
+  await page.evaluate(() => {
+    const n = document.getElementById("pName"); n.value = ""; n.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
   // ---------------------------------------------------------------- phones
   /* Most kids will play this on a phone, often a parent's, often held
      sideways at the rink. Measured before this section existed, the A/B/C

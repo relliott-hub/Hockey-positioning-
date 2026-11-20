@@ -184,6 +184,13 @@ th, td { border-bottom: 1px solid #eee; padding: 6px 4px; text-align: left; }
 }
 
 /* Coach box */
+#feedbackRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+#feedbackBtn { background: none; border: 0; box-shadow: none; padding: 6px 0; color: #5b6b7d; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+#versionStamp { color: #8193a6; font-size: 12px; }
+#feedbackPanel { margin-top: 8px; }
+#feedbackDone { background: #0f2a4a; color: #fff; }
+#feedbackPanel p { margin: 0 0 6px; font-size: 14px; }
+#feedbackText { width: 100%; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 8px; border-radius: 8px; border: 1px solid #cdd8e4; resize: vertical; }
 #coachBox { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; }
 #coachAvatar {
   position: relative;
