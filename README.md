@@ -61,6 +61,10 @@ holds special teams back until U13.
   the question, then freeze on exactly the picture the answers are graded
   against. Turn it off in settings; it starts off for anyone whose device asks
   for reduced motion
+- **Practises what you miss** — once there are enough answers to tell, the game
+  leans toward situations that teach the two ideas a player keeps missing (the
+  same two the coach report names), at most twice as often and never at the
+  expense of any situation dropping out
 - **Two answer styles** — tap A/B/C, or free-drag your player anywhere (advanced)
 - **Make it yours** — name, jersey number, and team colour on your player
 - **Progression** — XP, levels, streaks, and 12 trophies to unlock
@@ -91,7 +95,7 @@ over http(s).
 
 ```bash
 npm install        # installs playwright-core (test-only dependency)
-npm test           # 98 end-to-end checks against a real browser
+npm test           # 105 end-to-end checks against a real browser
 ```
 
 Run it against the single-file bundle too, since that is what gets shared:
